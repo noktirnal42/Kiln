@@ -12,6 +12,7 @@ public final class AppModel {
     public let manager: ModuleManager
     public let themeManager = ThemeManager()
     public let modelContainer: ModelContainer
+    public let modelRegistry: ModelRegistry
 
     public private(set) var records: [ModuleRecord] = []
     public private(set) var busEntries: [BusEntry] = []
@@ -49,6 +50,7 @@ public final class AppModel {
         self.eventBus = eventBus
         self.serviceRegistry = ServiceRegistry()
         self.keychain = KeychainService()
+        self.modelRegistry = ModelRegistry(eventBus: eventBus)
 
         let userConfigURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first?.appendingPathComponent("SuperMetaApp/settings.json")
@@ -82,6 +84,7 @@ public final class AppModel {
             guard let self else { return }
             await self.recordBusEntry(entry)
         }
+        await registerModelProviders()
         await manager.discoverManifests()
         _ = await manager.loadAll()
         await refreshRecords()
@@ -93,6 +96,28 @@ public final class AppModel {
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
             await activateModule(firstUI)
         }
+    }
+
+    private func registerModelProviders() async {
+        let keychain = self.keychain
+        let registry = modelRegistry
+        await registry.register(OpenCodeProvider(scope: .local))
+        await registry.register(OpenCodeProvider(
+            scope: .cloud,
+            secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "ollama-cloud")
+        ))
+        await registry.register(OpenRouterProvider(
+            secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "openrouter")
+        ))
+        await registry.register(NVIDIANIMProvider(
+            secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "nvidia-nim")
+        ))
+        await registry.register(CustomEndpointProvider(
+            baseURL: await settings.get("providers.custom.baseURL", as: String.self, fallback: ""),
+            secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "custom")
+        ))
+        await registry.register(AppleFoundationProvider())
+        await registry.register(MLXProvider())
     }
 
     public func shutdown() async {

@@ -12,6 +12,21 @@ incremental agent sessions.
 
 ## Status
 
+### Phase 1a — Model Provider Layer (complete)
+
+Implemented per `09-AGENT-PROMPTS.md` Prompt 1 / `08-ROADMAP.md` items 1.1–1.8:
+
+| Area | What exists |
+|------|-------------|
+| Provider protocol | `ModelProvider`: id / name / providerType / capabilities, `fetchModels()`, `streamChat(_:reasoning:)`, `countTokens(_:)`, `checkAvailability()` (`Core/Providers/`) |
+| Providers | OpenCode (Ollama `/api/tags` + `/api/chat` with OpenAI-compatible fallback for LM Studio/vLLM), Ollama Cloud (same class, cloud scope, Keychain bearer), OpenRouter, NVIDIA NIM (non-chat endpoint filtering, GLM-5.3 `reasoning_effort` special-casing), Custom Endpoint (OpenAI-compatible + custom headers), Apple Foundation Models (FoundationModels availability-gated: deviceNotEligible / appleIntelligenceNotEnabled / modelNotReady each reported specifically), MLX (honest: runtime not yet linked — reports the exact reason and the Phase 2 plan; model catalog still works from the shared HF cache) |
+| Streaming | Shared `OpenAICompatibleTransport`: SSE, **deltas only — never cumulative snapshots**, bounded 64 KiB error-body reads, status→error mapping (401/402/429/5xx), bounded retries (408/409/425/429/5xx with Retry-After); Apple provider prefix-diffs cumulative snapshots into deltas |
+| Reasoning | `ReasoningConfig` (enabled/budget/depth/temperature/topP/maxTokens/stop/systemPrompt) with per-provider mappings: `toOllamaOptions()`, `toNIMEffort()`, `toAppleEffort()`, OpenAI `reasoning` fields (`Core/Reasoning/`) |
+| Registry | `ModelRegistry` actor: register/unregister, 300 s model cache TTL, capability-based selection skipping unavailable/weaker providers, prefix-based model→provider resolution, emits `ModelSwitchedEvent` on the module event bus (`Core/Providers/ModelProvider.swift`) |
+| Secrets | API keys read lazily through `KeychainService.secretProvider` (module `com.supermeta.providers`), never stored in provider state, never logged, never persisted |
+| Universal store | `UniversalModelStore`: `HF_HUB_CACHE` → `HF_HOME/hub` → `~/.cache/huggingface/hub` walk (ports AxiomCore ModelStore query; shared with `hf`/`mlx_lm`) — closes roadmap item 0.10 |
+| Tests | Swift Testing: 81 tests / 14 suites, all green. All providers contract-tested through the registry against `URLProtocol` stubs (no real network); delta-only streaming asserted; per-provider unavailability reasons asserted |
+
 ### Phase 0 — Foundation & Core Shell (complete)
 
 Implemented per `09-AGENT-PROMPTS.md` Prompt 0 / `08-ROADMAP.md` Phase 0:
