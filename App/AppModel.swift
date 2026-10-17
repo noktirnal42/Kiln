@@ -1,0 +1,157 @@
+import Foundation
+import SwiftData
+import Observation
+
+@MainActor
+@Observable
+public final class AppModel {
+    public let eventBus: ModuleEventBus
+    public let serviceRegistry: ServiceRegistry
+    public let keychain: KeychainService
+    public let settings: SettingsService
+    public let manager: ModuleManager
+    public let themeManager = ThemeManager()
+    public let modelContainer: ModelContainer
+
+    public private(set) var records: [ModuleRecord] = []
+    public private(set) var busEntries: [BusEntry] = []
+    public private(set) var uiModules: [String: any ModuleUI] = [:]
+    public var activeModuleID: String?
+    public private(set) var bootstrapError: String?
+
+    private var catchAllToken: SubscriptionToken?
+
+    public static let appVersion = "0.1.0"
+
+    public init() {
+        let schema = Schema([
+            Workspace.self, ModuleState.self, Conversation.self, Message.self,
+            Artifact.self, SettingsEntry.self,
+        ])
+        let configuration: ModelConfiguration
+        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let storeDirectory = appSupport.appendingPathComponent("SuperMetaApp", isDirectory: true)
+            try? FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+            configuration = ModelConfiguration(schema: schema, url: storeDirectory.appendingPathComponent("SuperMetaApp.store"))
+        } else {
+            configuration = ModelConfiguration(schema: schema)
+        }
+        let container: ModelContainer
+        do {
+            container = try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            container = (try? ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]))!
+            bootstrapError = "Persistent store unavailable (\(error.localizedDescription)); running in-memory."
+        }
+        self.modelContainer = container
+
+        let eventBus = ModuleEventBus()
+        self.eventBus = eventBus
+        self.serviceRegistry = ServiceRegistry()
+        self.keychain = KeychainService()
+
+        let userConfigURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first?.appendingPathComponent("SuperMetaApp/settings.json")
+        self.settings = SettingsService(userConfigURL: userConfigURL)
+
+        var factories = ModuleFactoryRegistry()
+        factories.register(HelloModule.self)
+
+        var manifestDirs: [URL] = []
+        if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
+            manifestDirs.append(bundled)
+        }
+        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            manifestDirs.append(appSupport.appendingPathComponent("SuperMetaApp/Modules"))
+        }
+
+        self.manager = ModuleManager(
+            appVersion: Self.appVersion,
+            allowedCapabilities: ModuleCapabilities(rawValue: UInt64.max),
+            factories: factories,
+            manifestDirectories: manifestDirs,
+            eventBus: eventBus,
+            settings: settings,
+            keychain: keychain
+        )
+    }
+
+    public func bootstrap() async {
+        await themeManager.attach(settings: settings)
+        catchAllToken = await eventBus.subscribeAny { [weak self] entry in
+            guard let self else { return }
+            await self.recordBusEntry(entry)
+        }
+        await manager.discoverManifests()
+        _ = await manager.loadAll()
+        await refreshRecords()
+        for record in records where record.module is (any ModuleUI) {
+            try? await manager.activate(record.id)
+        }
+        await refreshRecords()
+        await syncUIModules()
+        if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
+            await activateModule(firstUI)
+        }
+    }
+
+    public func shutdown() async {
+        await manager.unloadAll()
+        await refreshRecords()
+    }
+
+    public func refreshRecords() async {
+        records = await manager.allRecords()
+    }
+
+    public func loadModule(_ identifier: String) async {
+        try? await manager.load(identifier)
+        await refreshRecords()
+        await syncUIModules()
+    }
+
+    public func unloadModule(_ identifier: String) async {
+        try? await manager.unload(identifier)
+        if activeModuleID == identifier {
+            activeModuleID = nil
+        }
+        await refreshRecords()
+        await syncUIModules()
+    }
+
+    public func activateModule(_ identifier: String) async {
+        if !(await manager.isLoaded(identifier)) {
+            try? await manager.load(identifier)
+        }
+        try? await manager.activate(identifier)
+        await refreshRecords()
+        await syncUIModules()
+        activeModuleID = identifier
+    }
+
+    public var activeModuleUI: (any ModuleUI)? {
+        guard let activeModuleID else { return nil }
+        return uiModules[activeModuleID]
+    }
+
+    public var activeRecord: ModuleRecord? {
+        guard let activeModuleID else { return nil }
+        return records.first { $0.id == activeModuleID }
+    }
+
+    private func syncUIModules() async {
+        var result: [String: any ModuleUI] = [:]
+        for record in records {
+            guard record.isLoaded, let module = record.module, let ui = module as? (any ModuleUI) else { continue }
+            result[record.id] = ui
+        }
+        uiModules = result
+    }
+
+    private func recordBusEntry(_ entry: BusEntry) async {
+        busEntries.append(entry)
+        if busEntries.count > 100 {
+            busEntries.removeFirst(busEntries.count - 100)
+        }
+    }
+}

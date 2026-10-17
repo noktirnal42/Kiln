@@ -1,0 +1,62 @@
+name: SuperMetaApp
+options:
+  bundleIdPrefix: com.supermeta
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+
+targets:
+  SuperMetaApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+      - path: Core
+      - path: Modules
+      - path: UI
+      - path: ModuleManifests
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.supermeta.app
+        CODE_SIGN_ENTITLEMENTS: Config/Entitlements.plist
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: SuperMetaApp
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        ENABLE_TESTABILITY: YES
+
+  SuperMetaAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.supermeta.app.tests
+    dependencies:
+      - target: SuperMetaApp
+
+schemes:
+  SuperMetaApp:
+    build:
+      targets:
+        SuperMetaApp: all
+        SuperMetaAppTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SuperMetaAppTests
