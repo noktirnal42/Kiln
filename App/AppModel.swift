@@ -17,6 +17,12 @@ public final class AppModel {
     public let mcpService = MCPClientService()
     public let gitService = GitService()
     public let fileIndexService = FileIndexService()
+    /// Gate B's shared center: every agent run routes approvals through
+    /// this one queue, and its grants are the persistable "always allow"
+    /// answers.
+    public let approvalCenter = ApprovalCenter.shared
+    /// The single-agent runtime, wired to the app's real services.
+    public private(set) var orchestrator: AgentOrchestrator?
 
     public private(set) var records: [ModuleRecord] = []
     public private(set) var busEntries: [BusEntry] = []
@@ -30,6 +36,7 @@ public final class AppModel {
     public static let appVersion = "0.1.0"
 
     public init() {
+        BuiltInTools.registerAll()
         let schema = Schema([
             Workspace.self, ModuleState.self, Conversation.self, Message.self,
             Artifact.self, ArtifactVersion.self, SettingsEntry.self,
@@ -81,6 +88,20 @@ public final class AppModel {
             eventBus: eventBus,
             settings: settings,
             keychain: keychain
+        )
+
+        // The agent runtime shares the app's git service and file index,
+        // and reads the web-search key from the Keychain. Tools fall back
+        // to their own implementations when a service is absent, so this
+        // only removes duplication — it never widens what tools may do.
+        let keychain = self.keychain
+        self.orchestrator = AgentOrchestrator(
+            approvalCenter: approvalCenter,
+            services: ToolServices(
+                git: gitService,
+                fileIndex: fileIndexService,
+                webSearchKey: { keychain.get(module: "com.supermeta.tools", key: "web-search-key") }
+            )
         )
     }
 

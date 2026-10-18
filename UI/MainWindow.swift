@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var app
+    @State private var showApprovals = false
 
     var body: some View {
         NavigationSplitView {
@@ -11,6 +12,47 @@ struct MainWindow: View {
             ModuleHostView()
         }
         .frame(minWidth: 960, minHeight: 600)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showApprovals = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.shield")
+                        let pending = app.approvalCenter.pending.count
+                        if pending > 0 {
+                            Text("\(pending)")
+                                .font(SSTypography.caption())
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(SSColor.accent, in: Capsule())
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+                .help(pendingHelp)
+            }
+        }
+        .sheet(isPresented: approvalsBinding) {
+            ApprovalQueueView(center: app.approvalCenter)
+        }
+    }
+
+    private var pendingHelp: String {
+        let pending = app.approvalCenter.pending.count
+        return pending > 0
+            ? "\(pending) tool call(s) waiting for approval"
+            : "Approval queue and standing grants"
+    }
+
+    /// Opens the sheet when the user asks for it AND whenever an approval
+    /// lands — a request awaiting a human is the one thing that should
+    /// interrupt, not wait to be discovered.
+    private var approvalsBinding: Binding<Bool> {
+        Binding(
+            get: { showApprovals || !app.approvalCenter.pending.isEmpty },
+            set: { showApprovals = $0 }
+        )
     }
 }
 
