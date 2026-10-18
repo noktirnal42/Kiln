@@ -17,6 +17,7 @@ public final class AppModel {
     public private(set) var records: [ModuleRecord] = []
     public private(set) var busEntries: [BusEntry] = []
     public private(set) var uiModules: [String: any ModuleUI] = [:]
+    public private(set) var chatSession: ChatSession?
     public var activeModuleID: String?
     public private(set) var bootstrapError: String?
 
@@ -27,7 +28,7 @@ public final class AppModel {
     public init() {
         let schema = Schema([
             Workspace.self, ModuleState.self, Conversation.self, Message.self,
-            Artifact.self, SettingsEntry.self,
+            Artifact.self, ArtifactVersion.self, SettingsEntry.self,
         ])
         let configuration: ModelConfiguration
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
@@ -58,6 +59,7 @@ public final class AppModel {
 
         var factories = ModuleFactoryRegistry()
         factories.register(HelloModule.self)
+        factories.register(ChatModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
@@ -118,6 +120,13 @@ public final class AppModel {
         ))
         await registry.register(AppleFoundationProvider())
         await registry.register(MLXProvider())
+
+        let conversations = ConversationStore(container: modelContainer)
+        let artifacts = ArtifactStore(container: modelContainer)
+        await serviceRegistry.register(modelRegistry, for: ModelRegistry.self)
+        await serviceRegistry.register(conversations, for: ConversationStore.self)
+        await serviceRegistry.register(artifacts, for: ArtifactStore.self)
+        chatSession = ChatSession(registry: modelRegistry, conversations: conversations, artifacts: artifacts)
     }
 
     public func shutdown() async {

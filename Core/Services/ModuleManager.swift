@@ -118,6 +118,7 @@ public actor ModuleManager {
     private let settings: SettingsService
     private let keychain: KeychainService
     private let workspace: WorkspaceSnapshot?
+    private let sharedServiceRegistry: ServiceRegistry
     private var recordsByID: [String: ModuleRecord] = [:]
     private var manifestDirectories: [URL]
 
@@ -129,7 +130,8 @@ public actor ModuleManager {
         eventBus: ModuleEventBus = .shared,
         settings: SettingsService,
         keychain: KeychainService,
-        workspace: WorkspaceSnapshot? = nil
+        workspace: WorkspaceSnapshot? = nil,
+        serviceRegistry: ServiceRegistry = ServiceRegistry()
     ) {
         self.appVersion = appVersion
         self.allowedCapabilities = allowedCapabilities
@@ -139,6 +141,7 @@ public actor ModuleManager {
         self.settings = settings
         self.keychain = keychain
         self.workspace = workspace
+        self.sharedServiceRegistry = serviceRegistry
     }
 
     public func addManifestDirectory(_ url: URL) {
@@ -259,7 +262,7 @@ public actor ModuleManager {
             grantedCapabilities: record.grantedCapabilities,
             workspace: workspace,
             eventBus: eventBus,
-            serviceRegistry: ServiceRegistry(),
+            serviceRegistry: sharedServiceRegistry,
             settings: settings,
             keychain: keychain
         )

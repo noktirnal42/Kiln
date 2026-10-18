@@ -12,6 +12,23 @@ incremental agent sessions.
 
 ## Status
 
+### Phase 1b — Chat UI + Artifacts (complete)
+
+Implemented per `09-AGENT-PROMPTS.md` Prompt 2 / `08-ROADMAP.md` items 1.9–1.12:
+
+| Area | What exists |
+|------|-------------|
+| Conversation persistence | `ConversationStore` actor over the shared SwiftData container (background `ModelContext`, actor-isolated): create/rename/delete, ordered messages (`order` field), `MessagePage` with truncation records, **fork-from-message** (copies the prefix into a new conversation), bulk `appendMessages` (one save for N messages) |
+| Chat streaming | `ChatSession` (@MainActor @Observable): drives `ModelRegistry.streamChat`, accumulates **deltas** into a live `streamingText` (bubbles never re-diff the whole list while streaming), `ToolCallAccumulator` joins indexed fragments, Stop persists the partial response, regenerate re-runs from the last user message, model-guard errors are specific ("No model selected") |
+| Chat UI | `ChatRootView` (NavigationSplitView-compatible): streaming `LazyVStack` with ScrollViewReader auto-scroll, copy/regenerate/fork/delete on every bubble (+ context menu), `ComposerView` with ⌘⏎ send, collapsible conversation list, error strip |
+| Message rendering | `MarkdownBlockView` over the bounded GFM-subset `MarkdownRenderer` (headings, paragraphs with inline markdown via AttributedString, fences, lists, blockquotes, tables, dividers); role indicators, reasoning disclosure, tool-call chips, token usage |
+| Model picker | Provider-grouped sections with per-provider availability warnings (hover = the specific unavailability reason), search, recents (persisted), expandable `ReasoningPanel` (enabled/budget/depth/temperature/topP/maxTokens/stop sequences) |
+| Artifacts | `ArtifactStore` actor (4 MiB content cap, version history capped at 50, content by version) + browser UI with per-kind renderers: code (bounded `CodeHighlighter` spans), markdown (same renderer as chat), HTML (`WKWebView` `loadHTMLString`, no network base), mermaid (**honest**: shows source with an explanation instead of a broken engine), data (CSV/JSON → table). Export via NSSavePanel |
+| Module | `com.supermeta.chat` loads from its manifest; resolves `ModelRegistry`/`ConversationStore`/`ArtifactStore` from the **shared** `ServiceRegistry` (ModuleManager now injects the app-level registry — services exist once per the layered architecture) |
+| Tests | Swift Testing: **104 tests / 18 suites green** — store round-trips, fork semantics, truncation, artifact versioning + caps, highlighter/markdown/CSV-JSON parser units, streaming end-to-end (deltas → persisted messages, tool-call fragment joining, deterministic mid-stream stop, fork via session, 10k-message synthetic conversation load) |
+
+Honest notes: @-mention file references in the composer are placeholder UI (FileIndexService arrives with Prompt 3); mermaid and react artifact kinds render source rather than pretending to run an engine; per-frame render timing is not yet instrumented (Phase 6 perf pass measures it; the 10k-message load test bounds the data layer).
+
 ### Phase 1a — Model Provider Layer (complete)
 
 Implemented per `09-AGENT-PROMPTS.md` Prompt 1 / `08-ROADMAP.md` items 1.1–1.8:

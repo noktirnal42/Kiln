@@ -48,15 +48,17 @@ public final class ModuleState {
 public final class Conversation {
     @Attribute(.unique) public var id: UUID
     public var title: String
+    public var modelID: String?
     public var createdAt: Date
     public var updatedAt: Date
     public var workspace: Workspace?
     @Relationship(deleteRule: .cascade, inverse: \Message.conversation)
     public var messages: [Message] = []
 
-    public init(id: UUID = UUID(), title: String) {
+    public init(id: UUID = UUID(), title: String, modelID: String? = nil) {
         self.id = id
         self.title = title
+        self.modelID = modelID
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -69,15 +71,29 @@ public final class Message {
     public var content: String
     public var reasoning: String?
     public var tokenCount: Int
+    public var order: Int
+    public var toolCallsJSON: Data?
+    public var modelID: String?
     public var createdAt: Date
     public var conversation: Conversation?
 
-    public init(role: String, content: String, reasoning: String? = nil, tokenCount: Int = 0) {
+    public init(
+        role: String,
+        content: String,
+        reasoning: String? = nil,
+        tokenCount: Int = 0,
+        order: Int = 0,
+        toolCallsJSON: Data? = nil,
+        modelID: String? = nil
+    ) {
         self.id = UUID()
         self.role = role
         self.content = content
         self.reasoning = reasoning
         self.tokenCount = tokenCount
+        self.order = order
+        self.toolCallsJSON = toolCallsJSON
+        self.modelID = modelID
         self.createdAt = Date()
     }
 }
@@ -88,19 +104,39 @@ public final class Artifact {
     public var title: String
     public var kind: String
     public var content: Data
+    public var language: String?
     public var version: Int
     public var createdAt: Date
     public var updatedAt: Date
     public var workspace: Workspace?
+    @Relationship(deleteRule: .cascade, inverse: \ArtifactVersion.artifact)
+    public var versions: [ArtifactVersion] = []
 
-    public init(title: String, kind: String, content: Data, version: Int = 1) {
+    public init(title: String, kind: String, content: Data, language: String? = nil, version: Int = 1) {
         self.id = UUID()
         self.title = title
         self.kind = kind
         self.content = content
+        self.language = language
         self.version = version
         self.createdAt = Date()
         self.updatedAt = Date()
+    }
+}
+
+@Model
+public final class ArtifactVersion {
+    @Attribute(.unique) public var id: UUID
+    public var version: Int
+    public var content: Data
+    public var createdAt: Date
+    public var artifact: Artifact?
+
+    public init(version: Int, content: Data) {
+        self.id = UUID()
+        self.version = version
+        self.content = content
+        self.createdAt = Date()
     }
 }
 
