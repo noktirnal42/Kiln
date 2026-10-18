@@ -29,6 +29,11 @@ public final class ChatSession {
     public let registry: ModelRegistry
     public let conversations: ConversationStore
     public let artifacts: ArtifactStore
+    public let ptyManager: PTYManager
+    public let mcpService: MCPClientService
+    public let gitService: GitService
+    public let fileIndexService: FileIndexService
+    public let workspaceRoot: String?
 
     public private(set) var conversationID: UUID?
     public private(set) var conversationTitle: String
@@ -51,11 +56,21 @@ public final class ChatSession {
         registry: ModelRegistry,
         conversations: ConversationStore,
         artifacts: ArtifactStore,
+        ptyManager: PTYManager = PTYManager(),
+        mcpService: MCPClientService = MCPClientService(),
+        gitService: GitService = GitService(),
+        fileIndexService: FileIndexService = FileIndexService(),
+        workspaceRoot: String? = nil,
         initialModelID: String = ""
     ) {
         self.registry = registry
         self.conversations = conversations
         self.artifacts = artifacts
+        self.ptyManager = ptyManager
+        self.mcpService = mcpService
+        self.gitService = gitService
+        self.fileIndexService = fileIndexService
+        self.workspaceRoot = workspaceRoot
         self.selectedModelID = initialModelID
         self.conversationTitle = "New Conversation"
         self.messages = []

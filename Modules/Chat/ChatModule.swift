@@ -34,7 +34,20 @@ public final class ChatModule: @preconcurrency Module, @preconcurrency ModuleDef
             context.logger.error("chat module init: missing ArtifactStore")
             return
         }
-        session = ChatSession(registry: registry, conversations: store, artifacts: artifacts)
+        let ptyManager = await context.serviceRegistry.resolve(PTYManager.self)
+        let mcpService = await context.serviceRegistry.resolve(MCPClientService.self)
+        let gitService = await context.serviceRegistry.resolve(GitService.self)
+        let fileIndexService = await context.serviceRegistry.resolve(FileIndexService.self)
+        session = ChatSession(
+            registry: registry,
+            conversations: store,
+            artifacts: artifacts,
+            ptyManager: ptyManager ?? PTYManager(),
+            mcpService: mcpService ?? MCPClientService(),
+            gitService: gitService ?? GitService(),
+            fileIndexService: fileIndexService ?? FileIndexService(),
+            workspaceRoot: context.workspace?.rootPath
+        )
         context.logger.info("chat module initialized")
     }
 

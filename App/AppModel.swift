@@ -13,6 +13,10 @@ public final class AppModel {
     public let themeManager = ThemeManager()
     public let modelContainer: ModelContainer
     public let modelRegistry: ModelRegistry
+    public let ptyManager = PTYManager()
+    public let mcpService = MCPClientService()
+    public let gitService = GitService()
+    public let fileIndexService = FileIndexService()
 
     public private(set) var records: [ModuleRecord] = []
     public private(set) var busEntries: [BusEntry] = []
@@ -126,6 +130,10 @@ public final class AppModel {
         await serviceRegistry.register(modelRegistry, for: ModelRegistry.self)
         await serviceRegistry.register(conversations, for: ConversationStore.self)
         await serviceRegistry.register(artifacts, for: ArtifactStore.self)
+        await serviceRegistry.register(ptyManager, for: PTYManager.self)
+        await serviceRegistry.register(mcpService, for: MCPClientService.self)
+        await serviceRegistry.register(gitService, for: GitService.self)
+        await serviceRegistry.register(fileIndexService, for: FileIndexService.self)
         chatSession = ChatSession(registry: modelRegistry, conversations: conversations, artifacts: artifacts)
     }
 

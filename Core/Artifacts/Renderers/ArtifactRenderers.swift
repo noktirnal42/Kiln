@@ -193,12 +193,12 @@ public enum DataTableParser {
 
     static func table(fromObjects array: [[String: Any]]) throws -> Table {
         guard array.count <= maxRows else { throw ParseError.tooManyRows(limit: maxRows) }
-        var columns: [String] = []
+        var columnSet: Set<String> = []
         for object in array.prefix(100) {
-            for key in object.keys where !columns.contains(key) {
-                columns.append(key)
-            }
+            columnSet.formUnion(object.keys)
         }
+        // JSONSerialization loses key order; sort for a stable column layout.
+        let columns = columnSet.sorted()
         guard columns.count <= maxColumns else { throw ParseError.unsupported("more than \(maxColumns) columns") }
         let rows = array.map { object in columns.map { stringify(object[$0]) } }
         return Table(columns: columns, rows: rows)

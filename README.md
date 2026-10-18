@@ -12,6 +12,21 @@ incremental agent sessions.
 
 ## Status
 
+### Phase 1c — Terminal + MCP + Git + File Index (complete)
+
+Implemented per `09-AGENT-PROMPTS.md` Prompt 3 / `08-ROADMAP.md` items 1.13–1.16:
+
+| Area | What exists |
+|------|-------------|
+| Terminal | Real PTY (`posix_openpt`/`grantpt`/`unlockpt` + Foundation `Process` — no manual fork), bounded 1 MiB output buffer, `ioctl(TIOCSWINSZ)` resize, per-callback explicit locks. `PTYManager` actor: shell detection (zsh/bash/fish with PATH scan), cwd constrained to an existing workspace root (specific error when invalid), **input-line command history persisted per workspace** (500-entry cap, JSON in Application Support). `TerminalDockView`: SwiftTerm tabbed terminal wired to the PTY (feed/send/resize), theme-synced to native colors, history sheet |
+| MCP client | JSON-RPC 2.0 over **stdio** (subprocess + pipes, id-correlated, bounded stderr capture), **HTTP** (POST + SSE response decode), **WebSocket** (URLSessionWebSocketTask). Discovery from `~/.config/mcp/servers.json`, `~/.cursor`, and project `.mcp.json` (both `{mcpServers:{}}` and bare shapes). **Every connect requires explicit user approval**, persisted bound to a command fingerprint (changing a server's command invalidates the grant; revocable). Tool/resource/prompt registries aggregated across servers; tool palette UI with call panel. Fixed a real protocol bug: JSONEncoder escapes `/` as `\/`, which breaks line-based servers — client payloads are normalized |
+| Git | `GitService` actor over the **git CLI** (spec named libgit2, but no production Swift binding exists and the reference implementation also shells out — documented deviation). Status (porcelain `-z` incl. renames), staged/unstaged diff (512 KiB cap), stage/unstage/commit, branches/checkout, log (500 cap), blame (porcelain). **Push deliberately not implemented.** Auto-resolves a sandbox-safe git binary (`/usr/bin/git` is an xcrun shim that refuses to run under App Sandbox). `GitPanelView`: status/diff/history tabs, stage buttons, commit box, open-repo picker |
+| File index | `FileIndexService` actor: SQLite **FTS5** index over a bounded walk (20k files, standard ignore dirs), **Spotlight** (NSMetadataQuery, 3 s budget) merged into one ranked unified search (same-path collation, source-count → score → path), **FSEvents** watcher with debounced reindex. `SearchPanelView` with source badges |
+| Wiring | All four services registered once in the shared `ServiceRegistry`; chat module toolbar gains Terminal / MCP / Git / Search buttons with sheets |
+| Tests | Swift Testing: **125 tests / 22 suites green** — PTY echo/resize/termination + history persistence + rejection reasons; MCP stdio handshake against a deterministic shell fixture server (approval gate, unknown tool, disconnected tool, discovery shapes, JSON-RPC round-trip); git lifecycle against real temp repos (init→status→stage→commit→log→branches→blame, nothing-to-commit, empty-message refusal); FTS5 indexing/search/ranking + invalid-root refusals |
+
+Honest notes: PTY cwd constraint pins the starting directory but is not a security boundary (sandbox backends are Phase 4); Spotlight merge degrades silently to FTS5-only where the query engine is unavailable; git blame/log caps bound output; no git push by design.
+
 ### Phase 1b — Chat UI + Artifacts (complete)
 
 Implemented per `09-AGENT-PROMPTS.md` Prompt 2 / `08-ROADMAP.md` items 1.9–1.12:
