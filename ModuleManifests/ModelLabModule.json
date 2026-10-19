@@ -1,0 +1,16 @@
+{
+  "identifier": "com.supermeta.modellab",
+  "displayName": "Model Lab",
+  "version": "1.0.0",
+  "minAppVersion": "0.1.0",
+  "maxAppVersion": null,
+  "author": "SuperMetaApp Team",
+  "description": "On-device AI/ML laboratory: Create ML classifier training, MLX LoRA fine-tuning, from-scratch small LMs, automated distillation, Hugging Face discovery, evaluation metrics, auto-prompt optimization, red-team assessment, and artifact export.",
+  "category": "ai",
+  "icon": "brain.head.profile",
+  "dependencies": [],
+  "requiredCapabilities": ["fileSystem.readWrite", "network.client", "metal.compute", "neuralEngine"],
+  "optionalCapabilities": [],
+  "provides": ["training", "fineTuning", "distillation", "inference", "evaluation", "modelExport", "datasetManagement"],
+  "entryPoint": "ModelLabModule"
+}

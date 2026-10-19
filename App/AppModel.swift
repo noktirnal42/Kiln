@@ -71,6 +71,7 @@ public final class AppModel {
         var factories = ModuleFactoryRegistry()
         factories.register(HelloModule.self)
         factories.register(ChatModule.self)
+        factories.register(ModelLabModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
