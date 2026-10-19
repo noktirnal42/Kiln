@@ -34,7 +34,7 @@ public actor PTYManager {
         if let historyBaseDirectory {
             self.historyBaseDirectory = historyBaseDirectory
         } else if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            self.historyBaseDirectory = appSupport.appendingPathComponent("SuperMetaApp/TerminalHistory", isDirectory: true)
+            self.historyBaseDirectory = appSupport.appendingPathComponent("Kiln/TerminalHistory", isDirectory: true)
         } else {
             self.historyBaseDirectory = FileManager.default.temporaryDirectory
         }
@@ -135,7 +135,7 @@ public actor PTYManager {
             }
             try JSONEncoder().encode(history).write(to: url, options: .atomic)
         } catch {
-            ModuleLogger(moduleIdentifier: "com.supermeta.terminal")
+            ModuleLogger(moduleIdentifier: "com.kiln.terminal")
                 .error("history persist failed: \(String(describing: error))")
         }
     }

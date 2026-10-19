@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 struct AppleAndMLXProviderTests {
     @Test func appleAvailabilityReasonsAreSpecific() {
@@ -48,7 +48,7 @@ struct AppleAndMLXProviderTests {
 
     @Test func mlxProviderListsModelsFromSharedCache() async throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-store-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-store-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let repo = root.appendingPathComponent("models--mlx-community--Qwen3-0.6B-4bit")
         let snapshot = repo.appendingPathComponent("snapshots/abc123")

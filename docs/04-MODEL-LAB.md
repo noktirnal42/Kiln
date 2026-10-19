@@ -1,4 +1,4 @@
-# SuperMetaApp — AI/ML Model Laboratory Module Specification
+# Kiln — AI/ML Model Laboratory Module Specification
 
 ## Overview
 
@@ -10,7 +10,7 @@ The **Model Lab Module** provides a complete AI/ML model laboratory for creating
 
 ```json
 {
-  "identifier": "com.supermeta.modellab",
+  "identifier": "com.kiln.modellab",
   "displayName": "AI/ML Model Lab",
   "version": "1.0.0",
   "category": "ai",
@@ -900,7 +900,7 @@ enum PlaygroundMode: String, CaseIterable, Sendable {
 
 ---
 
-## Integration with SuperMetaApp
+## Integration with Kiln
 
 ### Cross-Module Workflows
 

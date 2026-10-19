@@ -97,7 +97,7 @@ public struct ModuleFactoryRegistry: Sendable {
 
 public struct ModuleLifecycleEvent: ModuleEvent, Encodable, Equatable {
     public let eventType = "module.lifecycle"
-    public let sourceModule = "com.supermeta.kernel"
+    public let sourceModule = "com.kiln.kernel"
     public let timestamp = Date()
     public let moduleIdentifier: String
     public let phase: String

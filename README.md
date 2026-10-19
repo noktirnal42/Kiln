@@ -1,4 +1,6 @@
-# SuperMetaApp
+# Kiln
+
+![Kiln](Branding/export/kiln-banner-1600x640.png)
 
 A unified native macOS application (Swift 6, Xcode 27, SwiftUI) combining a
 development platform (IDE), a reverse engineering console, an AI/ML model lab,
@@ -12,6 +14,8 @@ incremental agent sessions.
 
 ## Status
 
+> **Build state (2026-10-18):** the app builds and all 216 tests pass. The Phase 3 RE UI had a compile break (`REProjectDetail` bound a struct with `@Bindable`, and `REFunctionDetail` was missing); fixed. The project was renamed from SuperMetaApp to Kiln; see `Branding/` for the icon and mark sources.
+
 ### Phase 1d — Agent Runtime + Tools (complete)
 
 Implemented per `09-AGENT-PROMPTS.md` Prompt 4 / `08-ROADMAP.md` items 1.17–1.19, ported from AppleHarness `AgentRuntime`/`ToolRuntime` and System5 `policy.py`:
@@ -22,21 +26,21 @@ Implemented per `09-AGENT-PROMPTS.md` Prompt 4 / `08-ROADMAP.md` items 1.17–1.
 | Execution policy | System5's declarative policy ported to Swift: `PolicyDecision(verdict, rule, reason)` with allow/require-approval/deny; workspace write-scope + deny-paths (fnmatch-style globs); shell block patterns (mkfs, disk erase, dd, shutdown, fork bombs — denied outright, no approval possible) and approval-gated patterns (sudo, force-push, `rm -rf`, `curl \| sh`, npm publish); egress allow/deny lists with the **SSRF backstop that parses addresses instead of matching spelling** (`127.1`, `2130706433`, `0`, `::ffff:127.0.0.1`, `.local`, cloud metadata hosts); budget caps (USD/tokens/wall-clock, 0 disables) |
 | Retry/backoff | System5's `_turn_with_retry` ported: 429/5xx/transport errors (typed `ProviderError`/`URLError` classification plus message regex) retried 5× at 1s→2s→4s→8s; non-retryable errors (bad key, no credit, missing model) fail immediately; backoff sleeps in **1-second slices so an operator Stop lands within a second, never after the schedule** |
 | Approval center | Gate B's human gate (`@MainActor`, UI-bindable): queue with the tool call's consequences spelled out (`CommandSafety` reasons: "Recursively deletes files without confirmation", etc.), per-conversation "ask once", and **persistable, revocable "always allow this host/command/tool" grants** (`GrantStore`, JSON in Application Support — host-scoped for `web_fetch`, command-scoped for shell tools) merged at policy-check time like System5's allowances. JSONL audit log of every decision. **`ApprovalQueueView`**: app-level sheet that auto-opens when a request lands (the one thing that should interrupt), showing the permission tier, destructive warnings, expandable call preview, and Deny / Approve Once / Always Allow; a "Standing grants" manager lists every grant with per-row and bulk revoke. Toolbar shield button shows the pending count |
-| Services wiring | `AgentOrchestrator` accepts the app's real `ToolServices` (shared `GitService`, shared `FileIndexService`, web-search key from the Keychain at `com.supermeta.tools`/`web-search-key`); tools fall back to their own implementations when a service is absent — services remove duplication, they never widen what tools may do. Verified by an e2e test proving an injected index is actually used |
+| Services wiring | `AgentOrchestrator` accepts the app's real `ToolServices` (shared `GitService`, shared `FileIndexService`, web-search key from the Keychain at `com.kiln.tools`/`web-search-key`); tools fall back to their own implementations when a service is absent — services remove duplication, they never widen what tools may do. Verified by an e2e test proving an injected index is actually used |
 | Agent profiles | `AgentProfile`: name, system prompt, model preferences, tool permissions, **`maxConcurrentTasks`** (enforced by `AgentRunLimiter` — same-profile runs queue, different profiles never block each other), run timeout. 3 built-ins (General Chat / Research Assistant / Coding Agent); JSON-backed `AgentProfileStore` |
 | Secrets | `SecretRedactor` strips known key shapes (AWS/GitHub/OpenAI/Anthropic/Slack/JWT/bearer/assignments) from prompts **and tool results** before any provider sees them; sensitive filenames (`.env`, `id_rsa`, `*.pem`…) are never read by file tools |
 | Built-in tools | 19 tools at read/write/execute/admin levels, all workspace-contained via `WorkspacePathResolver` (traversal refused with the specific reason, absolute paths inside the root accepted): file (read/write/edit/delete/list/glob/grep), shell (run 120s / stream 600s / background with job store + output reader, zsh in workspace cwd), git (status/diff/commit/branch/log over `GitService`), web (fetch with size caps; **search errors with the specific reason when no backend key is configured — no fake capabilities**), workspace search (FileIndexService-backed, honest: the FTS index is over names/paths, so the tool points content searches at `grep_files`; filename-scan fallback). 24 KiB middle-drop output cap preserves head and tail |
 
-Honest notes: redaction is heuristic, not cryptographic (the UI must say so); shell tools run unsandboxed on the host (sandbox backends are Phase 4 — the policy patterns and approval gate are the containment today); `web_search` works once a Tavily key is stored at Keychain module `com.supermeta.tools`, key `web-search-key` (wired through `ToolServices.webSearchKey`); Gate B's write-path check trusts the `path` argument when JSON parses — unparseable arguments fail the tool with a specific error rather than bypassing the check; the chat module does not yet drive the orchestrator (agent-mode chat UI is later-phase work — Prompt 7's swarming builds on this runtime).
+Honest notes: redaction is heuristic, not cryptographic (the UI must say so); shell tools run unsandboxed on the host (sandbox backends are Phase 4 — the policy patterns and approval gate are the containment today); `web_search` works once a Tavily key is stored at Keychain module `com.kiln.tools`, key `web-search-key` (wired through `ToolServices.webSearchKey`); Gate B's write-path check trusts the `path` argument when JSON parses — unparseable arguments fail the tool with a specific error rather than bypassing the check; the chat module does not yet drive the orchestrator (agent-mode chat UI is later-phase work — Prompt 7's swarming builds on this runtime).
 
 ### Phase 2 — Model Lab Module (Prompt 5)
 
-Implemented per `09-AGENT-PROMPTS.md` Prompt 5 (`docs/04-MODEL-LAB.md`), porting the verified ModelLabCore engine verbatim into `Packages/ModelLabCore` (CreateML text/tabular/image classifier training, MLX LoRA fine-tuning via `LoRATrain`, from-scratch char-level transformer, automated distillation, Hugging Face model/dataset discovery) plus new SuperMetaApp-side components in `Core/ModelLab/` and `Modules/ModelLab/`:
+Implemented per `09-AGENT-PROMPTS.md` Prompt 5 (`docs/04-MODEL-LAB.md`), porting the verified ModelLabCore engine verbatim into `Packages/ModelLabCore` (CreateML text/tabular/image classifier training, MLX LoRA fine-tuning via `LoRATrain`, from-scratch char-level transformer, automated distillation, Hugging Face model/dataset discovery) plus new Kiln-side components in `Core/ModelLab/` and `Modules/ModelLab/`:
 
 | Area | What exists |
 |------|-------------|
 | Engine port | ModelLabCore's verified sources copied as-is into `Packages/ModelLabCore` (`Sources`, `Tests`, `Package.swift`, `ModelLabSmoke`) and linked via `project.yml` (`mlx-swift-lm`, `mlx-swift`, `swift-huggingface`, `swift-transformers` resolve through SPM; `MLX` is also declared at root so the process-wide `MLX.compile(enable: false)` workaround from CAPABILITIES.md runs once before any MLX work). |
-| Module | `com.supermeta.modellab` manifest + `ModelLabModule`: lifecycle, sandboxed `ModelLabSchema` SwiftData store under `Application Support/ModelLab`, demo-data seeding, capability enforcement (`fileSystem.readWrite`, `network.client`, `metal.compute`, `neuralEngine`), training entry points wired to the engine coordinators, memory-aware compatibility verdicts from `HardwareProfile.current()`. |
+| Module | `com.kiln.modellab` manifest + `ModelLabModule`: lifecycle, sandboxed `ModelLabSchema` SwiftData store under `Application Support/ModelLab`, demo-data seeding, capability enforcement (`fileSystem.readWrite`, `network.client`, `metal.compute`, `neuralEngine`), training entry points wired to the engine coordinators, memory-aware compatibility verdicts from `HardwareProfile.current()`. |
 | Training | Create ML text/tabular/image classification, MLX LoRA fine-tune (repo + plain-text examples → adapter), from-scratch small LM pretraining, automated distillation (Apple Intelligence teacher → jsonl → student LoRA). Run lifecycle via `TrainingCoordinator`/`MLXFineTuningCoordinator`/etc.: start → record start/progress/completion/failure in the experiment store → register artifact. Each run gated on its declared capabilities (write + neural engine / metal). |
 | Experiment tracking (item 7) | SwiftData `ExperimentRecord`/`ExperimentStore` runs with hyperparameters, metric history, produced artifacts; `ExperimentComparison` for side-by-side run comparison with direction-aware best-per-metric (loss/perplexity lower-is-better). Experiments tab + Compare sheet UI. |
 | Evaluation (item 8) | `LabMetric` protocol + `AccuracyMetric`, `F1Metric` (macro), `BLEUMetric`, `ROUGEMetric` (1/2/L), `PerplexityMetric` (exp(mean NLL)); `EvaluationRunner` collects `MetricOutcome[]`; offline prompt-eval demo in the Evaluation tab. 24 unit tests with known-answer vectors (BLEU 0.5 two-gram case, macro-F1 0.7333, ROUGE-1/2/L 2/3/0.5, perplexity 2.0). |
@@ -74,7 +78,7 @@ Implemented per `09-AGENT-PROMPTS.md` Prompt 2 / `08-ROADMAP.md` items 1.9–1.1
 | Message rendering | `MarkdownBlockView` over the bounded GFM-subset `MarkdownRenderer` (headings, paragraphs with inline markdown via AttributedString, fences, lists, blockquotes, tables, dividers); role indicators, reasoning disclosure, tool-call chips, token usage |
 | Model picker | Provider-grouped sections with per-provider availability warnings (hover = the specific unavailability reason), search, recents (persisted), expandable `ReasoningPanel` (enabled/budget/depth/temperature/topP/maxTokens/stop sequences) |
 | Artifacts | `ArtifactStore` actor (4 MiB content cap, version history capped at 50, content by version) + browser UI with per-kind renderers: code (bounded `CodeHighlighter` spans), markdown (same renderer as chat), HTML (`WKWebView` `loadHTMLString`, no network base), mermaid (**honest**: shows source with an explanation instead of a broken engine), data (CSV/JSON → table). Export via NSSavePanel |
-| Module | `com.supermeta.chat` loads from its manifest; resolves `ModelRegistry`/`ConversationStore`/`ArtifactStore` from the **shared** `ServiceRegistry` (ModuleManager now injects the app-level registry — services exist once per the layered architecture) |
+| Module | `com.kiln.chat` loads from its manifest; resolves `ModelRegistry`/`ConversationStore`/`ArtifactStore` from the **shared** `ServiceRegistry` (ModuleManager now injects the app-level registry — services exist once per the layered architecture) |
 | Tests | Swift Testing: **104 tests / 18 suites green** — store round-trips, fork semantics, truncation, artifact versioning + caps, highlighter/markdown/CSV-JSON parser units, streaming end-to-end (deltas → persisted messages, tool-call fragment joining, deterministic mid-stream stop, fork via session, 10k-message synthetic conversation load) |
 
 Honest notes: @-mention file references in the composer are placeholder UI (FileIndexService arrives with Prompt 3); mermaid and react artifact kinds render source rather than pretending to run an engine; per-frame render timing is not yet instrumented (Phase 6 perf pass measures it; the 10k-message load test bounds the data layer).
@@ -90,7 +94,7 @@ Implemented per `09-AGENT-PROMPTS.md` Prompt 1 / `08-ROADMAP.md` items 1.1–1.8
 | Streaming | Shared `OpenAICompatibleTransport`: SSE, **deltas only — never cumulative snapshots**, bounded 64 KiB error-body reads, status→error mapping (401/402/429/5xx), bounded retries (408/409/425/429/5xx with Retry-After); Apple provider prefix-diffs cumulative snapshots into deltas |
 | Reasoning | `ReasoningConfig` (enabled/budget/depth/temperature/topP/maxTokens/stop/systemPrompt) with per-provider mappings: `toOllamaOptions()`, `toNIMEffort()`, `toAppleEffort()`, OpenAI `reasoning` fields (`Core/Reasoning/`) |
 | Registry | `ModelRegistry` actor: register/unregister, 300 s model cache TTL, capability-based selection skipping unavailable/weaker providers, prefix-based model→provider resolution, emits `ModelSwitchedEvent` on the module event bus (`Core/Providers/ModelProvider.swift`) |
-| Secrets | API keys read lazily through `KeychainService.secretProvider` (module `com.supermeta.providers`), never stored in provider state, never logged, never persisted |
+| Secrets | API keys read lazily through `KeychainService.secretProvider` (module `com.kiln.providers`), never stored in provider state, never logged, never persisted |
 | Universal store | `UniversalModelStore`: `HF_HUB_CACHE` → `HF_HOME/hub` → `~/.cache/huggingface/hub` walk (ports AxiomCore ModelStore query; shared with `hf`/`mlx_lm`) — closes roadmap item 0.10 |
 | Tests | Swift Testing: 81 tests / 14 suites, all green. All providers contract-tested through the registry against `URLProtocol` stubs (no real network); delta-only streaming asserted; per-provider unavailability reasons asserted |
 
@@ -112,15 +116,15 @@ Implemented per `09-AGENT-PROMPTS.md` Prompt 0 / `08-ROADMAP.md` Phase 0:
 | Keychain | `KeychainService`, module-namespaced generic passwords, SHA-256 fingerprinting (CryptoKit) — secrets never logged or persisted |
 | Design system | `ThemeManager` (system/light/dark/high-contrast, persisted), typography, spacing, corner radius, semantic colors (`UI/DesignSystem/`) |
 | Shell | `MainWindow` = NavigationSplitView; sidebar lists modules with live phase badges + a live event-bus feed; `ModuleHostView` renders the active module's root view |
-| Demo module | `com.supermeta.hello` loads from its bundled manifest, publishes/receives cross-module events, reads system info behind a `systemInfo` capability grant, and shows the exact denial reason when the grant is missing |
+| Demo module | `com.kiln.hello` loads from its bundled manifest, publishes/receives cross-module events, reads system info behind a `systemInfo` capability grant, and shows the exact denial reason when the grant is missing |
 | Tests | Swift Testing, 49 tests / 8 suites, all green (bus, registry, settings, keychain, capabilities, manifests, manager lifecycle + denials, Hello module). No network in unit tests. |
 
 Build & test:
 
 ```bash
 xcodegen generate
-xcodebuild build  -project SuperMetaApp.xcodeproj -scheme SuperMetaApp -destination 'platform=macOS'
-xcodebuild test   -project SuperMetaApp.xcodeproj -scheme SuperMetaApp -destination 'platform=macOS'
+xcodebuild build  -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'
+xcodebuild test   -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'
 ```
 
 Honest scope notes (no fake capabilities):

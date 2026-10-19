@@ -1,8 +1,8 @@
-# SuperMetaApp — Development Platform Module Specification
+# Kiln — Development Platform Module Specification
 
 ## Overview
 
-The **Development Platform Module** provides a complete Xcode 27-class IDE experience integrated into SuperMetaApp. It leverages Swift 6, SwiftUI, and native macOS frameworks to deliver a performant, native development environment.
+The **Development Platform Module** provides a complete Xcode 27-class IDE experience integrated into Kiln. It leverages Swift 6, SwiftUI, and native macOS frameworks to deliver a performant, native development environment.
 
 ---
 
@@ -10,7 +10,7 @@ The **Development Platform Module** provides a complete Xcode 27-class IDE exper
 
 ```json
 {
-  "identifier": "com.supermeta.devplatform",
+  "identifier": "com.kiln.devplatform",
   "displayName": "Development Platform",
   "version": "1.0.0",
   "category": "development",
@@ -894,7 +894,7 @@ struct SnippetPlaceholder: Codable, Sendable {
 
 ---
 
-## Integration with SuperMetaApp
+## Integration with Kiln
 
 ### Shared Services Used
 

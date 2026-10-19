@@ -5,7 +5,7 @@ import Observation
 @MainActor
 @Observable
 public final class ChatModule: @preconcurrency Module, @preconcurrency ModuleDefinition, ModuleUI {
-    public nonisolated static let identifier = "com.supermeta.chat"
+    public nonisolated static let identifier = "com.kiln.chat"
     public nonisolated static let displayName = "Agentic Chat"
     public nonisolated static let version = "1.0.0"
     public nonisolated static let dependencies: [String] = []

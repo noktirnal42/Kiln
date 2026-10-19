@@ -116,7 +116,7 @@ public final class PTYSession: @unchecked Sendable {
         self.masterFD = master
         self.isRunning = true
 
-        let source = DispatchSource.makeReadSource(fileDescriptor: master, queue: DispatchQueue(label: "com.supermeta.pty.\(id.uuidString)"))
+        let source = DispatchSource.makeReadSource(fileDescriptor: master, queue: DispatchQueue(label: "com.kiln.pty.\(id.uuidString)"))
         source.setEventHandler { [weak self] in
             guard let self else { return }
             var chunk = [UInt8](repeating: 0, count: 16384)

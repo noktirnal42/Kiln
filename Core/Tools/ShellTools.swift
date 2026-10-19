@@ -146,7 +146,7 @@ enum ShellRunner {
     static func launchBackground(command: String, cwd: URL?) throws -> BackgroundJob {
         let process = makeProcess(command: command, cwd: cwd)
         let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-job-\(UUID().uuidString).log")
+            .appendingPathComponent("kiln-job-\(UUID().uuidString).log")
         let handle = try FileHandle(forWritingTo: outputURL)
         process.standardOutput = handle
         process.standardError = handle

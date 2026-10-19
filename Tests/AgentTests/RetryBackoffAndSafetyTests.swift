@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 // MARK: - Retry / backoff (System5's _turn_with_retry, ported)
 
@@ -182,7 +182,7 @@ struct SafetySupportTests {
 
     @Test func workspaceResolverContainsTraversal() throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-resolve-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-resolve-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 

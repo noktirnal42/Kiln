@@ -149,7 +149,7 @@ public struct ModelExporters: Sendable {
             artifactFormat: record.format.rawValue,
             experimentID: record.experimentID,
             exportedAt: Date(),
-            sourceModule: "com.supermeta.modellab"
+            sourceModule: "com.kiln.modellab"
         )
         let manifestData = try JSONEncoder.prettyEncoder.encode(manifest)
         do {

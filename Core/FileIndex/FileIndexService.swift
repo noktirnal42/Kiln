@@ -57,7 +57,7 @@ public actor FileIndexService {
     private var db: OpaquePointer?
     private var fsEventStream: FSEventStreamRef?
     private var reindexWork: DispatchWorkItem?
-    private let indexQueue = DispatchQueue(label: "com.supermeta.fileindex")
+    private let indexQueue = DispatchQueue(label: "com.kiln.fileindex")
     private(set) var indexedRoot: String?
 
     public init() {}
@@ -127,7 +127,7 @@ public actor FileIndexService {
         sqlite3_close(db)
         db = nil
         let temporary = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-fileindex-\(UUID().uuidString).sqlite3")
+            .appendingPathComponent("kiln-fileindex-\(UUID().uuidString).sqlite3")
         guard sqlite3_open(temporary.path, &db) == SQLITE_OK else { return }
         _ = exec("CREATE TABLE files(path TEXT PRIMARY KEY, name TEXT, ext TEXT, size INTEGER, mtime REAL)")
         _ = exec("CREATE VIRTUAL TABLE files_fts USING fts5(name, path, content='files', content_rowid='rowid')")
@@ -326,5 +326,5 @@ public actor FileIndexService {
 }
 
 public extension Notification.Name {
-    static let fileIndexWorkspaceChanged = Notification.Name("com.supermeta.fileindex.workspaceChanged")
+    static let fileIndexWorkspaceChanged = Notification.Name("com.kiln.fileindex.workspaceChanged")
 }

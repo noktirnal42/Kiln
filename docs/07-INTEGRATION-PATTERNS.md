@@ -1,4 +1,4 @@
-# SuperMetaApp — Integration Patterns & Plugin Architecture
+# Kiln — Integration Patterns & Plugin Architecture
 
 ## Overview
 
@@ -283,8 +283,8 @@ func contributeMCPTools() -> [MCPTool] {
   "icon": "plugin-icon",
   "entryPoint": "MyPluginModule",
   "dependencies": [
-    "com.supermeta.core",
-    "com.supermeta.modelregistry"
+    "com.kiln.core",
+    "com.kiln.modelregistry"
   ],
   "requiredCapabilities": [
     "fileSystem.readWrite",
@@ -697,8 +697,8 @@ final class ConfigurationManager: Sendable {
     private let layers: [ConfigurationLayer] = [
         .commandLine,      // --flag=value
         .environment,      // ENV vars
-        .userConfig,       // ~/Library/Application Support/SuperMetaApp/config.json
-        .workspaceConfig,  // .supermeta/config.json
+        .userConfig,       // ~/Library/Application Support/Kiln/config.json
+        .workspaceConfig,  // .kiln/config.json
         .moduleDefaults,   // Module-provided defaults
         .appDefaults       // Built-in defaults
     ]
@@ -718,7 +718,7 @@ final class ConfigurationManager: Sendable {
 
 ```json
 {
-  "moduleIdentifier": "com.supermeta.agenticconsole",
+  "moduleIdentifier": "com.kiln.agenticconsole",
   "version": "1.0.0",
   "settings": [
     {
@@ -804,7 +804,7 @@ class ModelProviderContractTests: XCTestCase {
 
 ```swift
 final class IntegrationTestHarness: Sendable {
-    let app: SuperMetaApp
+    let app: Kiln
     let moduleManager: ModuleManager
     let serviceRegistry: ServiceRegistry
     let eventBus: ModuleEventBus

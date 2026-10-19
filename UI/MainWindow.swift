@@ -89,11 +89,35 @@ struct SidebarView: View {
                 }
             }
         }
-        .navigationTitle("SuperMetaApp")
+        .navigationTitle("Kiln")
+        .safeAreaInset(edge: .top, spacing: 0) {
+            BrandHeader()
+        }
         .onChange(of: selection) { _, newValue in
             guard let newValue else { return }
             Task { await app.activateModule(newValue) }
         }
+    }
+}
+
+/// Sidebar masthead: the Kiln mark and wordmark.
+struct BrandHeader: View {
+    var body: some View {
+        HStack(spacing: SSSpacing.s) {
+            Image("KilnMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 28, height: 28)
+                .accessibilityHidden(true)
+            Text("Kiln")
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+            Spacer()
+        }
+        .padding(.horizontal, SSSpacing.m)
+        .padding(.vertical, SSSpacing.s)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
+        .accessibilityElement(children: .combine)
     }
 }
 

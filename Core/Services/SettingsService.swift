@@ -29,7 +29,7 @@ public actor SettingsService {
     public init(
         userConfigURL: URL?,
         workspaceConfigURL: URL? = nil,
-        environmentPrefix: String = "SUPERMETA_",
+        environmentPrefix: String = "KILN_",
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.environment = environment
@@ -150,7 +150,7 @@ public actor SettingsService {
             }
             try data.write(to: url, options: .atomic)
         } catch {
-            ModuleLogger(moduleIdentifier: "com.supermeta.kernel")
+            ModuleLogger(moduleIdentifier: "com.kiln.kernel")
                 .error("settings persist failed: \(String(describing: error))")
         }
     }

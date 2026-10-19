@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 public struct KeychainService: Sendable {
-    public static let servicePrefix = "com.supermetaapp"
+    public static let servicePrefix = "com.kiln.app"
 
     public enum KeychainError: Error, Equatable, Sendable {
         case unexpectedStatus(OSStatus)

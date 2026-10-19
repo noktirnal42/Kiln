@@ -1,6 +1,6 @@
-# SuperMetaApp — Agent Prompts & Specifications
+# Kiln — Agent Prompts & Specifications
 
-This document contains ready-to-use prompts for AI agents (Claude Code, Codex, opencode, local models) to build SuperMetaApp incrementally. Each prompt is self-contained and references the specs in this folder.
+This document contains ready-to-use prompts for AI agents (Claude Code, Codex, opencode, local models) to build Kiln incrementally. Each prompt is self-contained and references the specs in this folder.
 
 **Usage pattern**: Feed one prompt per work session. Each prompt assumes prior phases' exit criteria are met. Adjust paths for your environment.
 
@@ -9,21 +9,21 @@ This document contains ready-to-use prompts for AI agents (Claude Code, Codex, o
 ## Prompt 0: Project Bootstrap
 
 ```
-You are building SuperMetaApp, a unified native macOS application (Swift 6,
+You are building Kiln, a unified native macOS application (Swift 6,
 Xcode 27, SwiftUI) that combines: a development platform (IDE), a reverse
 engineering console, an AI/ML model lab, an AI agentic harness console, and a
 multi-agent swarming engine — all as loadable modules in one app.
 
 Read these specs before writing any code:
-- /Volumes/Artificial_Intelligence_Machine_Learning/dev/SuperMetaApp/SuperMetaApp/00-MASTER-SPEC.md
-- /Volumes/Artificial_Intelligence_Machine_Learning/dev/SuperMetaApp/SuperMetaApp/01-MODULAR-ARCHITECTURE.md
-- /Volumes/Artificial_Intelligence_Machine_Learning/dev/SuperMetaApp/SuperMetaApp/08-ROADMAP.md
-- /Volumes/Artificial_Intelligence_Machine_Learning/dev/SuperMetaApp/SuperMetaApp/10-LAYERED-ARCHITECTURE.md
+- /Volumes/Artificial_Intelligence_Machine_Learning/dev/Kiln/Kiln/00-MASTER-SPEC.md
+- /Volumes/Artificial_Intelligence_Machine_Learning/dev/Kiln/Kiln/01-MODULAR-ARCHITECTURE.md
+- /Volumes/Artificial_Intelligence_Machine_Learning/dev/Kiln/Kiln/08-ROADMAP.md
+- /Volumes/Artificial_Intelligence_Machine_Learning/dev/Kiln/Kiln/10-LAYERED-ARCHITECTURE.md
 
 Your task: implement Phase 0 (Foundation & Core Shell).
 
 All work happens in the project root:
-/Volumes/Artificial_Intelligence_Machine_Learning/dev/SuperMetaApp/SuperMetaApp/
+/Volumes/Artificial_Intelligence_Machine_Learning/dev/Kiln/Kiln/
 
 Create the Xcode project (use XcodeGen with project.yml) with:
 1. Swift 6 strict concurrency, macOS 15+ target, App Sandbox + Hardened Runtime
@@ -57,7 +57,7 @@ clear error. Run `xcodebuild test` and report results honestly.
 ## Prompt 1: Model Provider Layer (Phase 1, items 1.1–1.8)
 
 ```
-You are implementing the model provider layer for SuperMetaApp's Agentic
+You are implementing the model provider layer for Kiln's Agentic
 Console module.
 
 Read first:
@@ -95,7 +95,7 @@ Verification: contract tests run against all providers through the registry.
 ## Prompt 2: Chat UI + Artifacts (Phase 1, items 1.9–1.12)
 
 ```
-You are building the chat interface and artifacts system for SuperMetaApp.
+You are building the chat interface and artifacts system for Kiln.
 
 Read first:
 - 05-AGENTIC-CONSOLE.md (sections: Chat Interface, Artifacts System)
@@ -128,7 +128,7 @@ Performance: message render < 16ms/frame while streaming; artifact render
 
 ```
 You are implementing terminal, MCP client, and git integration for
-SuperMetaApp's Agentic Console.
+Kiln's Agentic Console.
 
 Read first:
 - 05-AGENTIC-CONSOLE.md (sections: Terminal Integration, MCP Client, Git)
@@ -160,7 +160,7 @@ server credentials in Keychain; git operations never auto-push.
 ## Prompt 4: Agent Runtime + Tools (Phase 1, items 1.17–1.19)
 
 ```
-You are implementing the single-agent runtime for SuperMetaApp.
+You are implementing the single-agent runtime for Kiln.
 
 Read first:
 - 05-AGENTIC-CONSOLE.md (section: Agent Runtime)
@@ -198,7 +198,7 @@ coverage intent to Swift Testing.
 ## Prompt 5: Model Lab Module (Phase 2)
 
 ```
-You are porting the Model Lab into SuperMetaApp as a module.
+You are porting the Model Lab into Kiln as a module.
 
 Read first:
 - 04-MODEL-LAB.md
@@ -242,7 +242,7 @@ Hard rules from AILab's CAPABILITIES.md:
 ## Prompt 6: Reverse Engineering Module (Phase 3)
 
 ```
-You are porting Axiom RE into SuperMetaApp as the Reverse Engineering module.
+You are porting Axiom RE into Kiln as the Reverse Engineering module.
 
 Read first:
 - 03-REVERSE-ENGINEERING.md
@@ -250,7 +250,7 @@ Read first:
   (conventions are non-negotiable)
 - Port from: /Volumes/Artificial_Intelligence_Machine_Learning/dev/ghidraclone/Sources/AxiomCore/
   This is a complete, tested engine. Port it as the module's core; write
-  only the SuperMetaApp module wrapper and the new UI.
+  only the Kiln module wrapper and the new UI.
 
 Port the engine faithfully:
 1. Models.swift → project data, ProjectStore (atomic saves, revision
@@ -287,7 +287,7 @@ Non-negotiable guardrails (from AGENTS.md):
 ## Prompt 7: Swarming Engine (Phase 4)
 
 ```
-You are porting System5 into SuperMetaApp as the Swarming Engine module.
+You are porting System5 into Kiln as the Swarming Engine module.
 
 Read first:
 - 06-SWARMING-ENGINE.md
@@ -341,7 +341,7 @@ Threat-model invariants (from README, encode in tests):
 
 ```
 You are building the Development Platform module (editor + build) for
-SuperMetaApp. This is the largest greenfield component.
+Kiln. This is the largest greenfield component.
 
 Read first:
 - 02-DEV-PLATFORM.md (sections: Source Editor, Project Navigator, Build System)
@@ -380,7 +380,7 @@ in integration tests (skip gracefully if unavailable — report reason).
 ## Prompt 9: Development Platform — Debugger & Test (Phase 5b)
 
 ```
-You are implementing debugging and testing for SuperMetaApp's Development
+You are implementing debugging and testing for Kiln's Development
 Platform module. Prerequisite: Phase 5a editor/build are merged.
 
 Read first:
@@ -415,7 +415,7 @@ drop a frame. Tests use a tiny prebuilt fixture binary, no real network.
 ## Prompt 10: Integration Hardening + Release (Phase 6)
 
 ```
-You are preparing SuperMetaApp for v1.0 release.
+You are preparing Kiln for v1.0 release.
 
 Read first:
 - 00-MASTER-SPEC.md (Security Model, Performance Targets, Success Criteria)
@@ -433,7 +433,7 @@ Tasks:
    Keychain namespacing, no secrets in logs/SwiftData, MCP server
    approval flow, sandbox entitlements minimal
 5. Plugin SDK: extract Module protocol + ModuleContext + manifest schema
-   into SuperMetaKit; write SDK documentation; create module-template.sh;
+   into KilnKit; write SDK documentation; create module-template.sh;
    build 3 example plugins (tool provider, sidebar widget, command pack)
 6. Module marketplace: index JSON format, signature verification
    (Developer ID), download → verify → extract → capability prompt → load
@@ -451,10 +451,10 @@ passing; docs/RELEASE-CHECKLIST.md completed; signed+notarized DMG.
 Append these to any agent's system context:
 
 ```
-SUPERMETAAPP AGENT RULES:
+KILN AGENT RULES:
 
 1. Read the relevant spec in /Volumes/Artificial_Intelligence_Machine_Learning/
-   dev/SuperMetaApp/SuperMetaApp/ before writing code. Trust the spec over
+   dev/Kiln/Kiln/ before writing code. Trust the spec over
    your memory. For source-component locations, consult
    10-LAYERED-ARCHITECTURE.md (component harvest map).
 2. Harvest components per the harvest map rather than porting whole apps.

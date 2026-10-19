@@ -2,7 +2,7 @@ import Testing
 import Foundation
 import SwiftData
 import ModelLabCore
-@testable import SuperMetaApp
+@testable import Kiln
 
 @Suite struct ModelExporterTests {
     @Test func coreMLExportCopiesRealFile() throws {
@@ -46,7 +46,7 @@ import ModelLabCore
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
         let manifest = try decoder.decode(MLXPackageManifest.self, from: Data(contentsOf: manifestURL))
         #expect(manifest.artifactFormat == ModelFormat.mlxScratchModel.rawValue)
-        #expect(manifest.sourceModule == "com.supermeta.modellab")
+        #expect(manifest.sourceModule == "com.kiln.modellab")
         #expect(FileManager.default.fileExists(atPath: exported.appendingPathComponent("weights.safetensors").path))
     }
 

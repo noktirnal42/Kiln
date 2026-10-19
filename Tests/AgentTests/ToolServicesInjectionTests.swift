@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 /// Verifies the orchestrator hands its `ToolServices` to tool executions:
 /// a `search_workspace` call against a real indexed directory returns the
@@ -8,7 +8,7 @@ import Testing
 struct ToolServicesInjectionTests {
     @Test func injectedFileIndexIsUsedBySearchWorkspace() async throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-ws-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-ws-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -58,7 +58,7 @@ struct ToolServicesInjectionTests {
 
     @Test func missingIndexFallsBackToFilenameScan() async throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-ws-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-ws-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 

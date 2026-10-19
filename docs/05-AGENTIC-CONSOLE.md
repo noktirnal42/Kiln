@@ -1,4 +1,4 @@
-# SuperMetaApp — AI Agentic Harness Console Module Specification
+# Kiln — AI Agentic Harness Console Module Specification
 
 ## Overview
 
@@ -10,7 +10,7 @@ The **Agentic Console Module** provides a unified, model-agnostic AI agent inter
 
 ```json
 {
-  "identifier": "com.supermeta.agenticconsole",
+  "identifier": "com.kiln.agenticconsole",
   "displayName": "AI Agentic Console",
   "version": "1.0.0",
   "category": "ai",
@@ -974,7 +974,7 @@ final class FileIndexService: Sendable {
 
 ---
 
-## Integration with SuperMetaApp
+## Integration with Kiln
 
 ### Cross-Module Workflows
 

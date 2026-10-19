@@ -1,4 +1,4 @@
-# SuperMetaApp — Documentation Library
+# Kiln — Documentation Library
 
 **A unified, native macOS application (Swift 6, Xcode 27) combining a development platform, reverse engineering console, AI/ML model lab, AI agentic harness, and multi-agent swarming engine — organized as a layered architecture (Kernel → Core Services → Domain Engines → Activities) in one cohesive app.**
 

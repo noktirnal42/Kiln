@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import SuperMetaApp
+@testable import Kiln
 
 // swift test cannot exercise MLX paths on this machine (metallib packaging
 // issue — see CAPABILITIES.md); these tests cover the pure metric math and

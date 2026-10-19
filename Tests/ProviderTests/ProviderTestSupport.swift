@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 struct ProviderTestFixtures {
     static func ollamaTags() -> String {

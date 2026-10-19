@@ -119,7 +119,7 @@ public enum MCPError: Error, Equatable, Sendable {
 
 public enum MCPJSONRPC {
     public static let protocolVersion = "2024-11-05"
-    public static let clientName = "SuperMetaApp"
+    public static let clientName = "Kiln"
     public static let clientVersion = "0.1.0"
 
     public static func request(id: Int, method: String, params: [String: ProviderJSON] = [:]) -> Data? {

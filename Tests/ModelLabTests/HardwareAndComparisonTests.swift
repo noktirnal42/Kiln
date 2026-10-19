@@ -1,7 +1,7 @@
 import Testing
 import Foundation
 import ModelLabCore
-@testable import SuperMetaApp
+@testable import Kiln
 
 @Suite struct HardwareProfileTests {
     @Test func liveProbeReturnsRealValues() {

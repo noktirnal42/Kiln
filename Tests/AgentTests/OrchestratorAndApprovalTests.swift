@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 // MARK: - Test helpers
 
@@ -112,7 +112,7 @@ func makeTestApprovalCenter(
     autoResolve: ApprovalDecision?
 ) throws -> (ApprovalCenter, Task<Void, Never>) {
     let dir = FileManager.default.temporaryDirectory
-        .appendingPathComponent("supermeta-tests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("kiln-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     let center = ApprovalCenter(
         grants: GrantStore(fileURL: dir.appendingPathComponent("grants.json")),
@@ -137,7 +137,7 @@ func makeTestApprovalCenter(
 struct OrchestratorLoopTests {
     @Test func toolCallLoopFeedsResultsBackAndFinishes() async throws {
         let workspace = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-ws-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-ws-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workspace) }
 
@@ -185,7 +185,7 @@ struct OrchestratorLoopTests {
         // The model calls it anyway — Gate B must stop it, feed a denial
         // back, and the run must survive.
         let workspace = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-ws-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-ws-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workspace) }
 
@@ -225,7 +225,7 @@ struct OrchestratorLoopTests {
 
     @Test func outOfScopeWriteIsDeniedEvenWhenToolIsEnabled() async throws {
         let workspace = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-ws-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-ws-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workspace) }
 
@@ -264,7 +264,7 @@ struct OrchestratorLoopTests {
 
     @Test func blockedShellPatternIsDeniedBeforeAnyApproval() async throws {
         let workspace = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-ws-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-ws-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workspace) }
 
@@ -304,7 +304,7 @@ struct OrchestratorLoopTests {
 
     @Test func deniedApprovalStopsExecutionButNotTheRun() async throws {
         let workspace = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-ws-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-ws-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: workspace) }
 
@@ -415,7 +415,7 @@ struct ApprovalCenterTests {
 
     @Test func alwaysAllowPersistsARevocableHostGrant() async throws {
         let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-tests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let grantFile = dir.appendingPathComponent("grants.json")
 
@@ -456,7 +456,7 @@ struct ApprovalCenterTests {
 
     @Test func approvalLogRecordsEveryDecision() async throws {
         let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-tests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let center = ApprovalCenter(
             grants: GrantStore(fileURL: dir.appendingPathComponent("grants.json")),

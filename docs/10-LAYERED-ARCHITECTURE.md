@@ -1,4 +1,4 @@
-# SuperMetaApp — Layered Architecture & Component Harvest Map
+# Kiln — Layered Architecture & Component Harvest Map
 
 > **Revision note**: This document supersedes the "port app X as module Y" framing in the earlier specs. We **reuse code, not apps**. Existing projects are treated as **component libraries** — their features are harvested, regrouped by function, and composed in new ways. No existing app ships as a unit.
 
@@ -37,9 +37,9 @@
 
 ## 2. Why Regrouping Matters — Examples
 
-The existing projects each solved overlapping problems independently. SuperMetaApp keeps the **best implementation of each component** and deletes the duplication:
+The existing projects each solved overlapping problems independently. Kiln keeps the **best implementation of each component** and deletes the duplication:
 
-| Capability | Duplicated in existing projects | SuperMetaApp decision |
+| Capability | Duplicated in existing projects | Kiln decision |
 |------------|--------------------------------|----------------------|
 | Model providers | OpenClaudeCodexDesktop (7 providers), AppleHarness (Foundation+MLX), System5 (Anthropic/OpenRouter/Ollama/openai-compat) | **One** `ModelProviders` service; harvest each provider from whichever implementation is strongest |
 | Tool-call agent loop | OpenClaudeCodexDesktop AppTools, AppleHarness AgentRuntime+ToolRuntime, System5 orchestrator | **One** `AgentRuntime` engine; chat AND swarm both run on it |

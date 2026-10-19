@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 @main
-struct SuperMetaAppApp: App {
+struct KilnApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var appModel: AppModel
 

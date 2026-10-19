@@ -1,0 +1,16 @@
+{
+  "identifier": "com.kiln.reverseengineering",
+  "displayName": "Reverse Engineering Console",
+  "version": "1.0.0",
+  "minAppVersion": "0.1.0",
+  "maxAppVersion": null,
+  "author": "Kiln Team",
+  "description": "Static reverse engineering workbench: binary import, otool-native disassembly, optional Ghidra/radare2 analysis, function and string analysis, xrefs, crypto-constant scanning, format carving, ROP/JOP gadget search, and auto-decryption. Analyst annotations (names, comments, labels, variable renames) are revision-tracked and undoable.",
+  "category": "security",
+  "icon": "magnifyingglass.circle.fill",
+  "dependencies": [],
+  "requiredCapabilities": ["fileSystem.read", "process.spawn", "memory.inspection", "debugger.attach", "kernel.debug"],
+  "optionalCapabilities": [],
+  "provides": ["binaryInspector", "disassembler", "functionAnalyzer", "stringAnalyzer", "cryptoScanner", "entropyAnalyzer", "formatCarver", "autoDecryptor", "ruleScanner", "gadgetFinder", "dumpForensics", "projectStore"],
+  "entryPoint": "REModule"
+}

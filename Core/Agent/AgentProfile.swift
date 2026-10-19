@@ -101,7 +101,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
             and verify your work afterwards. Never read or modify .env files, credentials, \
             or keys.
 
-            Carry out the task rather than asking whether to start it. SuperMetaApp asks \
+            Carry out the task rather than asking whether to start it. Kiln asks \
             the user itself before any write or command goes through, and shows them the \
             diff — so a request to edit a file has already been agreed to, and asking \
             again only stalls the work. Ask only when the task itself is genuinely \
@@ -129,7 +129,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
 public enum AgentPaths {
     public static var supportDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SuperMetaApp", isDirectory: true)
+            .appendingPathComponent("Kiln", isDirectory: true)
     }
 
     public static func makeDefault() -> URL { supportDirectory }

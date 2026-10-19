@@ -43,9 +43,9 @@ public final class AppModel {
         ])
         let configuration: ModelConfiguration
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let storeDirectory = appSupport.appendingPathComponent("SuperMetaApp", isDirectory: true)
+            let storeDirectory = appSupport.appendingPathComponent("Kiln", isDirectory: true)
             try? FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
-            configuration = ModelConfiguration(schema: schema, url: storeDirectory.appendingPathComponent("SuperMetaApp.store"))
+            configuration = ModelConfiguration(schema: schema, url: storeDirectory.appendingPathComponent("Kiln.store"))
         } else {
             configuration = ModelConfiguration(schema: schema)
         }
@@ -65,20 +65,21 @@ public final class AppModel {
         self.modelRegistry = ModelRegistry(eventBus: eventBus)
 
         let userConfigURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            .first?.appendingPathComponent("SuperMetaApp/settings.json")
+            .first?.appendingPathComponent("Kiln/settings.json")
         self.settings = SettingsService(userConfigURL: userConfigURL)
 
         var factories = ModuleFactoryRegistry()
         factories.register(HelloModule.self)
         factories.register(ChatModule.self)
         factories.register(ModelLabModule.self)
+        factories.register(REModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
             manifestDirs.append(bundled)
         }
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            manifestDirs.append(appSupport.appendingPathComponent("SuperMetaApp/Modules"))
+            manifestDirs.append(appSupport.appendingPathComponent("Kiln/Modules"))
         }
 
         self.manager = ModuleManager(
@@ -101,7 +102,7 @@ public final class AppModel {
             services: ToolServices(
                 git: gitService,
                 fileIndex: fileIndexService,
-                webSearchKey: { keychain.get(module: "com.supermeta.tools", key: "web-search-key") }
+                webSearchKey: { keychain.get(module: "com.kiln.tools", key: "web-search-key") }
             )
         )
     }

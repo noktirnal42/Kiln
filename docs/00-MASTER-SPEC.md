@@ -1,8 +1,8 @@
-# SuperMetaApp — Master Specification
+# Kiln — Master Specification
 
 ## Vision Statement
 
-**SuperMetaApp** is a unified, native macOS application (Swift 6, Xcode 27) that combines:
+**Kiln** is a unified, native macOS application (Swift 6, Xcode 27) that combines:
 
 1. **Complete Development Platform** — Xcode 27-class IDE with all associated tools
 2. **Reverse Engineering Console** — Ghidra/Axiom RE-class native binary analysis
@@ -32,7 +32,7 @@
 
 ## Feature Regrouping (Function, Not Origin)
 
-Existing projects solved overlapping problems independently. SuperMetaApp keeps the **best implementation of each component** and regroups by function:
+Existing projects solved overlapping problems independently. Kiln keeps the **best implementation of each component** and regroups by function:
 
 | Unified Feature | Harvested from | Merged because |
 |-----------------|----------------|----------------|
@@ -54,7 +54,7 @@ The four **activities** (Develop, Analyze, Lab, Orchestrate) are UI arrangements
 ## Unified Architecture
 
 ```
-SuperMetaApp/
+Kiln/
 ├── App/                          # SwiftUI App Entry (@main)
 │   ├── App.swift
 │   ├── AppDelegate.swift
@@ -628,5 +628,5 @@ dependencies: [
 
 - **Version**: 1.0
 - **Date**: 2026-10-15
-- **Author**: SuperMetaApp Architecture Team
+- **Author**: Kiln Architecture Team
 - **Status**: Draft for Review

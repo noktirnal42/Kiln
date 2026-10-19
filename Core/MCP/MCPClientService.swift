@@ -31,7 +31,7 @@ public actor MCPApprovalStore {
         if let url {
             self.url = url
         } else if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            self.url = appSupport.appendingPathComponent("SuperMetaApp/mcp-approvals.json")
+            self.url = appSupport.appendingPathComponent("Kiln/mcp-approvals.json")
         } else {
             self.url = FileManager.default.temporaryDirectory.appendingPathComponent("mcp-approvals.json")
         }
@@ -65,7 +65,7 @@ public actor MCPApprovalStore {
             }
             try JSONEncoder().encode(file).write(to: url, options: .atomic)
         } catch {
-            ModuleLogger(moduleIdentifier: "com.supermeta.mcp")
+            ModuleLogger(moduleIdentifier: "com.kiln.mcp")
                 .error("approval persist failed: \(String(describing: error))")
         }
     }

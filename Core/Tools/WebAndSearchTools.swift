@@ -31,7 +31,7 @@ public struct WebFetchTool: ToolExecuting {
         }
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
-        request.setValue("SuperMetaApp/0.1 (Macintosh)", forHTTPHeaderField: "User-Agent")
+        request.setValue("Kiln/0.1 (Macintosh)", forHTTPHeaderField: "User-Agent")
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
@@ -187,7 +187,7 @@ public struct SearchWorkspaceTool: ToolExecuting {
 // MARK: - Registration
 
 public enum BuiltInTools {
-    /// Registers every tool SuperMetaApp ships with. Call once at launch.
+    /// Registers every tool Kiln ships with. Call once at launch.
     public static func registerAll(into registry: ToolRegistry = .shared) {
         let tools: [any ToolExecuting] = [
             ReadFileTool(), WriteFileTool(), EditFileTool(), DeleteFileTool(),

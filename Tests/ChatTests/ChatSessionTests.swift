@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 @MainActor
 struct ChatSessionTests {

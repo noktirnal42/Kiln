@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import SuperMetaApp
+@testable import Kiln
 
 @Suite struct AutoPromptEngineTests {
     @Test func generationIsDeterministicForSeed() async {

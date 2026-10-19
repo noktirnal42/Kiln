@@ -1,6 +1,6 @@
-name: SuperMetaApp
+name: Kiln
 options:
-  bundleIdPrefix: com.supermeta
+  bundleIdPrefix: com.kiln
   deploymentTarget:
     macOS: "15.0"
   createIntermediateGroups: true
@@ -14,6 +14,8 @@ packages:
   mlx-swift:
     url: https://github.com/ml-explore/mlx-swift
     from: 0.31.6
+  AxiomCore:
+    path: Packages/AxiomCore
 
 settings:
   base:
@@ -24,7 +26,7 @@ settings:
     CODE_SIGN_IDENTITY: "-"
 
 targets:
-  SuperMetaApp:
+  Kiln:
     type: application
     platform: macOS
     sources:
@@ -32,17 +34,19 @@ targets:
       - path: Core
       - path: Modules
       - path: UI
+      - path: Resources
       - path: ModuleManifests
         type: folder
         buildPhase: resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.supermeta.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.kiln.app
         CODE_SIGN_ENTITLEMENTS: Config/Entitlements.plist
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: SuperMetaApp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleDisplayName: Kiln
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         ENABLE_TESTABILITY: YES
     dependencies:
@@ -52,8 +56,10 @@ targets:
         product: ModelLabCore
       - package: mlx-swift
         product: MLX
+      - package: AxiomCore
+        product: AxiomCore
 
-  SuperMetaAppTests:
+  KilnTests:
     type: bundle.unit-test
     platform: macOS
     sources:
@@ -61,19 +67,19 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.supermeta.app.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.kiln.app.tests
     dependencies:
-      - target: SuperMetaApp
+      - target: Kiln
 
 schemes:
-  SuperMetaApp:
+  Kiln:
     build:
       targets:
-        SuperMetaApp: all
-        SuperMetaAppTests: [test]
+        Kiln: all
+        KilnTests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
-        - SuperMetaAppTests
+        - KilnTests

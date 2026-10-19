@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 /// Gate A and the System5 policy decision coverage, ported from
 /// system5's pytest suite: what is offered, what is denied outright, what

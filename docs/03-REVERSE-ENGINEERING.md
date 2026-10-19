@@ -1,4 +1,4 @@
-# SuperMetaApp — Reverse Engineering Console Module Specification
+# Kiln — Reverse Engineering Console Module Specification
 
 ## Overview
 
@@ -10,7 +10,7 @@ The **Reverse Engineering Console Module** provides a native macOS reverse engin
 
 ```json
 {
-  "identifier": "com.supermeta.reverseengineering",
+  "identifier": "com.kiln.reverseengineering",
   "displayName": "Reverse Engineering Console",
   "version": "1.0.0",
   "category": "security",
@@ -1135,7 +1135,7 @@ let reTools: [MCPTool] = [
 
 ---
 
-## Integration with SuperMetaApp
+## Integration with Kiln
 
 ### Cross-Module Workflows
 

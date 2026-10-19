@@ -40,11 +40,11 @@ public extension KeychainService {
     }
 }
 
-public let providersKeychainModule = "com.supermeta.providers"
+public let providersKeychainModule = "com.kiln.providers"
 
 public struct ModelSwitchedEvent: ModuleEvent, Encodable, Equatable {
     public let eventType = "model.switched"
-    public let sourceModule = "com.supermeta.modelregistry"
+    public let sourceModule = "com.kiln.modelregistry"
     public let timestamp = Date()
     public let fromModel: String?
     public let toModel: String

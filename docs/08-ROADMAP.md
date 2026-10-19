@@ -1,10 +1,10 @@
-# SuperMetaApp — Development Roadmap & Phases
+# Kiln — Development Roadmap & Phases
 
 ## Overview
 
-This roadmap organizes SuperMetaApp development into phases that maximize reuse of existing, working code from the `/dev` folder. Each phase delivers a usable increment.
+This roadmap organizes Kiln development into phases that maximize reuse of existing, working code from the `/dev` folder. Each phase delivers a usable increment.
 
-**Core strategy**: The existing projects (OpenClaudeCodexDesktop, Axiom RE, ModelLab, System5, LumenDeck) are individually advanced. SuperMetaApp's job is *integration*, not reinvention. Port working engines, build the shell around them.
+**Core strategy**: The existing projects (OpenClaudeCodexDesktop, Axiom RE, ModelLab, System5, LumenDeck) are individually advanced. Kiln's job is *integration*, not reinvention. Port working engines, build the shell around them.
 
 ---
 

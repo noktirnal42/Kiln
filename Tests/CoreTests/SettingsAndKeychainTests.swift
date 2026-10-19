@@ -1,11 +1,11 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 struct SettingsServiceTests {
     private func makeTempFile() throws -> URL {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-settings-\(UUID().uuidString).json")
+            .appendingPathComponent("kiln-settings-\(UUID().uuidString).json")
         return url
     }
 
@@ -23,22 +23,22 @@ struct SettingsServiceTests {
     }
 
     @Test func environmentOverridesDefaults() async {
-        let service = SettingsService(userConfigURL: nil, environment: ["SUPERMETA_GREETING": "\"env\""])
+        let service = SettingsService(userConfigURL: nil, environment: ["KILN_GREETING": "\"env\""])
         await service.registerDefault("greeting", "hi")
         let value = await service.get("greeting", as: String.self, fallback: "fallback")
         #expect(value == "env")
     }
 
     @Test func environmentAcceptsRawStringForStringType() async {
-        let service = SettingsService(userConfigURL: nil, environment: ["SUPERMETA_APP_NAME": "SuperMeta"])
+        let service = SettingsService(userConfigURL: nil, environment: ["KILN_APP_NAME": "Kiln"])
         let value = await service.get("app.name", as: String.self, fallback: "")
-        #expect(value == "SuperMeta")
+        #expect(value == "Kiln")
     }
 
     @Test func environmentParsesJSONTypes() async {
         let service = SettingsService(userConfigURL: nil, environment: [
-            "SUPERMETA_LEVEL": "3",
-            "SUPERMETA_FLAG": "true",
+            "KILN_LEVEL": "3",
+            "KILN_FLAG": "true",
         ])
         let level = await service.get("level", as: Int.self, fallback: 0)
         let flag = await service.get("flag", as: Bool.self, fallback: false)

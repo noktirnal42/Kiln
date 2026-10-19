@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 struct PingEvent: ModuleEvent, Encodable, Equatable {
     let eventType = "test.ping"

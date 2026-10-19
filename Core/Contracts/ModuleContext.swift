@@ -7,7 +7,7 @@ public struct ModuleLogger: Sendable {
 
     public init(moduleIdentifier: String) {
         self.moduleIdentifier = moduleIdentifier
-        self.logger = Logger(subsystem: "com.supermeta.app", category: moduleIdentifier)
+        self.logger = Logger(subsystem: "com.kiln.app", category: moduleIdentifier)
     }
 
     public func debug(_ message: String) { logger.debug("\(message, privacy: .public)") }

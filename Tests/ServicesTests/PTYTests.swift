@@ -1,11 +1,11 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 struct PTYTests {
     private func tempDirectory() -> String {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-pty-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-pty-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url.path
     }

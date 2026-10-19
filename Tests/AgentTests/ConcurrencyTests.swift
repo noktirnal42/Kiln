@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 /// Records when each run's model turn starts; the first call blocks briefly
 /// so overlap between runs would be visible in the timestamps.

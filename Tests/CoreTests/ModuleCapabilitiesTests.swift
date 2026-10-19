@@ -1,5 +1,5 @@
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 struct ModuleCapabilitiesTests {
     @Test func parsesKnownNames() {

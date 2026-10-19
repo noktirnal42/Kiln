@@ -6,14 +6,14 @@ import ModelLabCore
 import MLX
 
 /// The Model Lab module: the verified ModelLabCore engine (ported verbatim
-/// from AILab into `Packages/ModelLabCore`) wrapped in SuperMetaApp's module
+/// from AILab into `Packages/ModelLabCore`) wrapped in Kiln's module
 /// system, plus the Prompt 5 additions (hardware profile, evaluation
 /// metrics, experiment comparison, auto-prompt engine, red-team harness,
 /// exporters) that live in `Core/ModelLab`.
 @MainActor
 @Observable
 public final class ModelLabModule: @preconcurrency Module, @preconcurrency ModuleDefinition, ModuleUI {
-    public nonisolated static let identifier = "com.supermeta.modellab"
+    public nonisolated static let identifier = "com.kiln.modellab"
     public nonisolated static let displayName = "Model Lab"
     public nonisolated static let version = "1.0.0"
     public nonisolated static let dependencies: [String] = []

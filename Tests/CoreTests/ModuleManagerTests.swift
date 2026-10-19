@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SuperMetaApp
+@testable import Kiln
 
 actor LifecycleRecorder {
     private var entries: [String] = []
@@ -73,7 +73,7 @@ struct ModuleManagerTests {
         _ manifests: [ModuleManifest]
     ) throws -> URL {
         let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("supermeta-tests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("kiln-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         for (index, manifest) in manifests.enumerated() {

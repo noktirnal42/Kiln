@@ -1,4 +1,4 @@
-# SuperMetaApp — Swarming Engine Module Specification
+# Kiln — Swarming Engine Module Specification
 
 ## Overview
 
@@ -10,7 +10,7 @@ The **Swarming Engine Module** provides multi-agent orchestration capabilities i
 
 ```json
 {
-  "identifier": "com.supermeta.swarming",
+  "identifier": "com.kiln.swarming",
   "displayName": "Swarming Engine",
   "version": "1.0.0",
   "category": "ai",
@@ -1065,7 +1065,7 @@ struct AuditEntry: Identifiable, Codable, Sendable {
 
 ---
 
-## Integration with SuperMetaApp
+## Integration with Kiln
 
 ### Cross-Module Workflows
 

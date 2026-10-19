@@ -1,8 +1,8 @@
-# SuperMetaApp — Modular Architecture Specification
+# Kiln — Modular Architecture Specification
 
 ## Overview
 
-This document defines the plug-in architecture that allows SuperMetaApp to be extensible, maintainable, and capable of integrating diverse capabilities as loadable modules.
+This document defines the plug-in architecture that allows Kiln to be extensible, maintainable, and capable of integrating diverse capabilities as loadable modules.
 
 ---
 
@@ -22,21 +22,21 @@ Each module includes a `ModuleManifest.json`:
 
 ```json
 {
-  "identifier": "com.supermeta.devplatform",
+  "identifier": "com.kiln.devplatform",
   "displayName": "Development Platform",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
   "maxAppVersion": "2.0.0",
-  "author": "SuperMetaApp Team",
+  "author": "Kiln Team",
   "license": "Proprietary",
   "description": "Xcode-class IDE with build, debug, test, and deploy",
   "category": "development",
   "icon": "hammer.fill",
   "dependencies": [
-    "com.supermeta.core",
-    "com.supermeta.modelregistry",
-    "com.supermeta.mcp",
-    "com.supermeta.workspace"
+    "com.kiln.core",
+    "com.kiln.modelregistry",
+    "com.kiln.mcp",
+    "com.kiln.workspace"
   ],
   "requiredCapabilities": [
     "fileSystem.readWrite",
@@ -463,7 +463,7 @@ final class SettingsService: Sendable {
 
 ```json
 {
-  "moduleIdentifier": "com.supermeta.devplatform",
+  "moduleIdentifier": "com.kiln.devplatform",
   "version": "1.0.0",
   "settings": [
     {
@@ -552,13 +552,13 @@ MyModule/
 
 ```swift
 import Foundation
-import SuperMetaCore
+import KilnCore
 
 public final class MyModule: Module {
     public static let identifier = "com.example.mymodule"
     public static let displayName = "My Module"
     public static let version = "1.0.0"
-    public static let dependencies = ["com.supermeta.core"]
+    public static let dependencies = ["com.kiln.core"]
     public static let requiredCapabilities: ModuleCapabilities = [
         .fileSystemRead, .fileSystemWrite, .processSpawn
     ]
@@ -637,12 +637,12 @@ public final class MyModule: Module {
   "updated": "2026-10-15T00:00:00Z",
   "modules": [
     {
-      "identifier": "com.supermeta.devplatform",
+      "identifier": "com.kiln.devplatform",
       "displayName": "Development Platform",
       "version": "1.0.0",
-      "author": "SuperMetaApp Team",
-      "repository": "https://github.com/supermeta/devplatform",
-      "releaseURL": "https://github.com/supermeta/devplatform/releases/latest",
+      "author": "Kiln Team",
+      "repository": "https://github.com/kiln/devplatform",
+      "releaseURL": "https://github.com/kiln/devplatform/releases/latest",
       "checksum": "sha256:...",
       "minAppVersion": "1.0.0",
       "categories": ["development", "ide"],
@@ -664,13 +664,13 @@ User clicks "Install" in Marketplace
 Download module bundle (.supermodule)
         │
         ▼
-Verify signature (Apple Developer ID + SuperMetaApp Team ID)
+Verify signature (Apple Developer ID + Kiln Team ID)
         │
         ▼
 Verify checksum matches index
         │
         ▼
-Extract to ~/Library/Application Support/SuperMetaApp/Modules/
+Extract to ~/Library/Application Support/Kiln/Modules/
         │
         ▼
 ModuleManager discovers new manifest
@@ -803,16 +803,16 @@ let migrations: [ModuleMigration] = [
 
 ```bash
 # Enable module debug logging
-defaults write com.supermeta.app ModuleDebugLogging -bool YES
+defaults write com.kiln.app ModuleDebugLogging -bool YES
 
 # List loaded modules
-supermeta modules list
+kiln modules list
 
 # Inspect module state
-supermeta modules inspect com.example.mymodule
+kiln modules inspect com.example.mymodule
 
 # Force reload module
-supermeta modules reload com.example.mymodule
+kiln modules reload com.example.mymodule
 ```
 
 ---
