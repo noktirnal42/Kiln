@@ -80,6 +80,18 @@ public enum Analyzer {
         let result = try ghidra(path, home: home, scriptPath: scriptPath, arch: arch, workspace: engineWorkspace(projectPath: project, projectID: initial.id))
         return try ProjectStore.replace(result, to: project, expectedID: initial.id, expectedRevision: initial.revision, preserveAnnotations: true)
     }
+    /// `/usr/bin/otool` is a stub that calls `xcrun`, and the App Sandbox refuses
+    /// `xcrun` ("cannot be used within an App Sandbox"). Run the toolchain binary
+    /// directly; the stub is the last resort for command-line-tools-only machines.
+    static let otoolExecutable: String = {
+        let candidates = [
+            "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/otool",
+            "/Library/Developer/CommandLineTools/usr/bin/otool",
+            "/usr/bin/otool",
+        ]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/bin/otool"
+    }()
+
     public static func inspect(_ path: String, arch: String? = nil) throws -> Analysis {
         let original = URL(fileURLWithPath: path).standardizedFileURL
         let attrs = try FileManager.default.attributesOfItem(atPath: original.path)
@@ -98,8 +110,8 @@ public enum Analyzer {
         var sections = "Format metadata requires Mach-O or Ghidra analysis."
         var functions: [FunctionRecord] = []
         if format.contains("Mach-O") {
-            sections = (try? ProcessRunner.run("/usr/bin/otool", ["-l", url.path])) ?? "Could not read load commands."
-            let listing = try ProcessRunner.run("/usr/bin/otool", ["-tvV", url.path])
+            sections = (try? ProcessRunner.run(otoolExecutable, ["-l", url.path])) ?? "Could not read load commands."
+            let listing = try ProcessRunner.run(otoolExecutable, ["-tvV", url.path])
             functions = parseAssembly(listing)
             warnings.append("Native inspection uses otool. Decompilation and richer references require Ghidra.")
         } else { warnings.append("Native disassembly supports Mach-O. Configure Ghidra for this format.") }

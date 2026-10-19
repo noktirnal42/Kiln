@@ -1,0 +1,63 @@
+import Foundation
+import Testing
+import AxiomCore
+@testable import Kiln
+
+@MainActor
+struct REModuleTests {
+    /// Copies a system binary into a private temp dir so the test never
+    /// depends on the analyzed file staying put.
+    private func copySystemBinary() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kiln-re-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dest = dir.appendingPathComponent("true")
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: dest)
+        return dest
+    }
+
+    @Test func importBinaryCreatesSelectableProjectWithAnalysis() async throws {
+        let module = REModule()
+        let analysis = try await module.importBinary(at: try copySystemBinary())
+
+        #expect(!analysis.sha256.isEmpty)
+        #expect(analysis.size > 0)
+        #expect(module.projects.count == 1)
+        #expect(module.selected?.analysis?.sha256 == analysis.sha256)
+    }
+
+    @Test func importedProjectListsFunctionsAndSurvivesReload() async throws {
+        let module = REModule()
+        let analysis = try await module.importBinary(at: try copySystemBinary())
+        let projectID = try #require(module.selected?.id)
+
+        let reloaded = try await module.analysis(projectID: projectID)
+        #expect(reloaded.sha256 == analysis.sha256)
+        #expect(reloaded.functions.count == analysis.functions.count)
+    }
+
+    @Test func selectByProjectIDChangesSelection() async throws {
+        let module = REModule()
+        _ = try await module.importBinary(at: try copySystemBinary())
+        let id = try #require(module.projects.first?.id)
+
+        module.select(projectID: id)
+        #expect(module.selected?.id == id)
+    }
+
+    @Test func ghidraWithoutConfigurationFailsWithSpecificReason() async throws {
+        let module = REModule()
+        _ = try await module.importBinary(at: try copySystemBinary())
+        let id = try #require(module.projects.first?.id)
+
+        await #expect(throws: REError.self) {
+            _ = try await module.analyzeWithGhidra(projectID: id)
+        }
+    }
+
+    @Test func mcpToolDefinitionsHaveUniqueNames() {
+        let names = REMCPTools.definitions.map(\.name)
+        #expect(Set(names).count == names.count)
+        #expect(!names.isEmpty)
+    }
+}

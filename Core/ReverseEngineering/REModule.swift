@@ -371,11 +371,18 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
             suffix += 1
             folder = root.appendingPathComponent("\(proposed)-\(suffix)", isDirectory: true)
         }
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        // ProjectStore.create must make the project folder itself (it refuses an existing path),
+        // so analyze a staged copy first and move the binary in once the folder exists.
+        let staging = root.appendingPathComponent(".staging-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: staging) }
+        let staged = staging.appendingPathComponent(original.lastPathComponent)
+        try FileManager.default.copyItem(at: original, to: staged)
+        var analysis = try Analyzer.inspect(staged.path)
         let binary = folder.appendingPathComponent(original.lastPathComponent)
-        try FileManager.default.copyItem(at: original, to: binary)
-        let analysis = try Analyzer.inspect(binary.path)
+        analysis.binaryPath = binary.path
         try ProjectStore.create(analysis, to: folder.path)
+        try FileManager.default.copyItem(at: staged, to: binary)
         return (folder: folder, analysis: analysis)
     }
 }
