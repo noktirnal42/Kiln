@@ -16,7 +16,7 @@ struct REProjectDetail: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             List(selection: $selectedAddress) {
                 Section("Functions (\(analysis.functions.count))") {
                     ForEach(analysis.functions) { function in
@@ -28,15 +28,18 @@ struct REProjectDetail: View {
                 }
             }
             .listStyle(.sidebar)
-        } detail: {
-            if let function = selectedFunction {
-                REFunctionDetail(function: function)
-            } else {
-                ContentUnavailableView("No function selected", systemImage: "function",
-                                       description: Text("Select a function from the list."))
+            .frame(width: 260)
+            Divider()
+            Group {
+                if let function = selectedFunction {
+                    REFunctionDetail(function: function)
+                } else {
+                    ContentUnavailableView("No function selected", systemImage: "function",
+                                           description: Text("Select a function from the list."))
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle(project.binaryURL.lastPathComponent)
     }
 }
 

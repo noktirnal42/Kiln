@@ -4,18 +4,23 @@ struct REModuleRootView: View {
     @Bindable var module: REModule
 
     var body: some View {
-        NavigationSplitView {
+        // Plain HStack, not NavigationSplitView: this view is itself the detail of the app's
+        // split view, and a nested split view squeezed the app sidebar and clipped content.
+        HStack(spacing: 0) {
             REProjectBrowser(module: module)
-        } detail: {
-            if let project = module.selected, let analysis = project.analysis {
-                REProjectDetail(module: module, project: project, analysis: analysis)
-                    .id(project.id)
-            } else {
-                ContentUnavailableView("No project", systemImage: "cube",
-                                       description: Text("Import a binary to begin analysis."))
+                .frame(width: 240)
+            Divider()
+            Group {
+                if let project = module.selected, let analysis = project.analysis {
+                    REProjectDetail(module: module, project: project, analysis: analysis)
+                        .id(project.id)
+                } else {
+                    ContentUnavailableView("No project", systemImage: "cube",
+                                           description: Text("Import a binary to begin analysis."))
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle("Reverse Engineering")
     }
 }
 

@@ -11,7 +11,7 @@ struct HelloModuleView: View {
             Text("Hello from a dynamically loaded module")
                 .font(SSTypography.title())
 
-            Text("This module was discovered from its ModuleManifest.json, loaded by ModuleManager, and granted the capabilities it declared. Events it publishes are delivered cross-module over the ModuleEventBus.")
+            Text("This module was discovered from its module manifest, loaded by ModuleManager, and granted the capabilities it declared. Events it publishes are delivered cross-module over the ModuleEventBus.")
                 .font(SSTypography.body())
                 .foregroundStyle(.secondary)
 

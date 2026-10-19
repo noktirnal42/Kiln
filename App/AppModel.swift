@@ -89,7 +89,8 @@ public final class AppModel {
             manifestDirectories: manifestDirs,
             eventBus: eventBus,
             settings: settings,
-            keychain: keychain
+            keychain: keychain,
+            serviceRegistry: serviceRegistry
         )
 
         // The agent runtime shares the app's git service and file index,

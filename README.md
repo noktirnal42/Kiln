@@ -107,7 +107,7 @@ Implemented per `09-AGENT-PROMPTS.md` Prompt 0 / `08-ROADMAP.md` Phase 0:
 | Project | XcodeGen `project.yml`, Swift 6 strict concurrency, macOS 15+, App Sandbox (`Config/Entitlements.plist`), Hardened Runtime setting |
 | SwiftData schema | `Workspace`, `ModuleState`, `Conversation`, `Message`, `Artifact`, `SettingsEntry` (`Core/Models/SwiftDataModels.swift`) |
 | Module protocol | `Module` / `ModuleDefinition` / `ModuleUI` with initialize / activate / deactivate / shutdown lifecycle (`Core/Contracts/`) |
-| ModuleManager | Manifest discovery (`ModuleManifest.json` + `*.modulemanifest.json`, bounded scan), topological dependency resolution, load/unload/activate/deactivate, semantic-version compatibility check, lifecycle events on the bus |
+| ModuleManager | Manifest discovery (`*.modulemanifest.json` or `ModuleManifest.json`, bounded scan), topological dependency resolution, load/unload/activate/deactivate, semantic-version compatibility check, lifecycle events on the bus |
 | Capability system | `ModuleCapabilities` OptionSet (31 capabilities, string names per `01-MODULAR-ARCHITECTURE.md`), manifest declaration, grant = required ∩ allowed, **runtime enforcement via `ModuleContext.requireCapability`** — denial fails cleanly naming the missing capability |
 | ModuleContext | Per-module granted capabilities, workspace snapshot, event bus, service registry, settings, keychain, `os.Logger` namespacing |
 | Event bus | `ModuleEventBus` actor: typed publish/subscribe, unsubscribe, catch-all observation, 256-entry bounded history with JSON payloads |
@@ -148,7 +148,7 @@ Core/Contracts/       Module, ModuleUI, capabilities, manifest, context, bus, re
 Core/Services/        ModuleManager, SettingsService, KeychainService
 Core/Models/          SwiftData schema
 Modules/Hello/        Demo module (UI + engine)
-ModuleManifests/      Bundled ModuleManifest.json files
+ModuleManifests/      Bundled *.modulemanifest.json files
 UI/                   MainWindow, sidebar, module host, design system
 Tests/CoreTests/      Swift Testing suite
 docs/                 Specifications (00–10)

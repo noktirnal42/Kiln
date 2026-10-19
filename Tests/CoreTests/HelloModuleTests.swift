@@ -87,7 +87,7 @@ struct HelloModuleTests {
 
     @Test func bundledManifestDecodes() throws {
         let bundle = Bundle(for: AppModel.self)
-        let url = bundle.url(forResource: "HelloModule", withExtension: "json", subdirectory: "ModuleManifests")
+        let url = bundle.url(forResource: "HelloModule.modulemanifest", withExtension: "json", subdirectory: "ModuleManifests")
         guard let url else {
             Issue.record("bundled manifest not found in app bundle")
             return
