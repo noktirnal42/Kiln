@@ -124,6 +124,14 @@ public final class AppModel {
         await refreshRecords()
         if let re = (await manager.record(for: REModule.identifier))?.module as? REModule {
             REAgentTools.register(module: re)
+            #if DEBUG
+            // Visual-QA hook, compiled out of release builds:
+            //   open Kiln.app --args -KilnImportFixture /usr/bin/true
+            // imports the binary at launch so analysis views can be checked without the file picker.
+            if let fixture = UserDefaults.standard.string(forKey: "KilnImportFixture") {
+                _ = try? await re.importBinary(at: URL(fileURLWithPath: fixture))
+            }
+            #endif
         }
         await syncUIModules()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
