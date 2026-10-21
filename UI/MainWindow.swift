@@ -59,6 +59,13 @@ struct MainWindow: View {
 struct SidebarView: View {
     @Environment(AppModel.self) private var app
     @State private var selection: String?
+    /// Lifecycle events fire on every module transition and drown out real activity, so they are hidden by default.
+    @State private var showLifecycle = false
+
+    /// Filters the feed. `module.lifecycle` is the only noisy type today; add others here if they need hiding.
+    static func visibleBusEntries(_ entries: [BusEntry], showLifecycle: Bool) -> [BusEntry] {
+        showLifecycle ? entries : entries.filter { $0.eventType != "module.lifecycle" }
+    }
 
     var body: some View {
         @Bindable var app = app
@@ -69,11 +76,12 @@ struct SidebarView: View {
                         .tag(record.id)
                 }
             }
-            Section("Event Bus") {
-                if app.busEntries.isEmpty {
+            Section {
+                let entries = Self.visibleBusEntries(app.busEntries, showLifecycle: showLifecycle)
+                if entries.isEmpty {
                     Text("No events yet").font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
-                ForEach(app.busEntries.suffix(30).reversed()) { entry in
+                ForEach(entries.suffix(30).reversed()) { entry in
                     HStack(alignment: .top, spacing: SSSpacing.s) {
                         Image(systemName: "bolt.fill")
                             .foregroundStyle(SSColor.accent)
@@ -86,6 +94,16 @@ struct SidebarView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                }
+            } header: {
+                HStack {
+                    Text("Event Bus")
+                    Spacer()
+                    Toggle("Lifecycle", isOn: $showLifecycle)
+                        .toggleStyle(.checkbox)
+                        .controlSize(.small)
+                        .font(SSTypography.caption())
+                        .help("Show module lifecycle events, which are hidden by default")
                 }
             }
         }

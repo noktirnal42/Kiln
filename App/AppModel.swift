@@ -122,6 +122,9 @@ public final class AppModel {
             try? await manager.activate(record.id)
         }
         await refreshRecords()
+        if let re = (await manager.record(for: REModule.identifier))?.module as? REModule {
+            REAgentTools.register(module: re)
+        }
         await syncUIModules()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
             await activateModule(firstUI)
