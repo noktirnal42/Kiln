@@ -55,6 +55,11 @@ struct REProjectDetail: View {
             Group {
                 if let function = selectedFunction {
                     REFunctionDetail(function: function)
+                } else if analysis.functions.isEmpty {
+                    ContentUnavailableView("No functions recovered", systemImage: "function",
+                                           description: Text("Native inspection found no named code symbols. "
+                                               + "The binary is probably stripped. Strings, crypto, format and "
+                                               + "gadget analyses still work; Ghidra can recover stripped functions."))
                 } else {
                     ContentUnavailableView("No function selected", systemImage: "function",
                                            description: Text("Select a function from the list."))
