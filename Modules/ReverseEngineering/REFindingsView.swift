@@ -8,6 +8,8 @@ enum REFindingsTab: String, CaseIterable, Identifiable {
     case formats = "Formats"
     case gadgets = "Gadgets"
     case rules = "Rules"
+    case forensics = "Forensics"
+    case script = "Script"
 
     var id: String { rawValue }
 }
@@ -26,6 +28,7 @@ struct REFindingsView: View {
 
     @State private var query = ""
     @State private var ruleSource = REFindingsView.exampleRule
+    @State private var scriptSource = REFindingsView.exampleScript
     @State private var rows: [REFindingRow] = []
     @State private var status: String?
     @State private var isRunning = false
@@ -72,16 +75,25 @@ struct REFindingsView: View {
     }
     """
 
+    /// Starting point for the script editor: the binary path is in `binary`, and the last expression is the result.
+    static let exampleScript = """
+    // `binary` is this project's binary; `axiom` is the analysis API.
+    const t = axiom.triage(binary);
+    axiom.log("triaged " + binary);
+    JSON.stringify(t).slice(0, 200);
+    """
+
     @ViewBuilder
     private var controls: some View {
-        if tab == .rules {
+        if tab == .rules || tab == .script {
+            let source = tab == .script ? $scriptSource : $ruleSource
             VStack(alignment: .leading, spacing: 8) {
-                TextEditor(text: $ruleSource)
+                TextEditor(text: source)
                     .font(.caption.monospaced())
                     .frame(height: 110)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
                 Button(actionTitle) { Task { await run() } }
-                    .disabled(isRunning || ruleSource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isRunning || source.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         } else {
             HStack {
@@ -103,6 +115,8 @@ struct REFindingsView: View {
         case .formats: "Carve embedded formats"
         case .gadgets: "Find gadgets"
         case .rules: "Scan with rules"
+        case .forensics: "Analyze dump structure"
+        case .script: "Run script"
         }
     }
 
@@ -113,6 +127,8 @@ struct REFindingsView: View {
         case .formats: "No embedded format signatures were found."
         case .gadgets: "No instruction sequences ending in a return were found."
         case .rules: "No rule matched this binary."
+        case .forensics: "No embedded modules or core-dump structure were found."
+        case .script: "The script returned no output."
         }
     }
 
@@ -176,6 +192,27 @@ struct REFindingsView: View {
                                     detail: (match.tags.isEmpty ? "" : "[\(match.tags.joined(separator: ", "))] ")
                                         + (hits.isEmpty ? "matched by condition" : hits))
             }
+        case .forensics:
+            let report = try await module.dumpForensics(projectID: projectID)
+            var rows = report.modules.map {
+                REFindingRow(title: "\($0.format) @ " + String(format: "0x%llx", UInt64($0.offset)),
+                             detail: [$0.size.map { "\($0) bytes" }, $0.note].compactMap { $0 }.joined(separator: " · "))
+            }
+            if let core = report.core {
+                rows.append(REFindingRow(title: "\(core.format) core dump",
+                                         detail: "\(core.regions.count) regions"
+                                             + (core.regionListTruncated ? " (list truncated)" : "")))
+                rows += core.regions.map {
+                    REFindingRow(title: String(format: "0x%llx", $0.virtualAddress),
+                                 detail: "\($0.memorySize) bytes in memory · file offset "
+                                     + String(format: "0x%llx", UInt64($0.fileOffset)))
+                }
+            }
+            return rows
+        case .script:
+            let result = try await module.runScript(projectID: projectID, source: scriptSource)
+            return [REFindingRow(title: "result", detail: result.value)]
+                + result.output.map { REFindingRow(title: "log", detail: $0) }
         }
     }
 }

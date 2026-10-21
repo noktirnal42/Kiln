@@ -214,6 +214,33 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
         }.value
     }
 
+    /// Dump forensics over the project's binary: embedded module listing plus, when the
+    /// file is an ELF/Mach-O core dump, its region layout. Read-only; nothing is extracted.
+    public func dumpForensics(projectID: String) async throws -> REDumpReport {
+        try await Task.detached(priority: .userInitiated) {
+            let project = try await MainActor.run { try self.projectFolder(id: projectID) }
+            let data = try ToolBelt.readData(project.binaryURL.path, limit: ToolBelt.scanLimit)
+            return REDumpReport(modules: DumpForensics.listModules(data), core: DumpForensics.parseCore(data))
+        }.value
+    }
+
+    /// Runs an analyst script against the project's binary. The script sees the binary's
+    /// path as `binary` and the `axiom` analysis API. Runs in-process: a script that never
+    /// returns keeps its background thread busy, so keep scripts short.
+    public func runScript(projectID: String, source: String) async throws -> REScriptResult {
+        let binaryPath = try await MainActor.run { try self.projectFolder(id: projectID).binaryURL.path }
+        return try await Task.detached(priority: .userInitiated) {
+            let encoded = String(data: try JSONSerialization.data(withJSONObject: [binaryPath]), encoding: .utf8) ?? "[\"\"]"
+            let prelude = "var binary = \(encoded.dropFirst().dropLast());\n"
+            switch ScriptConsole().run(script: prelude + source) {
+            case .success(let (value, output)):
+                return REScriptResult(value: value, output: output)
+            case .failure(let error):
+                throw error
+            }
+        }.value
+    }
+
     /// Format carving over the project's binary.
     public func carveFormats(projectID: String) async throws -> [FormatHit] {
         try await Task.detached(priority: .userInitiated) {
@@ -415,6 +442,18 @@ public enum REEditOperation: Sendable, Equatable {
             .variable(address: address, id: id, name: name, type: type)
         }
     }
+}
+
+/// Result of dump forensics over one binary.
+public struct REDumpReport: Sendable {
+    public let modules: [DumpModule]
+    public let core: DumpForensics.CoreDump?
+}
+
+/// Result of one script run: the final expression's value and the console lines it logged.
+public struct REScriptResult: Sendable, Equatable {
+    public let value: String
+    public let output: [String]
 }
 
 public struct StringMatch: Codable, Sendable, Identifiable {
