@@ -92,6 +92,15 @@ public enum Analyzer {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/bin/otool"
     }()
 
+    /// Linear disassembly of a whole Mach-O file, for analyses that recovered no functions
+    /// (stripped binaries). `arch` selects one slice of a universal binary so instructions
+    /// from different architectures are never mixed.
+    public static func disassemblyListing(_ path: String, arch: String? = nil) throws -> String {
+        var arguments = ["-tvV"]
+        if let arch { arguments += ["-arch", arch] }
+        return try ProcessRunner.run(otoolExecutable, arguments + [path])
+    }
+
     public static func inspect(_ path: String, arch: String? = nil) throws -> Analysis {
         let original = URL(fileURLWithPath: path).standardizedFileURL
         let attrs = try FileManager.default.attributesOfItem(atPath: original.path)
@@ -139,7 +148,8 @@ public enum Analyzer {
         func flush() { if let name, !address.isEmpty { result.append(FunctionRecord(address: address, name: name, assembly: lines.joined(separator: "\n"))) } }
         for raw in text.split(separator: "\n") {
             let line = String(raw)
-            if line.hasSuffix(":"), !line.contains(" "), !line.contains("\t") { flush(); name = String(line.dropLast()); lines = []; address = "" }
+            // otool prints the file path as a header ("/abs/path/binary:"). That is not a symbol, so it must not open a function.
+            if line.hasSuffix(":"), !line.hasPrefix("/"), !line.contains(" "), !line.contains("\t") { flush(); name = String(line.dropLast()); lines = []; address = "" }
             else if name != nil {
                 let token = line.split(whereSeparator: { $0 == "\t" || $0 == " " }).first.map(String.init) ?? ""
                 if token.count >= 8, UInt64(token, radix: 16) != nil { if address.isEmpty { address = token }; lines.append(line) }

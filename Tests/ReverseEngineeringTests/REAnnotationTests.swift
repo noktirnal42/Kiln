@@ -52,15 +52,13 @@ struct REAnnotationTests {
         }
     }
 
-    @Test func bookmarkToggleRoundTrips() async throws {
+    /// Bookmarks belong to functions. A stripped binary has none, so a bookmark there must be refused, not recorded.
+    @Test func bookmarkNeedsARecoveredFunction() async throws {
         let module = REModule()
         let (id, initial) = try await importSystemBinary(into: module)
-        let address = "0x100000368"
 
-        let added = try await module.toggleBookmark(projectID: id, expectedRevision: initial.revision, address: address)
-        #expect((added.bookmarks ?? []).contains { $0.lowercased().hasSuffix("100000368") })
-
-        let removed = try await module.toggleBookmark(projectID: id, expectedRevision: added.revision, address: address)
-        #expect(!(removed.bookmarks ?? []).contains { $0.lowercased().hasSuffix("100000368") })
+        await #expect(throws: (any Error).self) {
+            _ = try await module.toggleBookmark(projectID: id, expectedRevision: initial.revision, address: "0x100000368")
+        }
     }
 }

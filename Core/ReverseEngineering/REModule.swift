@@ -268,7 +268,14 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
     /// ROP/JOP gadget search over the project's disassembly.
     public func findGadgets(projectID: String, ending: String? = nil, depth: Int? = nil) async throws -> [Gadget] {
         try await Task.detached(priority: .userInitiated) {
-            let analysis = try await MainActor.run { try self.loadedAnalysis(projectID: projectID) }
+            let (analysis, binaryPath) = try await MainActor.run {
+                (try self.loadedAnalysis(projectID: projectID), try self.projectFolder(id: projectID).binaryURL.path)
+            }
+            if analysis.functions.isEmpty {
+                // Stripped binaries recover no functions, so sweep the whole disassembly instead.
+                let listing = try Analyzer.disassemblyListing(binaryPath, arch: analysis.slice)
+                return GadgetSearch.search(assembly: listing, depth: depth ?? 5, ending: ending ?? "ret", limit: 1024)
+            }
             return GadgetSearch.search(
                 functions: analysis.functions,
                 depth: depth ?? 5,
