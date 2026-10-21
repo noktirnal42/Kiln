@@ -54,7 +54,7 @@ struct REProjectDetail: View {
             Divider()
             Group {
                 if let function = selectedFunction {
-                    REFunctionDetail(function: function)
+                    REFunctionDetail(module: module, projectID: project.id, analysis: analysis, function: function)
                 } else if analysis.functions.isEmpty {
                     ContentUnavailableView("No functions recovered", systemImage: "function",
                                            description: Text("Native inspection found no named code symbols. "
@@ -73,11 +73,15 @@ struct REProjectDetail: View {
 /// Read-only detail for one function: signature, call relationships, assembly
 /// and — when a Ghidra analysis produced it — decompiled pseudocode.
 struct REFunctionDetail: View {
+    let module: REModule
+    let projectID: String
+    let analysis: Analysis
     let function: FunctionRecord
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                REAnnotationControls(module: module, projectID: projectID, analysis: analysis, function: function)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(function.name).font(.title2.monospaced()).textSelection(.enabled)
                     Text(function.address).font(.caption.monospaced()).foregroundStyle(.secondary)
