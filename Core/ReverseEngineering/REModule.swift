@@ -203,6 +203,17 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
         }.value
     }
 
+    /// Runs analyst-supplied YARA-subset rules over the project's binary. Syntax
+    /// errors surface as `RuleSyntaxError` with the position the compiler reports.
+    public func scanRules(projectID: String, source: String) async throws -> [RuleMatch] {
+        try await Task.detached(priority: .userInitiated) {
+            let rules = try RuleScanner.compile(source)
+            let project = try await MainActor.run { try self.projectFolder(id: projectID) }
+            let data = try ToolBelt.readData(project.binaryURL.path, limit: ToolBelt.scanLimit)
+            return RuleScanner.scan(data, rules: rules)
+        }.value
+    }
+
     /// Format carving over the project's binary.
     public func carveFormats(projectID: String) async throws -> [FormatHit] {
         try await Task.detached(priority: .userInitiated) {

@@ -7,6 +7,7 @@ enum REFindingsTab: String, CaseIterable, Identifiable {
     case crypto = "Crypto"
     case formats = "Formats"
     case gadgets = "Gadgets"
+    case rules = "Rules"
 
     var id: String { rawValue }
 }
@@ -24,6 +25,7 @@ struct REFindingsView: View {
     let tab: REFindingsTab
 
     @State private var query = ""
+    @State private var ruleSource = REFindingsView.exampleRule
     @State private var rows: [REFindingRow] = []
     @State private var status: String?
     @State private var isRunning = false
@@ -60,16 +62,37 @@ struct REFindingsView: View {
         .onChange(of: projectID) { _, _ in reset() }
     }
 
+    /// Starting point for the rules editor: one rule, shown so the syntax is visible.
+    static let exampleRule = """
+    rule libsystem_reference {
+        strings:
+            $a = "libSystem"
+        condition:
+            $a
+    }
+    """
+
     @ViewBuilder
     private var controls: some View {
-        HStack {
-            if tab == .strings {
-                TextField("Substring to find", text: $query)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { Task { await run() } }
+        if tab == .rules {
+            VStack(alignment: .leading, spacing: 8) {
+                TextEditor(text: $ruleSource)
+                    .font(.caption.monospaced())
+                    .frame(height: 110)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                Button(actionTitle) { Task { await run() } }
+                    .disabled(isRunning || ruleSource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            Button(actionTitle) { Task { await run() } }
-                .disabled(isRunning || (tab == .strings && query.trimmingCharacters(in: .whitespaces).isEmpty))
+        } else {
+            HStack {
+                if tab == .strings {
+                    TextField("Substring to find", text: $query)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { Task { await run() } }
+                }
+                Button(actionTitle) { Task { await run() } }
+                    .disabled(isRunning || (tab == .strings && query.trimmingCharacters(in: .whitespaces).isEmpty))
+            }
         }
     }
 
@@ -79,6 +102,7 @@ struct REFindingsView: View {
         case .crypto: "Scan for crypto constants"
         case .formats: "Carve embedded formats"
         case .gadgets: "Find gadgets"
+        case .rules: "Scan with rules"
         }
     }
 
@@ -88,6 +112,7 @@ struct REFindingsView: View {
         case .crypto: "No known cryptographic constants were found."
         case .formats: "No embedded format signatures were found."
         case .gadgets: "No instruction sequences ending in a return were found."
+        case .rules: "No rule matched this binary."
         }
     }
 
@@ -139,6 +164,17 @@ struct REFindingsView: View {
             let gadgets = try await module.findGadgets(projectID: projectID)
             return gadgets.map {
                 REFindingRow(title: $0.address, detail: $0.instructions.joined(separator: " ; "))
+            }
+        case .rules:
+            let matches = try await module.scanRules(projectID: projectID, source: ruleSource)
+            return matches.map { match in
+                let hits = match.strings
+                    .filter { !$0.offsets.isEmpty }
+                    .map { "\($0.identifier) @ " + $0.offsets.prefix(4).map { String(format: "0x%llx", UInt64($0)) }.joined(separator: ", ") }
+                    .joined(separator: " · ")
+                return REFindingRow(title: match.rule,
+                                    detail: (match.tags.isEmpty ? "" : "[\(match.tags.joined(separator: ", "))] ")
+                                        + (hits.isEmpty ? "matched by condition" : hits))
             }
         }
     }
