@@ -1,14 +1,16 @@
 import SwiftUI
 import AxiomCore
 
-/// Two-column view of one analyzed binary: function list on the left, the
-/// selected function's assembly and decompilation on the right.
+/// One analyzed binary. The Functions tab is two columns: function list on the
+/// left, the selected function's assembly and decompilation on the right. The
+/// other tabs run analyses over the whole binary (see `REFindingsView`).
 struct REProjectDetail: View {
     let module: REModule
     let project: REModule.REProject
     let analysis: Analysis
 
     @State private var selectedAddress: String?
+    @State private var tab: REFindingsTab?
 
     private var selectedFunction: FunctionRecord? {
         guard let selectedAddress else { return nil }
@@ -16,6 +18,26 @@ struct REProjectDetail: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            Picker("View", selection: $tab) {
+                Text("Functions").tag(REFindingsTab?.none)
+                ForEach(REFindingsTab.allCases) { tab in
+                    Text(tab.rawValue).tag(REFindingsTab?.some(tab))
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(8)
+            Divider()
+            if let tab {
+                REFindingsView(module: module, projectID: project.id, tab: tab)
+            } else {
+                functionsBody
+            }
+        }
+    }
+
+    private var functionsBody: some View {
         HStack(spacing: 0) {
             List(selection: $selectedAddress) {
                 Section("Functions (\(analysis.functions.count))") {

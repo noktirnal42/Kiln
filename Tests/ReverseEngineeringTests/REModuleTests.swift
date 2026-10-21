@@ -55,6 +55,19 @@ struct REModuleTests {
         }
     }
 
+    @Test func findingsAnalysesRunOnImportedProject() async throws {
+        let module = REModule()
+        _ = try await module.importBinary(at: try copySystemBinary())
+        let id = try #require(module.selected?.id)
+
+        _ = try await module.scanCrypto(projectID: id)
+        _ = try await module.carveFormats(projectID: id)
+        let gadgets = try await module.findGadgets(projectID: id)
+        #expect(gadgets.allSatisfy { !$0.instructions.isEmpty })
+        let matches = try await module.searchStrings(projectID: id, pattern: "zzz-no-such-string-\(UUID().uuidString)")
+        #expect(matches.isEmpty)
+    }
+
     @Test func mcpToolDefinitionsHaveUniqueNames() {
         let names = REMCPTools.definitions.map(\.name)
         #expect(Set(names).count == names.count)
