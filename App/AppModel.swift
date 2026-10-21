@@ -128,8 +128,13 @@ public final class AppModel {
             // Visual-QA hook, compiled out of release builds:
             //   open Kiln.app --args -KilnImportFixture /usr/bin/true
             // imports the binary at launch so analysis views can be checked without the file picker.
+            // Skips a fixture already imported on an earlier launch, so relaunches don't pile up copies.
             if let fixture = UserDefaults.standard.string(forKey: "KilnImportFixture") {
-                _ = try? await re.importBinary(at: URL(fileURLWithPath: fixture))
+                let name = URL(fileURLWithPath: fixture).lastPathComponent
+                let alreadyImported = re.projects.contains { $0.binaryURL.lastPathComponent == name }
+                if !alreadyImported {
+                    _ = try? await re.importBinary(at: URL(fileURLWithPath: fixture))
+                }
             }
             #endif
         }
