@@ -225,20 +225,35 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
     }
 
     /// Runs an analyst script against the project's binary. The script sees the binary's
-    /// path as `binary` and the `axiom` analysis API. Runs in-process: a script that never
-    /// returns keeps its background thread busy, so keep scripts short.
-    public func runScript(projectID: String, source: String) async throws -> REScriptResult {
+    /// path as `binary` and the `axiom` analysis API. The caller gets an answer after
+    /// `timeout` even if the script is still running: JavaScriptCore offers no way to
+    /// interrupt a script in-process, so a runaway script keeps its own thread busy until
+    /// the process exits. The thread is dedicated, so it never starves the cooperative pool.
+    public func runScript(projectID: String, source: String,
+                          timeout: Duration = .seconds(10)) async throws -> REScriptResult {
         let binaryPath = try await MainActor.run { try self.projectFolder(id: projectID).binaryURL.path }
-        return try await Task.detached(priority: .userInitiated) {
-            let encoded = String(data: try JSONSerialization.data(withJSONObject: [binaryPath]), encoding: .utf8) ?? "[\"\"]"
-            let prelude = "var binary = \(encoded.dropFirst().dropLast());\n"
-            switch ScriptConsole().run(script: prelude + source) {
-            case .success(let (value, output)):
-                return REScriptResult(value: value, output: output)
-            case .failure(let error):
-                throw error
+        let encoded = String(data: try JSONSerialization.data(withJSONObject: [binaryPath]), encoding: .utf8) ?? "[\"\"]"
+        let script = "var binary = \(encoded.dropFirst().dropLast());\n" + source
+        let seconds = Int(timeout.components.seconds)
+        return try await withCheckedThrowingContinuation { continuation in
+            let gate = ResumeOnce()
+            let worker = Thread {
+                let outcome: Result<REScriptResult, Error>
+                switch ScriptConsole().run(script: script) {
+                case .success(let (value, output)):
+                    outcome = .success(REScriptResult(value: value, output: output))
+                case .failure(let error):
+                    outcome = .failure(error)
+                }
+                if gate.claim() { continuation.resume(with: outcome) }
             }
-        }.value
+            worker.stackSize = 8 * 1024 * 1024
+            worker.start()
+            Task.detached {
+                try? await Task.sleep(for: timeout)
+                if gate.claim() { continuation.resume(throwing: REError.scriptTimedOut(seconds)) }
+            }
+        }
     }
 
     /// Format carving over the project's binary.
@@ -476,9 +491,12 @@ public enum REError: LocalizedError {
     case unknownFunction
     case noDecompilation(String)
     case ghidraNotConfigured
+    case scriptTimedOut(Int)
 
     public var errorDescription: String? {
         switch self {
+        case .scriptTimedOut(let seconds):
+            "Script did not finish within \(seconds) s and was abandoned. Its background thread may stay busy until the process exits."
         case .notAFile(let path): "Not a regular file: \(path)"
         case .fileTooLarge(let size):
             "File too large: \(size / 1024 / 1024) MiB (import limit is 256 MiB)."
@@ -489,5 +507,20 @@ public enum REError: LocalizedError {
             "Ghidra is not configured. Set the Ghidra install home and the AxiomExport.java " +
             "script path in Settings → Reverse Engineering, then re-run analysis."
         }
+    }
+}
+
+/// Lets exactly one of two racing completions resume a continuation.
+private final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var claimed = false
+
+    /// True for the first caller only.
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if claimed { return false }
+        claimed = true
+        return true
     }
 }

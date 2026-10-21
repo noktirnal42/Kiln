@@ -49,6 +49,19 @@ struct REForensicsAndScriptTests {
         #expect(result.output.contains { $0.contains("hello from script") })
     }
 
+    @Test func slowScriptIsAbandonedAfterItsTimeout() async throws {
+        let module = REModule()
+        let id = try await importSystemBinary(into: module)
+        let started = ContinuousClock.now
+        // The loop is bounded, so its worker thread finishes on its own; the caller must not wait for it.
+        await #expect(throws: REError.self) {
+            _ = try await module.runScript(projectID: id,
+                                           source: "var i = 0; while (i < 300000000) { i++; } i",
+                                           timeout: .milliseconds(100))
+        }
+        #expect(ContinuousClock.now - started < .seconds(5))
+    }
+
     @Test func thrownScriptErrorFailsInsteadOfCrashing() async throws {
         let module = REModule()
         let id = try await importSystemBinary(into: module)
