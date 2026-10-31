@@ -116,7 +116,21 @@ public final class AppModel {
             monitor: MonitorPolicy(
                 enabled: true, pauseAtSeverity: 5,
                 protectedPaths: [auditRoot, Bundle.main.bundleURL].compactMap { $0 }
-            )
+            ),
+            // Model-based monitor pass: OFF unless `monitor.rubricModel` is set, so by default no
+            // extra model calls are made and no activity leaves the machine. Calls use
+            // completeSilently, which never changes the model the user's chat is using.
+            rubric: { [settings = self.settings, registry = self.modelRegistry] in
+                let model = await settings.get("monitor.rubricModel", as: String.self, fallback: "")
+                guard !model.isEmpty else { return nil }
+                let fallback = await settings.get("monitor.rubricFallbackModel", as: String.self, fallback: "")
+                return RubricMonitor(model: model, fallbackModel: fallback.isEmpty ? nil : fallback) { model, system, prompt in
+                    try await registry.completeSilently(ChatRequest(
+                        messages: [ChatMessage(role: .system, content: system), ChatMessage(role: .user, content: prompt)],
+                        model: model, temperature: 0, maxTokens: 800
+                    ))
+                }
+            }
         )
     }
 

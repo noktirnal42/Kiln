@@ -4,7 +4,7 @@ import Testing
 
 // MARK: - Helpers
 
-private final class CallCounter: @unchecked Sendable {
+final class CallCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var value = 0
     var count: Int { lock.withLock { value } }
@@ -12,7 +12,7 @@ private final class CallCounter: @unchecked Sendable {
 }
 
 /// Stands in for read_file so a test can prove whether the tool actually ran.
-private struct SpyReadTool: ToolExecuting {
+struct SpyReadTool: ToolExecuting {
     let counter: CallCounter
 
     var spec: ToolSpec {
@@ -26,30 +26,30 @@ private struct SpyReadTool: ToolExecuting {
     }
 }
 
-private func makeWorkspace() throws -> URL {
+func makeWorkspace() throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("kiln-monitor-ws-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     return url
 }
 
-private func readerProfile(_ name: String = "reader") -> AgentProfile {
+func readerProfile(_ name: String = "reader") -> AgentProfile {
     AgentProfile(
         name: name, mode: .review,
         toolPermissions: ToolPermissionSet(enabledTools: ["read_file"], policyByLevel: [.read: .automatic])
     )
 }
 
-private func readCall(_ path: String, id: String = "c1") -> ToolCall {
+func readCall(_ path: String, id: String = "c1") -> ToolCall {
     ToolCall(id: id, name: "read_file", arguments: #"{"path": "\#(path)"}"#)
 }
 
 /// The path that trips credential_access (7) and scope_probing (6): outside the workspace and
 /// credential-shaped.
-private let credentialPath = "../../.aws/credentials"
+let credentialPath = "../../.aws/credentials"
 
 @MainActor
-private func waitForPending(_ center: ApprovalCenter, timeout: Double = 5) async -> Bool {
+func waitForPending(_ center: ApprovalCenter, timeout: Double = 5) async -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
         if !center.pending.isEmpty { return true }

@@ -169,6 +169,21 @@ public actor ModelRegistry {
         return try await provider.streamChat(request, reasoning: reasoning)
     }
 
+    /// One non-interactive completion, returned as text.
+    ///
+    /// Unlike `streamChat` this leaves the registry's active model alone and publishes no
+    /// `ModelSwitchedEvent`. Background callers (the behavior monitor) use it so scoring a run with
+    /// some other model never changes what the user's chat is talking to. Output is capped.
+    public func completeSilently(_ request: ChatRequest, maxCharacters: Int = 64 * 1024) async throws -> String {
+        let provider = try await resolveProvider(for: request.model)
+        var text = ""
+        for try await chunk in try await provider.streamChat(request, reasoning: nil) {
+            text += chunk.delta?.content ?? ""
+            if text.count >= maxCharacters { break }
+        }
+        return String(text.prefix(maxCharacters))
+    }
+
     private func resolveProvider(for modelID: String) async throws -> any ModelProvider {
         if let providerID = modelIndex[modelID], let provider = providers[providerID] {
             return provider

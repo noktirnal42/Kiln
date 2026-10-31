@@ -146,18 +146,24 @@ public final class AgentOrchestrator: Sendable {
     /// severity pauses only the originating run and asks a human.
     public let monitor: MonitorPolicy
 
+    /// Resolves the model-based rubric monitor for a run, or nil for none. Resolved per run so a
+    /// setting changed between runs takes effect. Nil (the default) makes no extra model calls.
+    public let rubric: (@Sendable () async -> RubricMonitor?)?
+
     public init(
         toolRegistry: ToolRegistry = .shared,
         approvalCenter: ApprovalCenter? = nil,
         services: ToolServices = ToolServices(),
         auditChain: AuditChain? = nil,
-        monitor: MonitorPolicy = .standard
+        monitor: MonitorPolicy = .standard,
+        rubric: (@Sendable () async -> RubricMonitor?)? = nil
     ) {
         self.toolRegistry = toolRegistry
         self.approvalCenter = approvalCenter
         self.services = services
         self.auditChain = auditChain
         self.monitor = monitor
+        self.rubric = rubric
     }
 
     func resolveCenter() async -> ApprovalCenter {
@@ -183,6 +189,7 @@ public final class AgentOrchestrator: Sendable {
                         profileID: profile.id, profileName: profile.name, modelID: profile.modelID,
                         mode: profile.mode.rawValue, promptCharacters: prompt.count, workspaceRoot: workspaceRoot
                     )
+                    let rubricMonitor = self.monitor.enabled ? await self.rubric?() : nil
                     try await self.limiter.withSlot(profileID: profile.id, maxConcurrent: profile.maxConcurrentTasks) {
                         try await self.loop(
                             profile: profile,
@@ -194,6 +201,7 @@ public final class AgentOrchestrator: Sendable {
                             backoffUnitSeconds: backoffUnitSeconds,
                             chat: chat,
                             audit: recorder,
+                            rubric: rubricMonitor,
                             yield: {
                                 recorder?.record(event: $0)
                                 continuation.yield($0)
@@ -225,6 +233,7 @@ public final class AgentOrchestrator: Sendable {
         backoffUnitSeconds: Double,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>,
         audit: AgentAuditRecorder?,
+        rubric: RubricMonitor?,
         yield: @escaping @Sendable (AgentEvent) -> Void
     ) async throws -> Void {
         let approvalCenter = await resolveCenter()
@@ -271,6 +280,12 @@ public final class AgentOrchestrator: Sendable {
 
         var summary = AgentRunSummary(redactionCount: redactions)
         var assistantText = ""
+
+        // Rubric passes run beside the loop. They are advisory: a slow or failing monitor never
+        // delays or stops the agent, and passes still in flight when the run ends are cancelled.
+        let findings: RubricFindings? = rubric == nil ? nil : RubricFindings()
+        var passes: [Task<Void, Never>] = []
+        defer { passes.forEach { $0.cancel() } }
 
         while true {
             if stop.stopped { throw AgentRunError.stopped }
@@ -341,6 +356,7 @@ public final class AgentOrchestrator: Sendable {
                     approvalCenter: approvalCenter,
                     toolTimeout: toolBudget,
                     audit: audit,
+                    findings: findings,
                     yield: yield
                 )
                 switch record.status {
@@ -365,6 +381,29 @@ public final class AgentOrchestrator: Sendable {
                     content: content,
                     metadata: metadata
                 ))
+            }
+
+            if let rubric, let findings {
+                let round = summary.rounds
+                let activity = RubricMonitor.activityText(round: round, assistantText: turn.text, calls: turn.toolCalls)
+                passes.append(Task {
+                    let found = await rubric.assess(activity: activity)
+                    findings.add(found)
+                    audit?.record("monitor.assessed", [
+                        "round": .int(round),
+                        "flags": .int(found.count),
+                        "worst": .int(Tripwires.worstSeverity(found)),
+                    ])
+                    for flag in found {
+                        audit?.record("monitor.flag", [
+                            "round": .int(round),
+                            "category": .string(flag.category),
+                            "severity": .int(flag.severity),
+                            "rationale": .string(AgentAuditRecorder.clip(SecretRedactor.redact(flag.rationale).text)),
+                            "source": .string(flag.source),
+                        ])
+                    }
+                })
             }
         }
 
@@ -463,6 +502,7 @@ public final class AgentOrchestrator: Sendable {
         approvalCenter: ApprovalCenter,
         toolTimeout: TimeInterval,
         audit: AgentAuditRecorder?,
+        findings: RubricFindings?,
         yield: @escaping @Sendable (AgentEvent) -> Void
     ) async throws -> ToolCallRecord {
         var record = ToolCallRecord(
@@ -628,10 +668,17 @@ public final class AgentOrchestrator: Sendable {
         // Behavior-monitor hold. Placed after every policy and approval decision: a call that was
         // refused never needs a hold, and one that survived them all still gets a second look if it
         // tripped a wire. This pauses THIS run only; no other run is touched.
-        let worst = Tripwires.worstSeverity(flags)
+        // Severe findings from the model-based monitor's recent passes join the hold here: this is
+        // the next call about to run, so it is where an advisory finding can ask a human.
+        let modelFindings = monitor.enabled ? (findings?.takeAtOrAbove(monitor.pauseAtSeverity) ?? []) : []
+        let allFlags = flags + modelFindings
+        let worst = Tripwires.worstSeverity(allFlags)
         if monitor.enabled, worst >= monitor.pauseAtSeverity {
-            let held = flags.filter { $0.severity >= monitor.pauseAtSeverity }
-                .map { "• [\($0.category), severity \($0.severity)] \($0.rationale)" }
+            let held = allFlags.filter { $0.severity >= monitor.pauseAtSeverity }
+                .map { flag in
+                    let origin = flag.source == "model" ? " (monitor model, recent activity)" : ""
+                    return "• [\(flag.category), severity \(flag.severity)]\(origin) \(flag.rationale)"
+                }
                 .joined(separator: "\n")
             let review = ApprovalRequest(
                 toolName: spec.name,
