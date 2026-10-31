@@ -138,14 +138,20 @@ public final class AgentOrchestrator: Sendable {
     /// Empty by default so tests and previews run without booting the app.
     public let services: ToolServices
 
+    /// When set, every run is recorded into this tamper-evident chain: what the agent did and was
+    /// allowed to do, never prompts, file contents or tool results. Nil records nothing.
+    public let auditChain: AuditChain?
+
     public init(
         toolRegistry: ToolRegistry = .shared,
         approvalCenter: ApprovalCenter? = nil,
-        services: ToolServices = ToolServices()
+        services: ToolServices = ToolServices(),
+        auditChain: AuditChain? = nil
     ) {
         self.toolRegistry = toolRegistry
         self.approvalCenter = approvalCenter
         self.services = services
+        self.auditChain = auditChain
     }
 
     func resolveCenter() async -> ApprovalCenter {
@@ -164,8 +170,13 @@ public final class AgentOrchestrator: Sendable {
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
+            let recorder = self.auditChain.map { AgentAuditRecorder(chain: $0) }
             let task = Task {
                 do {
+                    recorder?.recordStarted(
+                        profileID: profile.id, profileName: profile.name, modelID: profile.modelID,
+                        mode: profile.mode.rawValue, promptCharacters: prompt.count, workspaceRoot: workspaceRoot
+                    )
                     try await self.limiter.withSlot(profileID: profile.id, maxConcurrent: profile.maxConcurrentTasks) {
                         try await self.loop(
                             profile: profile,
@@ -176,11 +187,19 @@ public final class AgentOrchestrator: Sendable {
                             stop: stop,
                             backoffUnitSeconds: backoffUnitSeconds,
                             chat: chat,
-                            yield: { continuation.yield($0) }
+                            audit: recorder,
+                            yield: {
+                                recorder?.record(event: $0)
+                                continuation.yield($0)
+                            }
                         )
                     }
+                    // Everything queued must be in the chain before the caller sees the run end.
+                    await recorder?.finish()
                     continuation.finish()
                 } catch {
+                    recorder?.recordFailure(error)
+                    await recorder?.finish()
                     continuation.finish(throwing: error)
                 }
             }
@@ -199,6 +218,7 @@ public final class AgentOrchestrator: Sendable {
         stop: AgentStopFlag,
         backoffUnitSeconds: Double,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>,
+        audit: AgentAuditRecorder?,
         yield: @escaping @Sendable (AgentEvent) -> Void
     ) async throws -> Void {
         let approvalCenter = await resolveCenter()
@@ -314,6 +334,7 @@ public final class AgentOrchestrator: Sendable {
                     stop: stop,
                     approvalCenter: approvalCenter,
                     toolTimeout: toolBudget,
+                    audit: audit,
                     yield: yield
                 )
                 switch record.status {
@@ -435,6 +456,7 @@ public final class AgentOrchestrator: Sendable {
         stop: AgentStopFlag,
         approvalCenter: ApprovalCenter,
         toolTimeout: TimeInterval,
+        audit: AgentAuditRecorder?,
         yield: @escaping @Sendable (AgentEvent) -> Void
     ) async throws -> ToolCallRecord {
         var record = ToolCallRecord(
@@ -569,6 +591,11 @@ public final class AgentOrchestrator: Sendable {
             )
             yield(.awaitingApproval(request))
             let decision = await approvalCenter.requestApproval(request, conversationID: profile.id)
+            // The event below only says yes/no; the audit also needs HOW (once, session, standing grant).
+            audit?.record("approval.decision", [
+                "request_id": .string(request.id.uuidString),
+                "decision": .string(decision.auditName),
+            ])
             yield(.approvalResolved(id: request.id, approved: decision.isApproval))
             guard decision.isApproval else {
                 return finish(.denied, error: "You declined to run '\(call.name)'.")

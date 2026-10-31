@@ -98,13 +98,20 @@ public final class AppModel {
         // to their own implementations when a service is absent, so this
         // only removes duplication — it never widens what tools may do.
         let keychain = self.keychain
+        // Every agent run is recorded into a tamper-evident chain. The head is kept one directory
+        // above the log so truncating the log alone is reported, not silently accepted.
+        let auditRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("Kiln", isDirectory: true)
         self.orchestrator = AgentOrchestrator(
             approvalCenter: approvalCenter,
             services: ToolServices(
                 git: gitService,
                 fileIndex: fileIndexService,
                 webSearchKey: { keychain.get(module: "com.kiln.tools", key: "web-search-key") }
-            )
+            ),
+            auditChain: auditRoot.map {
+                AuditChain(directory: $0.appendingPathComponent("Audit", isDirectory: true), headDirectory: $0)
+            }
         )
     }
 
