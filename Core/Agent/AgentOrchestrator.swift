@@ -142,16 +142,22 @@ public final class AgentOrchestrator: Sendable {
     /// allowed to do, never prompts, file contents or tool results. Nil records nothing.
     public let auditChain: AuditChain?
 
+    /// Tripwires run on every tool call before it executes. A finding at or above the policy's
+    /// severity pauses only the originating run and asks a human.
+    public let monitor: MonitorPolicy
+
     public init(
         toolRegistry: ToolRegistry = .shared,
         approvalCenter: ApprovalCenter? = nil,
         services: ToolServices = ToolServices(),
-        auditChain: AuditChain? = nil
+        auditChain: AuditChain? = nil,
+        monitor: MonitorPolicy = .standard
     ) {
         self.toolRegistry = toolRegistry
         self.approvalCenter = approvalCenter
         self.services = services
         self.auditChain = auditChain
+        self.monitor = monitor
     }
 
     func resolveCenter() async -> ApprovalCenter {
@@ -482,6 +488,23 @@ public final class AgentOrchestrator: Sendable {
         let spec = tool.spec
         record.permission = spec.permission
 
+        // Deterministic tripwires, before anything else can refuse or run the call. Every finding is
+        // audited even when the policy also refuses the call: a denied attempt is still evidence.
+        let flags = monitor.enabled
+            ? Tripwires.check(tool: call.name, argumentsJSON: call.arguments,
+                              workspaceRoot: workspaceRoot, protectedPaths: monitor.protectedPaths)
+            : []
+        for flag in flags {
+            audit?.record("monitor.flag", [
+                "call_id": .string(call.id),
+                "tool": .string(call.name),
+                "category": .string(flag.category),
+                "severity": .int(flag.severity),
+                "rationale": .string(AgentAuditRecorder.clip(SecretRedactor.redact(flag.rationale).text)),
+                "source": .string(flag.source),
+            ])
+        }
+
         // The policy refuses this tool outright — the same tool list the
         // model was offered came from Gate A; this re-check catches a tool
         // call that was never on it.
@@ -599,6 +622,43 @@ public final class AgentOrchestrator: Sendable {
             yield(.approvalResolved(id: request.id, approved: decision.isApproval))
             guard decision.isApproval else {
                 return finish(.denied, error: "You declined to run '\(call.name)'.")
+            }
+        }
+
+        // Behavior-monitor hold. Placed after every policy and approval decision: a call that was
+        // refused never needs a hold, and one that survived them all still gets a second look if it
+        // tripped a wire. This pauses THIS run only; no other run is touched.
+        let worst = Tripwires.worstSeverity(flags)
+        if monitor.enabled, worst >= monitor.pauseAtSeverity {
+            let held = flags.filter { $0.severity >= monitor.pauseAtSeverity }
+                .map { "• [\($0.category), severity \($0.severity)] \($0.rationale)" }
+                .joined(separator: "\n")
+            let review = ApprovalRequest(
+                toolName: spec.name,
+                toolSummary: spec.summary,
+                argumentsJSON: call.arguments,
+                permission: spec.permission,
+                isDestructive: spec.isDestructive,
+                preview: ApprovalPreview.preview(for: spec, argumentsJSON: call.arguments),
+                consequences: "The behavior monitor held this call before it ran:\n" + held,
+                isMonitorReview: true
+            )
+            record.status = .awaitingApproval
+            audit?.record("monitor.paused", [
+                "request_id": .string(review.id.uuidString),
+                "call_id": .string(call.id),
+                "tool": .string(call.name),
+                "severity": .int(worst),
+            ])
+            yield(.awaitingApproval(review))
+            let decision = await approvalCenter.requestReview(review, conversationID: profile.id)
+            audit?.record("monitor.review", [
+                "request_id": .string(review.id.uuidString),
+                "decision": .string(decision.auditName),
+            ])
+            yield(.approvalResolved(id: review.id, approved: decision.isApproval))
+            guard decision.isApproval else {
+                return finish(.denied, error: "The behavior monitor held '\(call.name)' for review and it was declined.")
             }
         }
 

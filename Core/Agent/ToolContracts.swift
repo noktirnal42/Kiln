@@ -299,6 +299,9 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
     public var grantKind: AgentGrant.Kind?
     public var fileDiff: FileDiff?
     public var createdAt: Date
+    /// A behavior-monitor hold, not a permission question. Always asked, never satisfied by an
+    /// earlier "approve for session" or standing grant, and never creates one.
+    public var isMonitorReview: Bool
 
     public init(
         id: UUID = UUID(),
@@ -312,7 +315,8 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
         grantValue: String? = nil,
         grantKind: AgentGrant.Kind? = nil,
         fileDiff: FileDiff? = nil,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        isMonitorReview: Bool = false
     ) {
         self.id = id
         self.toolName = toolName
@@ -326,6 +330,7 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
         self.grantKind = grantKind
         self.fileDiff = fileDiff
         self.createdAt = createdAt
+        self.isMonitorReview = isMonitorReview
     }
 }
 

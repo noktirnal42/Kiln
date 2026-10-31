@@ -120,12 +120,15 @@ private struct ApprovalRequestRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SSSpacing.s) {
             HStack(spacing: SSSpacing.s) {
-                Image(systemName: request.permission.symbolName)
-                    .foregroundStyle(request.permission == .read ? SSColor.success : SSColor.accent)
+                Image(systemName: request.isMonitorReview ? "exclamationmark.shield.fill" : request.permission.symbolName)
+                    .foregroundStyle(request.isMonitorReview ? SSColor.danger
+                                     : (request.permission == .read ? SSColor.success : SSColor.accent))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(request.toolName)
                         .font(SSTypography.headline())
-                    Text("\(request.permission.displayName) access · \(request.toolSummary)")
+                    Text(request.isMonitorReview
+                         ? "Held by the behavior monitor · \(request.toolSummary)"
+                         : "\(request.permission.displayName) access · \(request.toolSummary)")
                         .font(SSTypography.caption())
                         .foregroundStyle(.secondary)
                 }
@@ -181,20 +184,23 @@ private struct ApprovalRequestRow: View {
                 Button {
                     center.resolve(request.id, decision: .approveOnce)
                 } label: {
-                    Text("Approve Once")
+                    Text(request.isMonitorReview ? "Allow This Call" : "Approve Once")
                         .frame(maxWidth: .infinity)
                 }
                 .controlSize(.large)
 
-                Button {
-                    center.resolve(request.id, decision: .alwaysAllow)
-                } label: {
-                    Text("Always Allow")
-                        .frame(maxWidth: .infinity)
+                // A monitor review asks about one specific call and can never become a standing permission.
+                if !request.isMonitorReview {
+                    Button {
+                        center.resolve(request.id, decision: .alwaysAllow)
+                    } label: {
+                        Text("Always Allow")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .controlSize(.large)
+                    .help(request.grantValue.map { "Remember this for '\($0)' — revocable under Standing Grants" }
+                          ?? "Remember this tool — revocable under Standing Grants")
                 }
-                .controlSize(.large)
-                .help(request.grantValue.map { "Remember this for '\($0)' — revocable under Standing Grants" }
-                      ?? "Remember this tool — revocable under Standing Grants")
             }
             .buttonStyle(.bordered)
         }

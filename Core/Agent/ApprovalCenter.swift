@@ -253,6 +253,23 @@ public final class ApprovalCenter: ObservableObject {
         return decision
     }
 
+    /// A one-off human review for a behavior-monitor hold.
+    ///
+    /// Unlike `requestApproval`, no earlier answer can satisfy it: a standing grant or an
+    /// "approve for session" for the same tool does not skip the question, because the monitor is
+    /// asking about THIS call. And no answer creates a permission: "approve for session" and
+    /// "always allow" both mean "allow this one call", so a review can never broaden what an agent
+    /// may do later.
+    public func requestReview(_ request: ApprovalRequest, conversationID: UUID) async -> ApprovalDecision {
+        pending.append(request)
+        let decision = await withCheckedContinuation { (continuation: CheckedContinuation<ApprovalDecision, Never>) in
+            continuations[request.id] = continuation
+        }
+        let effective: ApprovalDecision = decision.isApproval ? .approveOnce : .deny
+        log.record(request: request, decision: effective, conversationID: conversationID)
+        return effective
+    }
+
     /// The UI calls this with the human's answer.
     public func resolve(_ requestID: UUID, decision: ApprovalDecision) {
         pending.removeAll { $0.id == requestID }

@@ -111,7 +111,12 @@ public final class AppModel {
             ),
             auditChain: auditRoot.map {
                 AuditChain(directory: $0.appendingPathComponent("Audit", isDirectory: true), headDirectory: $0)
-            }
+            },
+            // Kiln's own control plane: audit log and head, grants, settings, and the app itself.
+            monitor: MonitorPolicy(
+                enabled: true, pauseAtSeverity: 5,
+                protectedPaths: [auditRoot, Bundle.main.bundleURL].compactMap { $0 }
+            )
         )
     }
 
