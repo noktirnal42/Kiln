@@ -59,9 +59,12 @@ struct REDeviceBenchView: View {
                 TextField("Host", text: $host).textFieldStyle(.roundedBorder)
                 TextField("Port", text: $port).textFieldStyle(.roundedBorder).frame(width: 90)
             }
-            Toggle("I own this target, or am authorized to inspect it, and consent to read-only access.",
-                   isOn: $consent)
-                .toggleStyle(.checkbox)
+            Toggle(isOn: $consent) {
+                // The consent statement must never be truncated, so it wraps instead.
+                Text("I own this target, or am authorized to inspect it, and consent to read-only access.")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .toggleStyle(.checkbox)
             Button("Connect") { Task { await connect() } }
                 .disabled(busy || !consent)
             Text("Only loopback hosts (127.0.0.1, localhost, ::1) are enabled.")
