@@ -177,6 +177,13 @@ public actor AuditChain {
                             expectedEvents: report.expected)
     }
 
+    /// The newest `limit` events, oldest first, WITHOUT verifying anything. For display; a view that
+    /// shows a tail must not pay for rehashing the whole chain.
+    public func recent(_ limit: Int) throws -> [AuditEvent] {
+        let (events, _) = try readEvents()
+        return Array(events.suffix(max(0, limit)))
+    }
+
     /// Recomputes the whole chain and compares its head with the recorded one.
     /// `brokenSeq` means a row was altered; `truncated` means rows were removed.
     public func verify() throws -> AuditVerification {

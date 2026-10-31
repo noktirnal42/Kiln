@@ -3,6 +3,7 @@ import SwiftUI
 struct MainWindow: View {
     @Environment(AppModel.self) private var app
     @State private var showApprovals = false
+    @State private var showAudit = false
 
     var body: some View {
         NavigationSplitView {
@@ -13,6 +14,14 @@ struct MainWindow: View {
         }
         .frame(minWidth: 960, minHeight: 600)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showAudit = true
+                } label: {
+                    Image(systemName: "checkmark.seal")
+                }
+                .help("Audit chain and behavior monitor")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showApprovals = true
@@ -35,6 +44,9 @@ struct MainWindow: View {
         }
         .sheet(isPresented: approvalsBinding) {
             ApprovalQueueView(center: app.approvalCenter)
+        }
+        .sheet(isPresented: $showAudit) {
+            AuditPanelView(model: AuditPanelModel(chain: app.auditChain, health: app.auditHealth, settings: app.settings))
         }
     }
 

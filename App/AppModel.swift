@@ -23,6 +23,9 @@ public final class AppModel {
     public let approvalCenter = ApprovalCenter.shared
     /// The single-agent runtime, wired to the app's real services.
     public private(set) var orchestrator: AgentOrchestrator?
+    /// Tamper-evident record of every agent run, and the count of entries it could not write.
+    public let auditChain: AuditChain?
+    public let auditHealth = AuditHealth()
 
     public private(set) var records: [ModuleRecord] = []
     public private(set) var busEntries: [BusEntry] = []
@@ -102,6 +105,10 @@ public final class AppModel {
         // above the log so truncating the log alone is reported, not silently accepted.
         let auditRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
             .appendingPathComponent("Kiln", isDirectory: true)
+        let auditChain = auditRoot.map {
+            AuditChain(directory: $0.appendingPathComponent("Audit", isDirectory: true), headDirectory: $0)
+        }
+        self.auditChain = auditChain
         self.orchestrator = AgentOrchestrator(
             approvalCenter: approvalCenter,
             services: ToolServices(
@@ -109,9 +116,7 @@ public final class AppModel {
                 fileIndex: fileIndexService,
                 webSearchKey: { keychain.get(module: "com.kiln.tools", key: "web-search-key") }
             ),
-            auditChain: auditRoot.map {
-                AuditChain(directory: $0.appendingPathComponent("Audit", isDirectory: true), headDirectory: $0)
-            },
+            auditChain: auditChain,
             // Kiln's own control plane: audit log and head, grants, settings, and the app itself.
             monitor: MonitorPolicy(
                 enabled: true, pauseAtSeverity: 5,
@@ -130,7 +135,8 @@ public final class AppModel {
                         model: model, temperature: 0, maxTokens: 800
                     ))
                 }
-            }
+            },
+            auditHealth: auditHealth
         )
     }
 

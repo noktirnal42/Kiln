@@ -150,13 +150,17 @@ public final class AgentOrchestrator: Sendable {
     /// setting changed between runs takes effect. Nil (the default) makes no extra model calls.
     public let rubric: (@Sendable () async -> RubricMonitor?)?
 
+    /// Where recorders report audit entries the chain refused, so the loss is visible app-wide.
+    public let auditHealth: AuditHealth?
+
     public init(
         toolRegistry: ToolRegistry = .shared,
         approvalCenter: ApprovalCenter? = nil,
         services: ToolServices = ToolServices(),
         auditChain: AuditChain? = nil,
         monitor: MonitorPolicy = .standard,
-        rubric: (@Sendable () async -> RubricMonitor?)? = nil
+        rubric: (@Sendable () async -> RubricMonitor?)? = nil,
+        auditHealth: AuditHealth? = nil
     ) {
         self.toolRegistry = toolRegistry
         self.approvalCenter = approvalCenter
@@ -164,6 +168,7 @@ public final class AgentOrchestrator: Sendable {
         self.auditChain = auditChain
         self.monitor = monitor
         self.rubric = rubric
+        self.auditHealth = auditHealth
     }
 
     func resolveCenter() async -> ApprovalCenter {
@@ -182,7 +187,7 @@ public final class AgentOrchestrator: Sendable {
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
-            let recorder = self.auditChain.map { AgentAuditRecorder(chain: $0) }
+            let recorder = self.auditChain.map { AgentAuditRecorder(chain: $0, health: self.auditHealth) }
             let task = Task {
                 do {
                     recorder?.recordStarted(

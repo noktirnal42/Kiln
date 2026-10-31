@@ -44,7 +44,8 @@ public final class AgentAuditRecorder: @unchecked Sendable {
     private let consumer: Task<Void, Never>
     private let failures = FailureLog()
 
-    public init(chain: AuditChain, runID: String = UUID().uuidString) {
+    /// - Parameter health: app-wide drop counter; nil in tests that only inspect this recorder.
+    public init(chain: AuditChain, runID: String = UUID().uuidString, health: AuditHealth? = nil) {
         self.runID = runID
         let (stream, continuation) = AsyncStream.makeStream(of: Entry.self)
         self.continuation = continuation
@@ -55,6 +56,7 @@ public final class AgentAuditRecorder: @unchecked Sendable {
                     try await chain.append(type: entry.type, payload: entry.payload, runID: runID)
                 } catch {
                     failures.note(error)
+                    health?.note(error)
                 }
             }
         }
