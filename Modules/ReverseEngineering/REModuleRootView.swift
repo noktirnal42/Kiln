@@ -28,6 +28,7 @@ struct REProjectBrowser: View {
     @Bindable var module: REModule
     @State private var importer = false
     @State private var importError: String?
+    @State private var showBench = false
 
     var body: some View {
         List {
@@ -62,7 +63,11 @@ struct REProjectBrowser: View {
             }
         }
         .toolbar {
+            Button("Device Bench…", systemImage: "cable.connector") { showBench = true }
             Button("Import Binary…", systemImage: "arrow.down.doc") { importer = true }
+        }
+        .sheet(isPresented: $showBench) {
+            REDeviceBenchView(bench: module.deviceBench)
         }
         .navigationTitle("Projects")
         .fileImporter(isPresented: $importer, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in

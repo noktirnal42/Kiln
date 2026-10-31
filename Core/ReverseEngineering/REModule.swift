@@ -49,6 +49,10 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
     private var context: ModuleContext?
     private var projectsRoot: URL = URL(fileURLWithPath: NSTemporaryDirectory())
 
+    /// Read-only debug-probe access. Its audit log moves into Application Support once the module initializes.
+    public private(set) var deviceBench = REDeviceBench(
+        auditLog: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("kiln-bench-sessions.jsonl"))
+
     public nonisolated init() {}
 
     // MARK: Module lifecycle
@@ -60,6 +64,8 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
         await MainActor.run {
             self.projectsRoot = support.appendingPathComponent("ReverseEngineering/Projects", isDirectory: true)
             try? FileManager.default.createDirectory(at: self.projectsRoot, withIntermediateDirectories: true)
+            self.deviceBench = REDeviceBench(
+                auditLog: support.appendingPathComponent("ReverseEngineering/bench-sessions.jsonl"))
         }
         await reloadProjectList()
         context.logger.info("Reverse Engineering module ready (\(projects.count) projects)")
