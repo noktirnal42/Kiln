@@ -99,6 +99,7 @@ struct SwarmView: View {
             }
         }
         .padding(SSSpacing.m)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func taskList(_ graph: SwarmGraph) -> some View {

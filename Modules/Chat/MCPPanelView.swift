@@ -17,7 +17,6 @@ struct MCPPanelView: View {
                 Text("MCP Servers").font(SSTypography.title())
                 Spacer()
                 Button("Rescan") { Task { await loadAll() } }
-                Button("Done") { dismissSheet() }.keyboardShortcut(.defaultAction)
             }
             .padding(SSSpacing.m)
             Divider()
@@ -31,9 +30,6 @@ struct MCPPanelView: View {
         .frame(minWidth: 760, minHeight: 520)
         .task { await loadAll() }
     }
-
-    @Environment(\.dismiss) private var dismiss
-    private func dismissSheet() { dismiss() }
 
     private var serverList: some View {
         VStack(spacing: 0) {
