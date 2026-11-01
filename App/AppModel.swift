@@ -214,6 +214,7 @@ public final class AppModel {
             fileIndexService: fileIndexService
         )
         chatSession = session
+        if let orchestrator { session.attachOrchestrator(orchestrator) }
         await serviceRegistry.register(session, for: ChatSession.self)
     }
 

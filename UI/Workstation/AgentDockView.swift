@@ -78,6 +78,7 @@ struct AgentDockView: View {
                     ForEach(session.messages) { message in
                         MessageBubble(session: session, message: message).id(message.id)
                     }
+                    AgentActivityView(session: session)
                     if session.isStreaming {
                         MessageBubble(
                             session: session,

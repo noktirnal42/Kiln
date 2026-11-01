@@ -33,7 +33,11 @@ public final class ChatSession {
     public let mcpService: MCPClientService
     public let gitService: GitService
     public let fileIndexService: FileIndexService
-    public let workspaceRoot: String?
+    /// Folder the agent's file and shell tools are scoped to. Nil = tools that need a workspace are unavailable.
+    public var workspaceRoot: String? {
+        didSet { UserDefaults.standard.set(workspaceRoot, forKey: Self.workspaceKey) }
+    }
+    static let workspaceKey = "agent.workspaceRoot"
 
     public private(set) var conversationID: UUID?
     public private(set) var conversationTitle: String
@@ -44,6 +48,24 @@ public final class ChatSession {
     public private(set) var errorText: String?
     public private(set) var lastUsage: ChatChunk.Usage?
     public private(set) var recentModelIDs: [String] = []
+
+    /// Agent mode: replies come from the orchestrator (tools, approvals, audit) instead of a bare completion.
+    public var agentEnabled = false
+    public var agentProfileIndex = 0
+    public private(set) var orchestrator: AgentOrchestrator?
+    /// Tool calls of the current (or last) agent run, in order.
+    public private(set) var agentActivity: [ToolCallRecord] = []
+    public private(set) var agentRound = 0
+    public private(set) var agentNotice: String?
+    private var agentStop: AgentStopFlag?
+
+    public var agentProfiles: [AgentProfile] { AgentProfile.builtIns.filter { !$0.toolPermissions.enabledTools.isEmpty } }
+    public var agentProfile: AgentProfile? {
+        let all = agentProfiles
+        return all.isEmpty ? nil : all[min(max(0, agentProfileIndex), all.count - 1)]
+    }
+
+    public func attachOrchestrator(_ orchestrator: AgentOrchestrator) { self.orchestrator = orchestrator }
 
     public var selectedModelID: String
     public var reasoning: ReasoningConfig = .default
@@ -70,7 +92,7 @@ public final class ChatSession {
         self.mcpService = mcpService
         self.gitService = gitService
         self.fileIndexService = fileIndexService
-        self.workspaceRoot = workspaceRoot
+        self.workspaceRoot = workspaceRoot ?? UserDefaults.standard.string(forKey: Self.workspaceKey)
         self.selectedModelID = initialModelID
         self.conversationTitle = "New Conversation"
         self.messages = []
@@ -198,6 +220,7 @@ public final class ChatSession {
     }
 
     public func stopStreaming() {
+        agentStop?.stop()
         streamTask?.cancel()
         streamTask = nil
         isStreaming = false
@@ -212,6 +235,10 @@ public final class ChatSession {
         isStreaming = true
         streamingText = ""
         streamingToolCalls = []
+        if agentEnabled, let orchestrator, let profile = agentProfile {
+            await runAgent(orchestrator: orchestrator, profile: profile, conversationID: conversationID)
+            return
+        }
 
         let history = messages.map { ChatMessage(role: $0.role, content: $0.content) }
         let request = ChatRequest(
@@ -270,6 +297,74 @@ public final class ChatSession {
             self?.streamingText = ""
             self?.streamingToolCalls = []
             self?.isStreaming = false
+        }
+        streamTask = task
+        await task.value
+    }
+
+    // MARK: Agent runs
+
+    /// Maps one orchestrator event onto the live activity list. Pure so it can be tested.
+    static func apply(_ event: AgentEvent, to activity: inout [ToolCallRecord]) {
+        switch event {
+        case .toolCallStarted(let record), .toolCallFinished(let record):
+            if let index = activity.firstIndex(where: { $0.id == record.id }) { activity[index] = record }
+            else { activity.append(record) }
+        default: break
+        }
+    }
+
+    private func runAgent(orchestrator: AgentOrchestrator, profile: AgentProfile, conversationID: UUID) async {
+        guard let promptIndex = messages.lastIndex(where: { $0.role == .user }) else { isStreaming = false; return }
+        let prompt = messages[promptIndex].content
+        let history = messages[..<promptIndex].map { ChatMessage(role: $0.role, content: $0.content) }
+        var profile = profile
+        profile.modelID = selectedModelID
+        let stop = AgentStopFlag()
+        agentStop = stop
+        agentActivity = []
+        agentRound = 0
+        agentNotice = nil
+        let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let registry = registry
+        let reasoning = reasoning
+        let store = conversations
+        let model = selectedModelID
+
+        let task = Task { [weak self] in
+            var finalText = ""
+            var tokens = 0
+            let stream = orchestrator.run(
+                profile: profile, prompt: prompt, history: Array(history), workspaceRoot: root, stop: stop,
+                chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
+            )
+            do {
+                for try await event in stream {
+                    guard let self else { return }
+                    switch event {
+                    case .textDelta(let delta): self.streamingText += delta
+                    case .roundStarted(let round): self.agentRound = round; self.streamingText = ""
+                    case .retryScheduled(let attempt, let delay, let reason):
+                        self.agentNotice = "Retrying (\(attempt)) in \(Int(delay))s: \(reason)"
+                    case .policyDenied(let tool, _, let reason): self.agentNotice = "\(tool) was blocked: \(reason)"
+                    case .finished(let summary): finalText = summary.finalText; tokens = summary.totalTokens
+                    default: break
+                    }
+                    Self.apply(event, to: &self.agentActivity)
+                }
+            } catch {
+                self?.errorText = AgentRetry.explain(error)
+            }
+            if finalText.isEmpty { finalText = self?.streamingText ?? "" }
+            if !finalText.isEmpty, let saved = try? await store.appendMessage(
+                conversationID: conversationID, role: .assistant, content: finalText,
+                reasoning: nil, tokenCount: tokens, toolCalls: [], modelID: model
+            ) {
+                self?.messages.append(saved)
+            }
+            self?.streamingText = ""
+            self?.isStreaming = false
+            self?.agentStop = nil
         }
         streamTask = task
         await task.value

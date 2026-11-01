@@ -20,6 +20,7 @@ struct ChatRootView: View {
                             MessageBubble(session: session, message: message)
                                 .id(message.id)
                         }
+                        AgentActivityView(session: session)
                         if session.isStreaming {
                             MessageBubble(
                                 session: session,
@@ -183,6 +184,13 @@ struct ComposerView: View {
     let onSend: () -> Void
 
     var body: some View {
+        VStack(spacing: 0) {
+            AgentModeBar(session: session)
+            composer
+        }
+    }
+
+    private var composer: some View {
         HStack(alignment: .bottom, spacing: SSSpacing.s) {
             TextEditor(text: $input)
                 .font(.system(size: 13, design: .monospaced))
@@ -199,13 +207,20 @@ struct ComposerView: View {
                 }
                 .onSubmit { onSend() }
 
-            Button(action: onSend) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
+            if session.isStreaming {
+                Button { session.stopStreaming() } label: {
+                    Image(systemName: "stop.circle.fill").font(.title2)
+                }
+                .help("Stop")
+            } else {
+                Button(action: onSend) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title2)
+                }
+                .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .keyboardShortcut(.return, modifiers: .command)
+                .help("Send (⌘⏎)")
             }
-            .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || session.isStreaming)
-            .keyboardShortcut(.return, modifiers: .command)
-            .help("Send (⌘⏎)")
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.vertical, SSSpacing.s)
