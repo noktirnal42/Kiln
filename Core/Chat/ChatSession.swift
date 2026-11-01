@@ -310,6 +310,15 @@ public final class ChatSession {
         case .toolCallStarted(let record), .toolCallFinished(let record):
             if let index = activity.firstIndex(where: { $0.id == record.id }) { activity[index] = record }
             else { activity.append(record) }
+        case .awaitingApproval(let request):
+            // The call is parked on a human; say so instead of leaving it looking merely queued.
+            if let index = activity.lastIndex(where: { $0.toolName == request.toolName && !$0.status.isTerminal }) {
+                activity[index].status = .awaitingApproval
+            }
+        case .approvalResolved:
+            if let index = activity.lastIndex(where: { $0.status == .awaitingApproval }) {
+                activity[index].status = .running
+            }
         default: break
         }
     }

@@ -27,9 +27,7 @@ struct MainWindow: View {
         .navigationTitle("Kiln — \(workstation.selected.title)")
         .overlay { paletteOverlay }
         .background { shortcuts }
-        .sheet(isPresented: approvalsBinding) {
-            ApprovalQueueView(center: app.approvalCenter)
-        }
+        .modifier(ApprovalSheetHost(center: app.approvalCenter, requested: $workstation.showApprovals))
         .sheet(isPresented: $workstation.showModules) {
             VStack(spacing: 0) {
                 HStack {
@@ -86,14 +84,22 @@ struct MainWindow: View {
         .frame(width: 0, height: 0)
         .accessibilityHidden(true)
     }
+}
 
-    /// Opens the sheet when asked AND whenever an approval lands: a request awaiting a human is the
-    /// one thing that should interrupt, not wait to be discovered.
-    private var approvalsBinding: Binding<Bool> {
-        Binding(
-            get: { workstation.showApprovals || !app.approvalCenter.pending.isEmpty },
-            set: { workstation.showApprovals = $0 }
-        )
+/// Shows the approval queue when asked AND whenever an approval lands: a request awaiting a human is
+/// the one thing that should interrupt, not wait to be discovered. `ApprovalCenter` is a Combine
+/// `ObservableObject`, so it must be observed here; reading it through `AppModel` never re-renders.
+private struct ApprovalSheetHost: ViewModifier {
+    @ObservedObject var center: ApprovalCenter
+    @Binding var requested: Bool
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: Binding(
+            get: { requested || !center.pending.isEmpty },
+            set: { requested = $0 }
+        )) {
+            ApprovalQueueView(center: center)
+        }
     }
 }
 

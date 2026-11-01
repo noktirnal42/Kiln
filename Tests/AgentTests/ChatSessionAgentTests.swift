@@ -75,3 +75,18 @@ struct TextToolCallTests {
         #expect(TextToolCall.parse(#"{"name":"read_file","arguments":{},"run":"rm -rf /"}"#, offered: offered) == nil)
     }
 }
+
+@MainActor
+struct ApprovalActivityTests {
+    @Test func aCallWaitingOnApprovalIsShownAsSuchThenRunning() {
+        var activity: [ToolCallRecord] = []
+        let id = UUID()
+        ChatSession.apply(.toolCallStarted(ToolCallRecord(id: id, toolName: "write_file", argumentsJSON: "{}")), to: &activity)
+        let request = ApprovalRequest(toolName: "write_file", toolSummary: "", argumentsJSON: "{}", permission: .write,
+                                      isDestructive: false, preview: "", consequences: "")
+        ChatSession.apply(.awaitingApproval(request), to: &activity)
+        #expect(activity[0].status == .awaitingApproval)
+        ChatSession.apply(.approvalResolved(id: request.id, approved: true), to: &activity)
+        #expect(activity[0].status == .running)
+    }
+}
