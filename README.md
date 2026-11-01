@@ -14,7 +14,9 @@ incremental agent sessions.
 
 ## Status
 
-> **Build state (2026-10-18):** the app builds and all 216 tests pass. The Phase 3 RE UI had a compile break (`REProjectDetail` bound a struct with `@Bindable`, and `REFunctionDetail` was missing); fixed. The project was renamed from SuperMetaApp to Kiln; see `Branding/` for the icon and mark sources.
+> **Current state (2026-11-01): see [`docs/11-CURRENT-STATE.md`](docs/11-CURRENT-STATE.md)** — what exists, how it was
+> verified, how to build/sign/notarize, and what is still open. The app builds with no warnings of its own, 451 tests
+> pass, and a notarized build runs. The sections below record how each phase was built.
 
 ### Phase 1d — Agent Runtime + Tools (complete)
 
