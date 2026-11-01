@@ -157,7 +157,7 @@ public final class ChatSession {
     }
 
     public func deleteMessage(_ id: UUID) async {
-        guard let conversationID else { return }
+        guard conversationID != nil else { return }
         do {
             try await conversations.deleteMessage(id)
             messages.removeAll { $0.id == id }
@@ -206,12 +206,12 @@ public final class ChatSession {
 
     public func regenerate() async {
         guard !isStreaming else { return }
-        guard let conversationID else { return }
+        guard conversationID != nil else { return }
         guard !selectedModelID.isEmpty else {
             errorText = "No model selected. Pick one in the model picker."
             return
         }
-        guard let lastUser = messages.last(where: { $0.role == .user }) else { return }
+        guard messages.contains(where: { $0.role == .user }) else { return }
         if let lastAssistant = messages.last(where: { $0.role == .assistant }) {
             try? await conversations.deleteMessage(lastAssistant.id)
             messages.removeAll { $0.id == lastAssistant.id }

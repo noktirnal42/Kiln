@@ -71,7 +71,7 @@ public final class PTYSession: @unchecked Sendable {
             Darwin.close(master)
             throw TerminalError.ptyAllocationFailed
         }
-        let slavePath = String(cString: slaveName)
+        let slavePath = String(decoding: slaveName.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
         let slaveFD = open(slavePath, O_RDWR)
         guard slaveFD >= 0 else {
             Darwin.close(master)

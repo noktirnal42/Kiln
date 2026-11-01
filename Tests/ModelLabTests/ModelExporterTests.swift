@@ -9,7 +9,7 @@ import ModelLabCore
         let dir = makeTempDirectory("coreml-export")
         let source = dir.appendingPathComponent("model.mlmodel")
         try Data([0xAA, 0xBB]).write(to: source)
-        let (record, context) = makeRecord(format: .mlmodel, relativePath: "model.mlmodel", in: dir)
+        let (record, _) = makeRecord(format: .mlmodel, relativePath: "model.mlmodel", in: dir)
 
         let exporters = ModelExporters()
         #expect(exporters.coreMLCapability(for: record, absoluteURL: source).isAvailable)

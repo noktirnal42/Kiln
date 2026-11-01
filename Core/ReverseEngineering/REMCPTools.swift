@@ -305,7 +305,7 @@ public enum REMCPTools {
     private static func functionInAnalysis(analysis: Analysis, address: String?, name: String?) throws -> FunctionRecord {
         if let address {
             guard let function = analysis.functions.first(where: { ProjectStore.normalizedAddress($0.address) == ProjectStore.normalizedAddress(address) }) else {
-                throw REMToolError.unknownFunction(address ?? "")
+                throw REMToolError.unknownFunction(address)
             }
             return function
         }

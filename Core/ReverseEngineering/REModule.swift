@@ -10,7 +10,7 @@ import AxiomCore
 /// the analyst) are the only tools invoked, and they work on the sandbox copy.
 @MainActor
 @Observable
-public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefinition, ModuleUI {
+public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI {
     public nonisolated static let identifier = "com.kiln.reverseengineering"
     public nonisolated static let displayName = "Reverse Engineering Console"
     public nonisolated static let version = "1.0.0"
@@ -98,7 +98,7 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
     /// disassembly). 256 MiB import cap; anything larger is refused with a
     /// specific reason.
     public func importBinary(at url: URL) async throws -> Analysis {
-        let root = try await MainActor.run { self.projectsRoot }
+        let root = await MainActor.run { self.projectsRoot }
         let imported = try await Task.detached(priority: .userInitiated) {
             try Self.importBinaryUnchecked(at: url, into: root)
         }.value
@@ -131,7 +131,7 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
         }
         let project = try await MainActor.run { try self.projectFolder(id: projectID) }
         let analysis = try await Task.detached(priority: .userInitiated) {
-            try Analyzer.analyzeProject(project.binaryURL.path, project: project.folder.path,
+            _ = try Analyzer.analyzeProject(project.binaryURL.path, project: project.folder.path,
                                         home: home.path, scriptPath: script.path, arch: nil)
             return try ProjectStore.load(project.folder.path)
         }.value
@@ -315,7 +315,7 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
     public func editProject(projectID: String, expectedRevision: Int,
                             operations: [REEditOperation]) async throws -> Analysis {
         try await mutatingProject(projectID: projectID, expectedRevision: expectedRevision) { project in
-            let result = try ProjectStore.transact(project.folder.path, expectedRevision: expectedRevision,
+            _ = try ProjectStore.transact(project.folder.path, expectedRevision: expectedRevision,
                                                    operations.map { $0.operation })
             return try ProjectStore.load(project.folder.path)
         }
@@ -410,7 +410,7 @@ public final class REModule: @preconcurrency Module, @preconcurrency ModuleDefin
         let result = try await Task.detached(priority: .userInitiated) {
             try mutate(project)
         }.value
-        try await MainActor.run {
+        await MainActor.run {
             self.replace(projectID: projectID, with: result)
         }
         return result
@@ -488,6 +488,9 @@ public struct StringMatch: Codable, Sendable, Identifiable {
     public let id = UUID()
     public let record: StringRecord
     public let rank: Int
+
+    /// `id` is generated per value, not stored, so it is left out of the encoded form.
+    private enum CodingKeys: String, CodingKey { case record, rank }
 }
 
 public struct Xref: Codable, Sendable, Equatable, Identifiable {
@@ -495,6 +498,8 @@ public struct Xref: Codable, Sendable, Equatable, Identifiable {
     public let from: String
     public let to: String
     public let kind: String
+
+    private enum CodingKeys: String, CodingKey { case from, to, kind }
 }
 
 public enum REError: LocalizedError {

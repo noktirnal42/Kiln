@@ -101,7 +101,7 @@ struct ModelLabPlaygroundView: View {
 
         Task { @MainActor in
             do {
-                let provider = try await resolveProvider()
+                let provider = try resolveProvider()
                 for try await chunk in provider.streamRespond(prompt: currentPrompt, history: history) {
                     streamText += chunk
                     if backend == .mlxLocal {
@@ -136,7 +136,7 @@ struct ModelLabPlaygroundView: View {
                   let directory = scratchModelDirectory(for: record) else {
                 throw InferenceError.unavailable(reason: "No trained small LM artifact exists yet — train one under Experiments first.")
             }
-            let provider = try TinyLMInferenceProvider(modelDirectory: directory)
+            let provider = TinyLMInferenceProvider(modelDirectory: directory)
             smallLMProvider = provider
             return provider
         case .coreMLClassifier:

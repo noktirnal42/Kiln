@@ -4,7 +4,7 @@ import Observation
 
 @MainActor
 @Observable
-public final class HelloModule: @preconcurrency Module, @preconcurrency ModuleDefinition, ModuleUI {
+public final class HelloModule: @preconcurrency Module, ModuleDefinition, ModuleUI {
     public nonisolated static let identifier = "com.kiln.hello"
     public nonisolated static let displayName = "Hello"
     public nonisolated static let version = "1.0.0"

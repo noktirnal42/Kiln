@@ -1,4 +1,4 @@
-import Foundation
+@preconcurrency import Foundation
 import SQLite3
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
@@ -200,13 +200,12 @@ public actor FileIndexService {
             let metadataQuery = NSMetadataQuery()
             metadataQuery.searchScopes = [scope]
             metadataQuery.predicate = NSPredicate(format: "(kMDItemFSName CONTAINS[cd] %@) && (kMDItemContentTypeTree = 'public.item')", query)
-            var finished = false
-            var observer: NSObjectProtocol?
-            observer = NotificationCenter.default.addObserver(
+            let gate = SpotlightGate()
+            gate.query = metadataQuery
+            gate.observer = NotificationCenter.default.addObserver(
                 forName: .NSMetadataQueryDidFinishGathering, object: metadataQuery, queue: nil
             ) { notification in
-                guard !finished else { return }
-                finished = true
+                guard gate.claim() else { return }
                 let query = notification.object as? NSMetadataQuery
                 query?.stop()
                 var hits: [SearchHit] = []
@@ -228,15 +227,14 @@ public actor FileIndexService {
                     ))
                     if hits.count >= limit { break }
                 }
-                if let observer { NotificationCenter.default.removeObserver(observer) }
+                gate.removeObserver()
                 continuation.resume(returning: hits)
             }
             metadataQuery.start()
             DispatchQueue.global().asyncAfter(deadline: .now() + 3) {
-                guard !finished else { return }
-                finished = true
-                metadataQuery.stop()
-                if let observer { NotificationCenter.default.removeObserver(observer) }
+                guard gate.claim() else { return }
+                gate.query?.stop()
+                gate.removeObserver()
                 continuation.resume(returning: [])
             }
         }
@@ -327,4 +325,33 @@ public actor FileIndexService {
 
 public extension Notification.Name {
     static let fileIndexWorkspaceChanged = Notification.Name("com.kiln.fileindex.workspaceChanged")
+}
+
+/// Shared by the Spotlight completion handler and its timeout: whichever claims it first resumes the
+/// continuation, and the notification observer is removed exactly once. A lock, not a bare `var`,
+/// because the two run on different threads.
+private final class SpotlightGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var finished = false
+    private var token: NSObjectProtocol?
+    /// Held here so the timeout can stop the query without capturing the non-Sendable object itself.
+    nonisolated(unsafe) var query: NSMetadataQuery?
+
+    var observer: NSObjectProtocol? {
+        get { lock.lock(); defer { lock.unlock() }; return token }
+        set { lock.lock(); token = newValue; lock.unlock() }
+    }
+
+    /// True for the first caller only.
+    func claim() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        if finished { return false }
+        finished = true
+        return true
+    }
+
+    func removeObserver() {
+        lock.lock(); let current = token; token = nil; lock.unlock()
+        if let current { NotificationCenter.default.removeObserver(current) }
+    }
 }

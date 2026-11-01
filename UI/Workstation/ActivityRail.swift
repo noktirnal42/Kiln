@@ -54,7 +54,7 @@ struct ActivityRail: View {
                 Capsule().fill(SSColor.accent).frame(width: 3, height: 18).offset(x: -6)
             }
         }
-        .help("\(activity.title) — \(activity.summary) (⌘\(activity.shortcutKey))")
+        .help("\(activity.title) — \(activity.summary) (⌘\(String(activity.shortcutKey)))")
         .keyboardShortcut(KeyEquivalent(activity.shortcutKey), modifiers: .command)
         .accessibilityLabel(activity.title)
     }

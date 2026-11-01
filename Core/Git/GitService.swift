@@ -151,7 +151,7 @@ public actor GitService {
     }
 
     public func initializeRepository(at path: String) throws {
-        try run(["init", "-q"], in: path)
+        _ = try run(["init", "-q"], in: path)
     }
 
     public func status(_ repositoryPath: String) throws -> [GitFileStatus] {
@@ -186,11 +186,11 @@ public actor GitService {
     }
 
     public func stage(_ repositoryPath: String, paths: [String]) throws {
-        try run(["add", "--"] + paths, in: repositoryPath)
+        _ = try run(["add", "--"] + paths, in: repositoryPath)
     }
 
     public func unstage(_ repositoryPath: String, paths: [String]) throws {
-        try run(["reset", "HEAD", "--"] + paths, in: repositoryPath)
+        _ = try run(["reset", "HEAD", "--"] + paths, in: repositoryPath)
     }
 
     @discardableResult
@@ -223,11 +223,11 @@ public actor GitService {
 
     public func createBranch(_ repositoryPath: String, name: String) throws {
         guard !name.isEmpty else { throw GitError.commandFailed("branch name is empty") }
-        try run(["branch", name], in: repositoryPath)
+        _ = try run(["branch", name], in: repositoryPath)
     }
 
     public func checkout(_ repositoryPath: String, branch: String) throws {
-        try run(["checkout", branch], in: repositoryPath)
+        _ = try run(["checkout", branch], in: repositoryPath)
     }
 
     public func log(_ repositoryPath: String, limit: Int = 50) throws -> [GitCommitInfo] {

@@ -12,7 +12,7 @@ import MLX
 /// exporters) that live in `Core/ModelLab`.
 @MainActor
 @Observable
-public final class ModelLabModule: @preconcurrency Module, @preconcurrency ModuleDefinition, ModuleUI {
+public final class ModelLabModule: @preconcurrency Module, ModuleDefinition, ModuleUI {
     public nonisolated static let identifier = "com.kiln.modellab"
     public nonisolated static let displayName = "Model Lab"
     public nonisolated static let version = "1.0.0"

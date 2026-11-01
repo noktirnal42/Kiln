@@ -23,7 +23,7 @@ xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1 || {
 xcodegen generate
 xcodebuild build -project Kiln.xcodeproj -scheme Kiln -configuration Release \
   -destination 'platform=macOS' -derivedDataPath "$DERIVED" \
-  CODE_SIGN_IDENTITY="$SIGN_IDENTITY"
+  CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=LH8KLB9N4F CODE_SIGN_IDENTITY="$SIGN_IDENTITY"
 
 echo "== Verifying signature"
 codesign --verify --deep --strict --verbose=2 "$APP"

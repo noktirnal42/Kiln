@@ -37,7 +37,7 @@ public struct AppleFoundationProvider: ModelProvider {
         guard availability.isAvailable else {
             throw ProviderError.engineUnavailable(availability.reason ?? "Apple Foundation Models unavailable")
         }
-        var catalog = [
+        let catalog = [
             ModelDescriptor(
                 id: "apple-foundation-model",
                 name: "Foundation Model",

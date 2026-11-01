@@ -42,7 +42,7 @@ struct SwiftTermContainer: NSViewRepresentable {
             guard let session else { return }
             let rows = UInt16(newRows)
             let cols = UInt16(newCols)
-            Task { try? await session.resize(rows: rows, columns: cols) }
+            Task { try? session.resize(rows: rows, columns: cols) }
         }
         func setTerminalIconTitle(source: TerminalView, title: String) {}
         func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
