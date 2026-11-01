@@ -22,8 +22,17 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     ENABLE_HARDENED_RUNTIME: YES
-    CODE_SIGN_STYLE: Automatic
-    CODE_SIGN_IDENTITY: "-"
+    # Signed with a real identity, not ad hoc. An ad-hoc signature changes on every build, so the
+    # Keychain sees a "new app" each time and asks for a password on launch; a stable identity
+    # does not. Debug uses the development certificate, Release the Developer ID one (notarizable).
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: LH8KLB9N4F
+  configs:
+    Debug:
+      CODE_SIGN_IDENTITY: "Apple Development"
+    Release:
+      CODE_SIGN_IDENTITY: "Developer ID Application"
+      OTHER_CODE_SIGN_FLAGS: "--timestamp"
 
 targets:
   Kiln:
