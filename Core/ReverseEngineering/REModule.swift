@@ -383,13 +383,19 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
         }
     }
 
+    /// A project is addressed by its folder name, but an import also reports the analysis's own id and
+    /// callers (including models) reasonably use that. Accept either so a follow-up call never fails on the id.
+    private func project(matching id: String) -> REProject? {
+        projects.first { $0.id == id } ?? projects.first { $0.analysis?.id == id }
+    }
+
     public func projectFolder(id: String) throws -> REProject {
-        guard let project = projects.first(where: { $0.id == id }) else { throw REError.unknownProject }
+        guard let project = project(matching: id) else { throw REError.unknownProject }
         return project
     }
 
     private func loadedAnalysis(projectID: String) throws -> Analysis {
-        guard let project = projects.first(where: { $0.id == projectID }), let analysis = project.analysis else {
+        guard let project = project(matching: projectID), let analysis = project.analysis else {
             throw REError.unknownProject
         }
         return analysis
@@ -400,7 +406,7 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
     }
 
     private func replace(projectID: String, with analysis: Analysis) {
-        guard let index = projects.firstIndex(where: { $0.id == projectID }) else { return }
+        guard let index = projects.firstIndex(where: { $0.id == projectID || $0.analysis?.id == projectID }) else { return }
         projects[index].analysis = analysis
     }
 

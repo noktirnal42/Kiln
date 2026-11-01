@@ -197,7 +197,8 @@ public enum REMCPTools {
                 throw REMToolError.missingArgument("path")
             }
             let analysis = try await service.importBinary(at: URL(fileURLWithPath: path))
-            return try text(JSONSerialization.data(withJSONObject: summary(analysis)))
+            let projectID = await MainActor.run { service.projects.first { $0.analysis?.id == analysis.id }?.id }
+            return try text(JSONSerialization.data(withJSONObject: summary(analysis, projectID: projectID)))
         case "analyze_function":
             let (projectID, address, name) = try functionArguments(arguments)
             let analysis = try await service.analysis(projectID: projectID)
@@ -333,8 +334,10 @@ public enum REMCPTools {
         ]
     }
 
-    private static func summary(_ analysis: Analysis) -> [String: Any] {
+    private static func summary(_ analysis: Analysis, projectID: String? = nil) -> [String: Any] {
         [
+            // The value every other re_* tool takes as `project_id`.
+            "project_id": projectID ?? analysis.id,
             "id": analysis.id,
             "revision": analysis.revision,
             "binaryPath": analysis.binaryPath,

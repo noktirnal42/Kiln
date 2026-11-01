@@ -32,3 +32,47 @@ struct OllamaToolsPayloadTests {
         #expect(parameters["required"] as? [String] == ["path"])
     }
 }
+
+struct BareModelIDTests {
+    @Test func theProviderIsHandedItsOwnModelNameNotTheCatalogId() {
+        #expect(ModelRegistry.bareModelID("nvidia-nim-z-ai/glm-5.3-flash", providerID: "nvidia-nim") == "z-ai/glm-5.3-flash")
+        #expect(ModelRegistry.bareModelID("openrouter-nvidia/nemotron:free", providerID: "openrouter") == "nvidia/nemotron:free")
+        #expect(ModelRegistry.bareModelID("ollama-cloud-glm-5.2", providerID: "ollama-cloud") == "glm-5.2")
+        #expect(ModelRegistry.bareModelID("already-bare", providerID: "other") == "already-bare")
+    }
+}
+
+@MainActor
+struct RegistryHandsProvidersBareModelNamesTests {
+    private final class Seen: @unchecked Sendable { var model: String? }
+
+    private struct Recorder: ModelProvider {
+        let id = "hosted"
+        let name = "Hosted"
+        let providerType: ProviderType = .customEndpoint
+        let capabilities: ProviderCapabilities = [.streaming]
+        let seen: Seen
+        func fetchModels() async throws -> [ModelDescriptor] {
+            [ModelDescriptor(id: "hosted-vendor/model-1", name: "vendor/model-1", providerID: id, providerType: providerType)]
+        }
+        func streamChat(_ request: ChatRequest, reasoning: ReasoningConfig?) async throws -> AsyncThrowingStream<ChatChunk, Error> {
+            seen.model = request.model
+            return AsyncThrowingStream { $0.finish() }
+        }
+        func checkAvailability() async -> ProviderAvailability { .available() }
+    }
+
+    @Test func streamingAndSilentCompletionBothSendTheBareName() async throws {
+        let seen = Seen()
+        let registry = ModelRegistry(eventBus: ModuleEventBus())
+        await registry.register(Recorder(seen: seen))
+        _ = await registry.allModels(forceRefresh: true)
+
+        _ = try await registry.streamChat(ChatRequest(messages: [], model: "hosted-vendor/model-1"))
+        #expect(seen.model == "vendor/model-1")
+
+        seen.model = nil
+        _ = try await registry.completeSilently(ChatRequest(messages: [], model: "hosted-vendor/model-1"))
+        #expect(seen.model == "vendor/model-1")
+    }
+}

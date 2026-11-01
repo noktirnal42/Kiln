@@ -60,3 +60,19 @@ struct REAgentToolsTests {
         #expect(SidebarView.visibleBusEntries(entries, showLifecycle: true).count == 2)
     }
 }
+
+@MainActor
+struct REProjectIDTests {
+    @Test func anImportReportsTheIDEveryOtherToolAccepts_andEitherIDWorks() async throws {
+        let module = REModule()
+        let output = try await REMCPTools.call(tool: "import_binary", arguments: ["path": "/bin/ls"], service: module)
+        let summary = try #require(try JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: Any])
+        let projectID = try #require(summary["project_id"] as? String)
+        let analysisID = try #require(summary["id"] as? String)
+
+        for id in Set([projectID, analysisID]) {
+            let strings = try await REMCPTools.call(tool: "search_strings", arguments: ["project_id": id, "pattern": "usage"], service: module)
+            #expect(strings.lowercased().contains("usage"), "search_strings failed for id \(id)")
+        }
+    }
+}

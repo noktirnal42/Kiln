@@ -160,15 +160,17 @@ public actor ModelRegistry {
         _ request: ChatRequest,
         reasoning: ReasoningConfig? = nil
     ) async throws -> AsyncThrowingStream<ChatChunk, Error> {
-        let provider = try await resolveProvider(for: request.model)
+        let (provider, bare) = try await resolve(modelID: request.model)
         let previous = activeModelID
         if previous != request.model {
             activeModelID = request.model
             await eventBus.publish(ModelSwitchedEvent(fromModel: previous, toModel: request.model))
         }
         let known = modelCache.values.joined().first { $0.id == request.model }
+        var forProvider = request
+        forProvider.model = bare
         return try await provider.streamChat(
-            request, reasoning: Self.reasoning(reasoning, forModelSupporting: known?.supportsReasoning))
+            forProvider, reasoning: Self.reasoning(reasoning, forModelSupporting: known?.supportsReasoning))
     }
 
     /// Reasoning is on by default, but a model that does not do it rejects the request outright
@@ -186,23 +188,34 @@ public actor ModelRegistry {
     /// `ModelSwitchedEvent`. Background callers (the behavior monitor) use it so scoring a run with
     /// some other model never changes what the user's chat is talking to. Output is capped.
     public func completeSilently(_ request: ChatRequest, maxCharacters: Int = 64 * 1024) async throws -> String {
-        let provider = try await resolveProvider(for: request.model)
+        let (provider, bare) = try await resolve(modelID: request.model)
+        var forProvider = request
+        forProvider.model = bare
         var text = ""
-        for try await chunk in try await provider.streamChat(request, reasoning: nil) {
+        for try await chunk in try await provider.streamChat(forProvider, reasoning: nil) {
             text += chunk.delta?.content ?? ""
             if text.count >= maxCharacters { break }
         }
         return String(text.prefix(maxCharacters))
     }
 
-    private func resolveProvider(for modelID: String) async throws -> any ModelProvider {
+    /// Finds the provider that serves a catalog model id and the name that provider's own API knows it
+    /// by. Catalog ids are "<provider id>-<model name>" so that names from different providers cannot
+    /// collide; the provider's API wants only the model name, and sending it the prefixed id is a 404.
+    private func resolve(modelID: String) async throws -> (provider: any ModelProvider, bareModelID: String) {
         if let providerID = modelIndex[modelID], let provider = providers[providerID] {
-            return provider
+            return (provider, Self.bareModelID(modelID, providerID: providerID))
         }
-        for (prefix, provider) in providers where modelID.hasPrefix("\(prefix)-") {
+        // Not catalogued yet: prefer the longest matching provider id ("ollama-cloud" over "ollama").
+        for (prefix, provider) in providers.sorted(by: { $0.key.count > $1.key.count }) where modelID.hasPrefix("\(prefix)-") {
             modelIndex[modelID] = prefix
-            return provider
+            return (provider, Self.bareModelID(modelID, providerID: prefix))
         }
         throw ProviderError.notFound("model '\(modelID)' (no registered provider serves it)")
+    }
+
+    public static func bareModelID(_ modelID: String, providerID: String) -> String {
+        let prefix = "\(providerID)-"
+        return modelID.hasPrefix(prefix) ? String(modelID.dropFirst(prefix.count)) : modelID
     }
 }
