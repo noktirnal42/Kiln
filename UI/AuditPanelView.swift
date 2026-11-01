@@ -7,9 +7,12 @@ import UniformTypeIdentifiers
 struct AuditPanelView: View {
     @State private var model: AuditPanelModel
     @Environment(\.dismiss) private var dismiss
+    /// True when shown as an activity rather than a sheet: no Done button, no fixed minimum size.
+    private let embedded: Bool
 
-    init(model: AuditPanelModel) {
+    init(model: AuditPanelModel, embedded: Bool = false) {
         _model = State(initialValue: model)
+        self.embedded = embedded
     }
 
     var body: some View {
@@ -17,7 +20,7 @@ struct AuditPanelView: View {
             HStack {
                 Text("Audit & Monitor").font(SSTypography.headline())
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+                if !embedded { Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: SSSpacing.m) {
@@ -29,7 +32,7 @@ struct AuditPanelView: View {
             }
         }
         .padding(SSSpacing.m)
-        .frame(minWidth: 640, minHeight: 600)
+        .frame(minWidth: embedded ? 0 : 640, minHeight: embedded ? 0 : 600)
         .task { await model.refresh() }
     }
 

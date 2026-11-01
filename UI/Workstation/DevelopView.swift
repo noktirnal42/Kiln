@@ -1,0 +1,103 @@
+import SwiftUI
+
+/// Develop: the working tools that used to hide behind chat toolbar sheets, in one place. There is
+/// no source editor yet; this is the terminal, git, workspace search and MCP servers.
+struct DevelopView: View {
+    enum Tool: String, CaseIterable, Identifiable {
+        case terminal = "Terminal", git = "Git", search = "Search", mcp = "MCP"
+        var id: String { rawValue }
+        var symbol: String {
+            switch self {
+            case .terminal: "terminal"
+            case .git: "arrow.triangle.branch"
+            case .search: "magnifyingglass"
+            case .mcp: "puzzlepiece.extension"
+            }
+        }
+    }
+
+    @Environment(AppModel.self) private var app
+    @State private var tool: Tool = .terminal
+    @State private var terminalModel: TerminalDockModel?
+    @State private var gitModel: GitPanelModel?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Picker("Tool", selection: $tool) {
+                    ForEach(Tool.allCases) { tool in
+                        Label(tool.rawValue, systemImage: tool.symbol).tag(tool)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: 420)
+                Spacer()
+            }
+            .padding(SSSpacing.s)
+            Divider()
+            content
+        }
+        .onAppear(perform: prepare)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch tool {
+        case .terminal:
+            if let terminalModel { TerminalDockView(model: terminalModel) }
+        case .git:
+            if let gitModel { GitPanelView(model: gitModel) }
+        case .search:
+            SearchPanelView(service: app.fileIndexService)
+        case .mcp:
+            MCPPanelView(service: app.mcpService)
+        }
+    }
+
+    private func prepare() {
+        if terminalModel == nil {
+            terminalModel = TerminalDockModel(manager: app.ptyManager,
+                                              workspaceRoot: app.chatSession?.workspaceRoot ?? NSHomeDirectory())
+        }
+        if gitModel == nil { gitModel = GitPanelModel(service: app.gitService) }
+    }
+}
+
+/// Renders a module's own root view inside an activity, or says plainly why it cannot.
+struct ModuleActivityView: View {
+    let identifier: String
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        if let ui = app.uiModules[identifier] {
+            ui.makeRootView()
+        } else if let error = app.bootstrapError {
+            ContentUnavailableView("Unavailable", systemImage: "externaldrive.badge.exclamationmark",
+                                   description: Text(error))
+        } else {
+            ProgressView("Loading…").frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+/// The audit panel as a full activity rather than a sheet.
+struct AuditActivityView: View {
+    @Environment(AppModel.self) private var app
+    @State private var model: AuditPanelModel?
+
+    var body: some View {
+        Group {
+            if let model {
+                AuditPanelView(model: model, embedded: true)
+            } else {
+                ProgressView()
+            }
+        }
+        .onAppear {
+            if model == nil {
+                model = AuditPanelModel(chain: app.auditChain, health: app.auditHealth, settings: app.settings)
+            }
+        }
+    }
+}

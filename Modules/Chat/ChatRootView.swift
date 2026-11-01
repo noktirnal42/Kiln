@@ -6,12 +6,6 @@ struct ChatRootView: View {
     @State private var showModelPicker = false
     @State private var showConversationList = false
     @State private var showArtifacts = false
-    @State private var showTerminal = false
-    @State private var showMCP = false
-    @State private var showGit = false
-    @State private var showSearch = false
-    @State private var terminalModel: TerminalDockModel?
-    @State private var gitModel: GitPanelModel?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -68,23 +62,6 @@ struct ChatRootView: View {
         .sheet(isPresented: $showArtifacts) {
             ArtifactsBrowserView(artifactStore: session.artifacts)
         }
-        .sheet(isPresented: $showTerminal) {
-            if let terminalModel {
-                TerminalDockView(model: terminalModel)
-                    .frame(minWidth: 760, minHeight: 480)
-            }
-        }
-        .sheet(isPresented: $showMCP) {
-            MCPPanelView(service: session.mcpService)
-        }
-        .sheet(isPresented: $showGit) {
-            if let gitModel {
-                GitPanelView(model: gitModel)
-            }
-        }
-        .sheet(isPresented: $showSearch) {
-            SearchPanelView(service: session.fileIndexService)
-        }
     }
 
     private var toolbar: some View {
@@ -134,59 +111,9 @@ struct ChatRootView: View {
             .buttonStyle(.borderless)
             .help("Artifacts")
 
-            Divider().frame(height: 16)
-
-            Button {
-                ensureTerminal()
-                showTerminal = true
-            } label: {
-                Image(systemName: "terminal")
-            }
-            .buttonStyle(.borderless)
-            .help("Terminal")
-
-            Button {
-                showMCP = true
-            } label: {
-                Image(systemName: "puzzlepiece.extension")
-            }
-            .buttonStyle(.borderless)
-            .help("MCP Servers")
-
-            Button {
-                ensureGit()
-                showGit = true
-            } label: {
-                Image(systemName: "arrow.triangle.branch")
-            }
-            .buttonStyle(.borderless)
-            .help("Git")
-
-            Button {
-                showSearch = true
-            } label: {
-                Image(systemName: "magnifyingglass")
-            }
-            .buttonStyle(.borderless)
-            .help("Workspace Search")
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.vertical, SSSpacing.s)
-    }
-
-    private func ensureTerminal() {
-        if terminalModel == nil {
-            terminalModel = TerminalDockModel(
-                manager: session.ptyManager,
-                workspaceRoot: session.workspaceRoot ?? NSHomeDirectory()
-            )
-        }
-    }
-
-    private func ensureGit() {
-        if gitModel == nil {
-            gitModel = GitPanelModel(service: session.gitService)
-        }
     }
 
     private func send() {

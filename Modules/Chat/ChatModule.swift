@@ -34,6 +34,12 @@ public final class ChatModule: @preconcurrency Module, @preconcurrency ModuleDef
             context.logger.error("chat module init: missing ArtifactStore")
             return
         }
+        // Prefer the app's shared session so the dock and this view show one conversation.
+        if let shared = await context.serviceRegistry.resolve(ChatSession.self) {
+            session = shared
+            context.logger.info("chat module initialized (shared session)")
+            return
+        }
         let ptyManager = await context.serviceRegistry.resolve(PTYManager.self)
         let mcpService = await context.serviceRegistry.resolve(MCPClientService.self)
         let gitService = await context.serviceRegistry.resolve(GitService.self)

@@ -1,69 +1,97 @@
 import SwiftUI
 
+/// The workstation shell: activity rail, the active activity, the agent dock, a status bar, and a
+/// command palette over everything.
 struct MainWindow: View {
     @Environment(AppModel.self) private var app
-    @State private var showApprovals = false
-    @State private var showAudit = false
+    @State private var workstation = WorkstationModel()
 
     var body: some View {
-        NavigationSplitView {
-            SidebarView()
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
-        } detail: {
-            ModuleHostView()
-        }
-        .frame(minWidth: 960, minHeight: 600)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showAudit = true
-                } label: {
-                    Image(systemName: "checkmark.seal")
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                ActivityRail(workstation: workstation)
+                Divider()
+                activityContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(SSColor.canvas)
+                if workstation.dockShown, let session = app.chatSession {
+                    Divider()
+                    AgentDockView(session: session, context: workstation.selected, workstation: workstation)
                 }
-                .help("Audit chain and behavior monitor")
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showApprovals = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.shield")
-                        let pending = app.approvalCenter.pending.count
-                        if pending > 0 {
-                            Text("\(pending)")
-                                .font(SSTypography.caption())
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(SSColor.accent, in: Capsule())
-                                .foregroundStyle(.white)
-                        }
-                    }
-                }
-                .help(pendingHelp)
-            }
+            StatusBar(workstation: workstation)
         }
+        .frame(minWidth: 1020, minHeight: 640)
+        .background(SSColor.canvas)
+        .tint(SSColor.accent)
+        .navigationTitle("Kiln — \(workstation.selected.title)")
+        .overlay { paletteOverlay }
+        .background { shortcuts }
         .sheet(isPresented: approvalsBinding) {
             ApprovalQueueView(center: app.approvalCenter)
         }
-        .sheet(isPresented: $showAudit) {
-            AuditPanelView(model: AuditPanelModel(chain: app.auditChain, health: app.auditHealth, settings: app.settings))
+        .sheet(isPresented: $workstation.showModules) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Modules").font(SSTypography.headline())
+                    Spacer()
+                    Button("Done") { workstation.showModules = false }.keyboardShortcut(.cancelAction)
+                }
+                .padding(SSSpacing.m)
+                Divider()
+                SidebarView().frame(minWidth: 380, minHeight: 480)
+            }
         }
     }
 
-    private var pendingHelp: String {
-        let pending = app.approvalCenter.pending.count
-        return pending > 0
-            ? "\(pending) tool call(s) waiting for approval"
-            : "Approval queue and standing grants"
+    @ViewBuilder
+    private var activityContent: some View {
+        switch workstation.selected {
+        case .home: HomeView(workstation: workstation)
+        case .develop: DevelopView()
+        case .audit: AuditActivityView()
+        case .agent, .analyze, .lab:
+            if let identifier = workstation.selected.moduleIdentifier {
+                ModuleActivityView(identifier: identifier)
+            }
+        }
     }
 
-    /// Opens the sheet when the user asks for it AND whenever an approval
-    /// lands — a request awaiting a human is the one thing that should
-    /// interrupt, not wait to be discovered.
+    @ViewBuilder
+    private var paletteOverlay: some View {
+        if workstation.showPalette {
+            ZStack(alignment: .top) {
+                Color.black.opacity(0.35)
+                    .ignoresSafeArea()
+                    .onTapGesture { workstation.showPalette = false }
+                CommandPaletteView(commands: workstation.commands(app: app)) { workstation.showPalette = false }
+                    .padding(.top, 90)
+            }
+            .transition(.opacity)
+        }
+    }
+
+    /// Window-wide shortcuts that have no visible button of their own.
+    private var shortcuts: some View {
+        Group {
+            Button("Command Palette") { workstation.showPalette.toggle() }
+                .keyboardShortcut("k", modifiers: .command)
+            Button("Toggle Agent Dock") { workstation.toggleDock() }
+                .keyboardShortcut("a", modifiers: [.command, .option])
+            Button("New Conversation") { Task { await app.chatSession?.newConversation() } }
+                .keyboardShortcut("n", modifiers: .command)
+        }
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
+    }
+
+    /// Opens the sheet when asked AND whenever an approval lands: a request awaiting a human is the
+    /// one thing that should interrupt, not wait to be discovered.
     private var approvalsBinding: Binding<Bool> {
         Binding(
-            get: { showApprovals || !app.approvalCenter.pending.isEmpty },
-            set: { showApprovals = $0 }
+            get: { workstation.showApprovals || !app.approvalCenter.pending.isEmpty },
+            set: { workstation.showApprovals = $0 }
         )
     }
 }

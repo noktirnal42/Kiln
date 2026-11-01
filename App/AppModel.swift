@@ -206,7 +206,15 @@ public final class AppModel {
         await serviceRegistry.register(mcpService, for: MCPClientService.self)
         await serviceRegistry.register(gitService, for: GitService.self)
         await serviceRegistry.register(fileIndexService, for: FileIndexService.self)
-        chatSession = ChatSession(registry: modelRegistry, conversations: conversations, artifacts: artifacts)
+        // One session for the whole app: the Agent activity and the dock beside every other activity
+        // show the same conversation. The chat module resolves this rather than making its own.
+        let session = ChatSession(
+            registry: modelRegistry, conversations: conversations, artifacts: artifacts,
+            ptyManager: ptyManager, mcpService: mcpService, gitService: gitService,
+            fileIndexService: fileIndexService
+        )
+        chatSession = session
+        await serviceRegistry.register(session, for: ChatSession.self)
     }
 
     public func shutdown() async {
