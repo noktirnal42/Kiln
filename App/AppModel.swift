@@ -26,6 +26,8 @@ public final class AppModel {
     /// Tamper-evident record of every agent run, and the count of entries it could not write.
     public let auditChain: AuditChain?
     public let auditHealth = AuditHealth()
+    /// Kiln's tools for outside agents over MCP. Created with the orchestrator; off until the user starts it.
+    public private(set) var mcpListener: KilnMCPListener?
 
     public private(set) var records: [ModuleRecord] = []
     public private(set) var busEntries: [BusEntry] = []
@@ -138,6 +140,12 @@ public final class AppModel {
             },
             auditHealth: auditHealth
         )
+        if let orchestrator {
+            mcpListener = KilnMCPListener(handler: KilnMCPHandler(
+                orchestrator: orchestrator,
+                workspaceRoot: { UserDefaults.standard.string(forKey: ChatSession.workspaceKey).map { URL(fileURLWithPath: $0, isDirectory: true) } }
+            ))
+        }
     }
 
     public func bootstrap() async {
@@ -169,6 +177,9 @@ public final class AppModel {
                 }
             }
             #endif
+        }
+        if let lab = (await manager.record(for: ModelLabModule.identifier))?.module as? ModelLabModule {
+            ModelLabAgentTools.register(module: lab)
         }
         await syncUIModules()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {

@@ -37,7 +37,7 @@ public final class ChatSession {
     public var workspaceRoot: String? {
         didSet { UserDefaults.standard.set(workspaceRoot, forKey: Self.workspaceKey) }
     }
-    static let workspaceKey = "agent.workspaceRoot"
+    nonisolated static let workspaceKey = "agent.workspaceRoot"
 
     public private(set) var conversationID: UUID?
     public private(set) var conversationTitle: String

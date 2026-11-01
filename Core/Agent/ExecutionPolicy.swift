@@ -223,6 +223,12 @@ public struct ExecutionPolicy: Codable, Equatable, Sendable {
 
     public static var standard: ExecutionPolicy { ExecutionPolicy() }
 
+    /// Tools contributed by Kiln's own modules (Reverse Engineering, Model Lab). They are not in the
+    /// fixed allowlist above, but each declares its permission level, which the mode cap, the
+    /// approval gate and the agent's own tool set still enforce.
+    public static let moduleToolPrefixes = ["re_", "lab_"]
+    public static func isModuleTool(_ name: String) -> Bool { moduleToolPrefixes.contains { name.hasPrefix($0) } }
+
     /// A policy for modes that must not touch anything: read tools only.
     public static var readOnly: ExecutionPolicy {
         var p = ExecutionPolicy(mode: .review, requiredApprovals: [.writeOutsideScope, .riskyShell, .networkNewDomain])
@@ -243,7 +249,7 @@ public struct ExecutionPolicy: Codable, Equatable, Sendable {
     ) -> [ToolSpec] {
         let cap = mode.maxPermittedLevel
         return registry.allSpecs().filter { spec in
-            guard toolsAllowed.contains(spec.name) else { return false }
+            guard toolsAllowed.contains(spec.name) || Self.isModuleTool(spec.name) else { return false }
             guard permissions.isEnabled(spec.name) else { return false }
             guard spec.permission <= cap else { return false }
             if mode.isReadOnly && !mode.allowsDirectWrites && spec.permission > .read { return false }
@@ -255,7 +261,7 @@ public struct ExecutionPolicy: Codable, Equatable, Sendable {
     // -- Gate B: per-hop checks ------------------------------------------------
 
     public func checkTool(_ tool: String) -> PolicyDecision {
-        if toolsAllowed.contains(tool) {
+        if toolsAllowed.contains(tool) || Self.isModuleTool(tool) {
             return PolicyDecision(verdict: .allow)
         }
         return PolicyDecision(verdict: .deny, rule: "tools_allowed", reason: "tool '\(tool)' not permitted")

@@ -122,6 +122,32 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
             runTimeoutSeconds: 1800,
             isBuiltIn: true
         ),
+        AgentProfile(
+            name: "Workstation Agent",
+            iconSymbol: "square.stack.3d.up",
+            summary: "Everything the Coding Agent does, plus Reverse Engineering and Model Lab tools.",
+            systemPrompt: """
+            You are the agent for Kiln, a workstation that combines an IDE, reverse engineering, \
+            and an ML lab. Use the re_* tools to analyze binaries and the lab_* tools to inspect \
+            hardware, experiments and datasets. Read before you change anything, prefer the \
+            smallest change that does the job, and say plainly what you did and what you could not verify. \
+            Kiln asks the user before any write, command or network call goes through.
+            """,
+            mode: .act,
+            toolPermissions: ToolPermissionSet(
+                enabledTools: [
+                    "read_file", "write_file", "edit_file", "delete_file",
+                    "list_directory", "glob_files", "grep_files", "search_workspace",
+                    "run_command", "stream_command", "background_command", "read_command_output",
+                    "git_status", "git_diff", "git_commit", "git_branch", "git_log",
+                    "web_fetch", "web_search", "re_*", "lab_*",
+                ],
+                policyByLevel: ToolPermissionSet.conservativeDefaults
+            ),
+            maxConcurrentTasks: 1,
+            runTimeoutSeconds: 1800,
+            isBuiltIn: true
+        ),
     ]
 }
 

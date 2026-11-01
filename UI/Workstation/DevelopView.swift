@@ -51,7 +51,10 @@ struct DevelopView: View {
         case .search:
             SearchPanelView(service: app.fileIndexService)
         case .mcp:
-            MCPPanelView(service: app.mcpService)
+            VStack(spacing: 0) {
+                if let listener = app.mcpListener { MCPServerCard(listener: listener) }
+                MCPPanelView(service: app.mcpService)
+            }
         }
     }
 
@@ -99,5 +102,37 @@ struct AuditActivityView: View {
                 model = AuditPanelModel(chain: app.auditChain, health: app.auditHealth, settings: app.settings)
             }
         }
+    }
+}
+
+
+/// Starts and stops Kiln's own MCP endpoint, so outside agents (Claude Code, Codex, scripts) can use Kiln's tools.
+struct MCPServerCard: View {
+    let listener: KilnMCPListener
+
+    var body: some View {
+        HStack(alignment: .top, spacing: SSSpacing.m) {
+            SSStatusDot(color: listener.isRunning ? SSColor.success : .secondary)
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Kiln as an MCP server").font(SSTypography.headline())
+                if listener.isRunning, let port = listener.port {
+                    Text("http://127.0.0.1:\(port)/mcp · loopback only · bearer token in Application Support/Kiln/mcp-server.json")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary).textSelection(.enabled)
+                } else {
+                    Text("Off. When on, outside agents can list and call Kiln's tools. Reads run freely; writes, commands and network calls wait for your approval here.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                if let error = listener.lastError {
+                    Text(error).font(SSTypography.caption()).foregroundStyle(SSColor.danger)
+                }
+            }
+            Spacer()
+            Button(listener.isRunning ? "Stop" : "Start") {
+                listener.isRunning ? listener.stop() : listener.start()
+            }
+        }
+        .padding(SSSpacing.m)
+        .overlay(alignment: .bottom) { Divider() }
     }
 }

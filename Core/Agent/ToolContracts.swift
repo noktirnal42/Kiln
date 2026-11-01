@@ -104,8 +104,11 @@ public struct ToolPermissionSet: Codable, Equatable, Sendable {
         policyByLevel[level] ?? .always
     }
 
+    /// An entry ending in `*` enables every tool with that prefix (`re_*`), so module tools that
+    /// are registered at runtime need not be listed one by one.
     public func isEnabled(_ toolName: String) -> Bool {
-        enabledTools.contains(toolName)
+        if enabledTools.contains(toolName) { return true }
+        return enabledTools.contains { $0.hasSuffix("*") && toolName.hasPrefix($0.dropLast()) }
     }
 
     private enum CodingKeys: String, CodingKey { case enabledTools, policyByLevel }

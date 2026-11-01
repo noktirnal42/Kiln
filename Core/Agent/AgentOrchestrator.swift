@@ -226,6 +226,53 @@ public final class AgentOrchestrator: Sendable {
         }
     }
 
+    // MARK: Single tool call (external agents)
+
+    /// Runs ONE tool call on behalf of an outside agent (for example over MCP) through exactly the
+    /// gates a built-in run uses: the profile's tool set and level policy, write/shell/egress checks,
+    /// the approval center, the behavior monitor, and the audit chain. Nothing here widens access;
+    /// a write or command still waits for a human in the app.
+    public func callTool(
+        _ call: ToolCall,
+        profile: AgentProfile,
+        workspaceRoot: URL? = nil,
+        timeout: TimeInterval = 120
+    ) async -> ToolCallRecord {
+        let recorder = auditChain.map { AgentAuditRecorder(chain: $0, health: auditHealth) }
+        recorder?.recordStarted(
+            profileID: profile.id, profileName: profile.name, modelID: nil,
+            mode: profile.mode.rawValue, promptCharacters: 0, workspaceRoot: workspaceRoot
+        )
+        let center = await resolveCenter()
+        // The profile decides what an external caller may use; the policy allowlist is widened to the
+        // same set so the two gates agree. Mode cap, write/shell/egress checks and approvals still apply.
+        var policy = ExecutionPolicy(mode: profile.mode)
+        policy.toolsAllowed = toolRegistry.allSpecs().map(\.name).filter { profile.toolPermissions.isEnabled($0) }
+        let record: ToolCallRecord
+        do {
+            record = try await dispatch(
+                call: call,
+                policy: policy,
+                profile: profile,
+                workspaceRoot: workspaceRoot,
+                stop: AgentStopFlag(),
+                approvalCenter: center,
+                toolTimeout: timeout,
+                audit: recorder,
+                findings: nil,
+                yield: { recorder?.record(event: $0) }
+            )
+        } catch {
+            var failed = ToolCallRecord(callID: call.id, toolName: call.name, argumentsJSON: call.arguments)
+            failed.status = .failed
+            failed.errorText = AgentRetry.explain(error)
+            failed.finishedAt = Date()
+            record = failed
+        }
+        await recorder?.finish()
+        return record
+    }
+
     // MARK: The loop
 
     private func loop(

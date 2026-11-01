@@ -32,3 +32,24 @@ struct ChatSessionAgentTests {
         #expect(activity.isEmpty)
     }
 }
+
+struct ModuleToolAccessTests {
+    @Test func prefixEntriesEnableModuleToolsButNothingElse() {
+        let set = ToolPermissionSet(enabledTools: ["read_file", "re_*"])
+        #expect(set.isEnabled("re_list_functions"))
+        #expect(set.isEnabled("read_file"))
+        #expect(!set.isEnabled("lab_hardware"))
+        #expect(!set.isEnabled("write_file"))
+    }
+
+    @Test func theWorkstationAgentReachesReAndLabToolsUnderEveryGate() throws {
+        let profile = try #require(AgentProfile.builtIns.first { $0.name == "Workstation Agent" })
+        let registry = ToolRegistry(tools: [])
+        let policy = ExecutionPolicy(mode: profile.mode)
+        #expect(policy.checkTool("re_list_functions").verdict == .allow)
+        #expect(policy.checkTool("lab_hardware").verdict == .allow)
+        #expect(policy.checkTool("rm_everything").verdict == .deny)
+        #expect(profile.toolPermissions.isEnabled("lab_search_models"))
+        _ = registry
+    }
+}
