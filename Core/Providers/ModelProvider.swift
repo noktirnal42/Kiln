@@ -166,7 +166,18 @@ public actor ModelRegistry {
             activeModelID = request.model
             await eventBus.publish(ModelSwitchedEvent(fromModel: previous, toModel: request.model))
         }
-        return try await provider.streamChat(request, reasoning: reasoning)
+        let known = modelCache.values.joined().first { $0.id == request.model }
+        return try await provider.streamChat(
+            request, reasoning: Self.reasoning(reasoning, forModelSupporting: known?.supportsReasoning))
+    }
+
+    /// Reasoning is on by default, but a model that does not do it rejects the request outright
+    /// (Ollama: "does not support thinking"). When the catalog says the model cannot reason, turn
+    /// the flag off and keep every other setting; when the catalog has no answer, change nothing.
+    public static func reasoning(_ config: ReasoningConfig?, forModelSupporting supports: Bool?) -> ReasoningConfig? {
+        guard var config, config.enabled, supports == false else { return config }
+        config.enabled = false
+        return config
     }
 
     /// One non-interactive completion, returned as text.

@@ -25,6 +25,24 @@ public enum ProviderRetry {
 /// OpenRouter, NVIDIA NIM, Ollama Cloud, and custom endpoints.
 /// Streams emit DELTAS only, never cumulative snapshots.
 public enum OpenAICompatibleTransport {
+    /// The `tools` array both the OpenAI-style and Ollama chat APIs accept.
+    public static func toolsJSON(_ tools: [ProviderTool]) -> ProviderJSON {
+        ProviderJSON(tools.map { tool in
+            ProviderJSON([
+                "type": ProviderJSON("function"),
+                "function": ProviderJSON([
+                    "name": ProviderJSON(tool.name),
+                    "description": ProviderJSON(tool.description),
+                    "parameters": ProviderJSON([
+                        "type": ProviderJSON("object"),
+                        "properties": ProviderJSON(tool.parameters.mapValues { ProviderJSON($0.value) }),
+                        "required": ProviderJSON(tool.required.map { ProviderJSON($0) }),
+                    ]),
+                ]),
+            ])
+        })
+    }
+
     public static func body(
         for request: ChatRequest,
         reasoning: ReasoningConfig? = nil,
@@ -65,20 +83,7 @@ public enum OpenAICompatibleTransport {
             payload["max_tokens"] = ProviderJSON(request.maxTokens)
         }
         if !request.tools.isEmpty {
-            payload["tools"] = ProviderJSON(request.tools.map { tool in
-                ProviderJSON([
-                    "type": ProviderJSON("function"),
-                    "function": ProviderJSON([
-                        "name": ProviderJSON(tool.name),
-                        "description": ProviderJSON(tool.description),
-                        "parameters": ProviderJSON([
-                            "type": ProviderJSON("object"),
-                            "properties": ProviderJSON(tool.parameters.mapValues { ProviderJSON($0.value) }),
-                            "required": ProviderJSON(tool.required.map { ProviderJSON($0) }),
-                        ]),
-                    ]),
-                ])
-            })
+            payload["tools"] = toolsJSON(request.tools)
         }
         if let reasoning, reasoning.enabled {
             payload["reasoning"] = ProviderJSON(reasoning.openAIRReasoningFields)

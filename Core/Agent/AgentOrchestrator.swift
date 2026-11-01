@@ -106,6 +106,30 @@ public enum AgentRetry {
     }
 }
 
+// MARK: - Tool calls written as text
+
+enum TextToolCall {
+    /// Recognises a reply that is nothing but `{"name": "<offered tool>", "arguments": {...}}`,
+    /// optionally inside a code fence. Anything else (prose, an unknown name, extra text) is left
+    /// alone, so a model that merely mentions a tool never triggers one.
+    static func parse(_ text: String, offered: Set<String>) -> ToolCall? {
+        var body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if body.hasPrefix("```") {
+            body = body.drop { $0 != "\n" }.dropFirst().description
+            if let fence = body.range(of: "```", options: .backwards) { body = String(body[..<fence.lowerBound]) }
+            body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard body.hasPrefix("{"), body.hasSuffix("}"),
+              let object = (try? JSONSerialization.jsonObject(with: Data(body.utf8))) as? [String: Any],
+              let name = object["name"] as? String, offered.contains(name),
+              Set(object.keys).isSubset(of: ["name", "arguments", "parameters"]) else { return nil }
+        let arguments = (object["arguments"] ?? object["parameters"]) as? [String: Any] ?? [:]
+        guard let data = try? JSONSerialization.data(withJSONObject: arguments),
+              let json = String(data: data, encoding: .utf8) else { return nil }
+        return ToolCall(id: "call_\(UUID().uuidString)", name: name, arguments: json, index: 0)
+    }
+}
+
 // MARK: - Orchestrator
 
 /// The single-agent tool-call loop: stream the model → parse tool calls →
@@ -375,13 +399,20 @@ public final class AgentOrchestrator: Sendable {
             request.tools = providerTools
 
             // One model turn, with System5's retry/backoff around it.
-            let turn = try await turnWithRetry(
+            var turn = try await turnWithRetry(
                 request: request,
                 chat: chat,
                 stop: stop,
                 backoffUnitSeconds: backoffUnitSeconds,
                 yield: yield
             )
+            // Small local models often write a tool call as JSON text instead of a structured call.
+            // Accept that only when the whole reply is one call to a tool this run actually offered.
+            if turn.toolCalls.isEmpty,
+               let call = TextToolCall.parse(turn.text, offered: Set(offered.map(\.name))) {
+                turn.toolCalls = [call]
+                turn.text = ""
+            }
 
             summary.totalTokens += turn.usageTotalTokens
             if profile.redactSecrets {

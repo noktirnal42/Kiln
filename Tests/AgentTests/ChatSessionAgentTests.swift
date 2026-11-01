@@ -53,3 +53,25 @@ struct ModuleToolAccessTests {
         _ = registry
     }
 }
+
+struct TextToolCallTests {
+    private let offered: Set<String> = ["read_file", "list_directory"]
+
+    @Test func aBareJSONCallToAnOfferedToolIsRecognised() throws {
+        let call = try #require(TextToolCall.parse(#"{"name":"read_file","arguments":{"path":"notes.txt"}}"#, offered: offered))
+        #expect(call.name == "read_file")
+        #expect(call.arguments.contains("notes.txt"))
+    }
+
+    @Test func aFencedCallIsRecognisedToo() throws {
+        let text = "```json\n{\n  \"name\": \"list_directory\",\n  \"arguments\": {}\n}\n```"
+        #expect(TextToolCall.parse(text, offered: offered)?.name == "list_directory")
+    }
+
+    @Test func proseUnknownToolsAndExtraKeysNeverTrigger() {
+        #expect(TextToolCall.parse("I will call read_file now", offered: offered) == nil)
+        #expect(TextToolCall.parse(#"{"name":"delete_file","arguments":{}}"#, offered: offered) == nil)
+        #expect(TextToolCall.parse(#"Sure! {"name":"read_file","arguments":{}}"#, offered: offered) == nil)
+        #expect(TextToolCall.parse(#"{"name":"read_file","arguments":{},"run":"rm -rf /"}"#, offered: offered) == nil)
+    }
+}

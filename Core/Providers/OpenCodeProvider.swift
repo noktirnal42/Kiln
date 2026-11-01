@@ -134,6 +134,10 @@ public struct OpenCodeProvider: ModelProvider {
         if reasoning?.enabled == true {
             payload["think"] = ProviderJSON(true)
         }
+        // Without this the model is never told it has tools, and answers that it cannot act.
+        if !request.tools.isEmpty {
+            payload["tools"] = OpenAICompatibleTransport.toolsJSON(request.tools)
+        }
         // Some Ollama catalogs advertise the full training context rather
         // than a practical runtime budget; passing it through makes llama.cpp
         // allocate a huge KV cache before the first token. Bound it to 8K.
