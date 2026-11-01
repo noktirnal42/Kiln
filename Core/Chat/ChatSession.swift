@@ -51,6 +51,8 @@ public final class ChatSession {
 
     /// Agent mode: replies come from the orchestrator (tools, approvals, audit) instead of a bare completion.
     public var agentEnabled = false
+    /// Text waiting to be put in the message box (a starter prompt, or context handed over from another tool).
+    public var draft = ""
     public var agentProfileIndex = 0
     public private(set) var orchestrator: AgentOrchestrator?
     /// Tool calls of the current (or last) agent run, in order.
@@ -66,6 +68,17 @@ public final class ChatSession {
     }
 
     public func attachOrchestrator(_ orchestrator: AgentOrchestrator) { self.orchestrator = orchestrator }
+
+    /// Points the agent at a folder chosen by the user, keeping access to it across launches. nil = no project.
+    public func setWorkspace(_ url: URL?) {
+        guard let url else { WorkspaceStore.shared.clearCurrent(); workspaceRoot = nil; return }
+        _ = try? WorkspaceStore.shared.remember(url)
+        workspaceRoot = url.path
+    }
+
+    public func openRecentWorkspace(_ entry: WorkspaceStore.Entry) {
+        if let url = WorkspaceStore.shared.open(path: entry.path) { workspaceRoot = url.path }
+    }
 
     public var selectedModelID: String
     public var reasoning: ReasoningConfig = .default
@@ -92,7 +105,9 @@ public final class ChatSession {
         self.mcpService = mcpService
         self.gitService = gitService
         self.fileIndexService = fileIndexService
-        self.workspaceRoot = workspaceRoot ?? UserDefaults.standard.string(forKey: Self.workspaceKey)
+        // The last project, with its sandbox access restored from its bookmark; the older plain-path default is
+        // only a fallback (it works for folders inside Kiln's own container).
+        self.workspaceRoot = workspaceRoot ?? WorkspaceStore.shared.current?.path ?? UserDefaults.standard.string(forKey: Self.workspaceKey)
         self.selectedModelID = initialModelID
         self.conversationTitle = "New Conversation"
         self.messages = []
@@ -166,6 +181,31 @@ public final class ChatSession {
         }
     }
 
+    /// Conversations made before titles were derived from their first message are all called "New Conversation".
+    /// Names them once, without moving them in the history. Returns how many were renamed.
+    @discardableResult
+    public func retitleUntitledConversations() async -> Int {
+        var renamed = 0
+        for summary in await conversations() where summary.title == ConversationTitle.placeholder && summary.messageCount > 0 {
+            guard let page = try? await conversations.messages(conversationID: summary.id),
+                  let first = page.messages.first(where: { $0.role == .user }) else { continue }
+            let title = ConversationTitle.make(from: first.content)
+            guard title != ConversationTitle.placeholder else { continue }
+            try? await conversations.renameConversation(summary.id, to: title, touch: false)
+            renamed += 1
+        }
+        return renamed
+    }
+
+    public func deleteConversation(_ id: UUID) async {
+        try? await conversations.deleteConversation(id)
+        if conversationID == id {
+            conversationID = nil
+            messages = []
+            conversationTitle = ConversationTitle.placeholder
+        }
+    }
+
     public func renameConversation(to title: String) async {
         guard let conversationID else { return }
         do {
@@ -195,6 +235,9 @@ public final class ChatSession {
         do {
             if let user = try await conversations.appendMessage(conversationID: conversationID, role: .user, content: trimmed) {
                 messages.append(user)
+            }
+            if conversationTitle == ConversationTitle.placeholder {
+                await renameConversation(to: ConversationTitle.make(from: trimmed))
             }
             try await conversations.setConversationModel(conversationID, modelID: selectedModelID.isEmpty ? nil : selectedModelID)
         } catch {

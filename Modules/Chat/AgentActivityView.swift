@@ -91,12 +91,26 @@ private struct ToolCallRow: View {
     }
 }
 
-/// Switch between plain chat and agent mode, pick the agent, and scope it to a folder.
+/// The controls that sit with the message box, as in the apps this is modelled on: which model, plain chat or
+/// agent, and which agent. The project is the sidebar's job; this only says when there isn't one.
 struct AgentModeBar: View {
     @Bindable var session: ChatSession
+    @State private var showModelPicker = false
 
     var body: some View {
         HStack(spacing: SSSpacing.s) {
+            Button { showModelPicker = true } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "cpu").font(.system(size: 10))
+                    Text(modelLabel).lineLimit(1).font(SSTypography.caption())
+                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+                }
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(SSColor.surfaceRaised, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .help(session.selectedModelID.isEmpty ? "Pick a model" : session.selectedModelID)
+
             Toggle(isOn: $session.agentEnabled) {
                 Label("Agent", systemImage: "wand.and.stars")
             }
@@ -111,29 +125,23 @@ struct AgentModeBar: View {
                     }
                 }
                 .labelsHidden().controlSize(.small).frame(maxWidth: 150)
-                Button {
-                    chooseFolder()
-                } label: {
-                    Label(folderName, systemImage: "folder")
+                if session.workspaceRoot == nil {
+                    Label("No project — pick one in the sidebar", systemImage: "folder.badge.questionmark")
+                        .font(SSTypography.caption()).foregroundStyle(SSColor.warning)
+                        .help("Without a project folder the agent can't read or change files.")
                 }
-                .controlSize(.small)
-                .help(session.workspaceRoot ?? "Choose the folder the agent may work in")
             }
             Spacer()
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.top, SSSpacing.xs)
+        .sheet(isPresented: $showModelPicker) { ModelPickerView(session: session) }
     }
 
-    private var folderName: String {
-        session.workspaceRoot.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Choose folder"
-    }
-
-    private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.prompt = "Use Folder"
-        if panel.runModal() == .OK, let url = panel.url { session.workspaceRoot = url.path }
+    private var modelLabel: String {
+        let id = session.selectedModelID
+        if id.isEmpty { return "Select model" }
+        let bare = id.split(separator: "/").last.map(String.init) ?? id
+        return bare.count > 26 ? String(bare.prefix(25)) + "…" : bare
     }
 }

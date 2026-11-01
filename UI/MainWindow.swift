@@ -5,23 +5,28 @@ import SwiftUI
 struct MainWindow: View {
     @Environment(AppModel.self) private var app
     @State private var workstation = WorkstationModel()
+    /// Sidebar (244) + the narrowest tool (about 600) + the panel (360), with some air.
+    static let dockMinimumWindowWidth: CGFloat = 1240
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                ActivityRail(workstation: workstation)
-                Divider()
-                activityContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(SSColor.canvas)
-                if workstation.dockShown, let session = app.chatSession {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    WorkstationSidebar(workstation: workstation)
                     Divider()
-                    AgentDockView(session: session, context: workstation.selected, workstation: workstation)
+                    activityContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(SSColor.canvas)
+                    // The agent panel yields before the work does: below this width the tool in front needs the room.
+                    if workstation.dockShown, geometry.size.width >= Self.dockMinimumWindowWidth, let session = app.chatSession {
+                        Divider()
+                        AgentDockView(session: session, context: workstation.selected, workstation: workstation)
+                    }
                 }
+                StatusBar(workstation: workstation)
             }
-            StatusBar(workstation: workstation)
         }
-        .frame(minWidth: 1020, minHeight: 640)
+        .frame(minWidth: 940, minHeight: 640)
         .background(SSColor.canvas)
         .tint(SSColor.accent)
         .navigationTitle("Kiln — \(workstation.selected.title)")
@@ -73,6 +78,10 @@ struct MainWindow: View {
     /// Window-wide shortcuts that have no visible button of their own.
     private var shortcuts: some View {
         Group {
+            ForEach(Activity.allCases) { activity in
+                Button(activity.title) { workstation.select(activity, app: app) }
+                    .keyboardShortcut(KeyEquivalent(activity.shortcutKey), modifiers: .command)
+            }
             Button("Command Palette") { workstation.showPalette.toggle() }
                 .keyboardShortcut("k", modifiers: .command)
             Button("Toggle Agent Dock") { workstation.toggleDock() }

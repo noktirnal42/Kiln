@@ -3,22 +3,16 @@ import SwiftUI
 struct ChatRootView: View {
     @Bindable var session: ChatSession
     @State private var input = ""
-    @State private var showModelPicker = false
-    @State private var showConversationList = false
     @State private var showArtifacts = false
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar
             Divider()
-            ConversationListView(session: session, isVisible: $showConversationList)
-            Divider()
             ScrollViewReader { proxy in
                 ScrollView {
                     if session.messages.isEmpty && !session.isStreaming {
-                        SSEmptyState(symbol: "sparkles", title: "Ask anything",
-                                     message: "Chat with any model you have set up, or turn on Agent to let it read files, run commands and use Kiln's tools. Pick a model above to begin.")
-                            .padding(.top, SSSpacing.xl)
+                        ChatHero(session: session)
                     }
                     LazyVStack(alignment: .leading, spacing: SSSpacing.m) {
                         ForEach(session.messages) { message in
@@ -62,9 +56,6 @@ struct ChatRootView: View {
             }
             ComposerView(session: session, input: $input, onSend: send)
         }
-        .sheet(isPresented: $showModelPicker) {
-            ModelPickerView(session: session)
-        }
         .sheet(isPresented: $showArtifacts) {
             ArtifactsBrowserView(artifactStore: session.artifacts)
         }
@@ -72,33 +63,14 @@ struct ChatRootView: View {
 
     private var toolbar: some View {
         HStack(spacing: SSSpacing.s) {
-            Button {
-                showConversationList.toggle()
-            } label: {
-                Image(systemName: "sidebar.left")
-            }
-            .buttonStyle(.borderless)
-
-            Button {
-                showModelPicker = true
-            } label: {
-                HStack(spacing: SSSpacing.xs) {
-                    Image(systemName: "cpu")
-                    Text(session.selectedModelID.isEmpty ? "Select model" : session.selectedModelID)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(SSTypography.caption())
-                }
-            }
-            .buttonStyle(.bordered)
-
+            Text(session.conversationTitle == ConversationTitle.placeholder ? "New chat" : session.conversationTitle)
+                .font(SSTypography.headline())
+                .lineLimit(1)
             Spacer()
 
             if session.isStreaming {
-                Button("Stop") {
-                    session.stopStreaming()
-                }
-                .buttonStyle(.bordered)
+                Button("Stop") { session.stopStreaming() }
+                    .buttonStyle(.bordered)
             } else {
                 Button {
                     Task { await session.regenerate() }
@@ -116,7 +88,6 @@ struct ChatRootView: View {
             }
             .buttonStyle(.borderless)
             .help("Artifacts")
-
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.vertical, SSSpacing.s)
@@ -135,51 +106,30 @@ struct ChatRootView: View {
     }
 }
 
-struct ConversationListView: View {
+/// What the conversation looks like before the first message: a question, with the project it is about, so the
+/// agent's context is the first thing you see instead of a blank page.
+struct ChatHero: View {
     let session: ChatSession
-    @Binding var isVisible: Bool
-    @State private var conversations: [ConversationSummary] = []
 
     var body: some View {
-        if isVisible {
-            HStack {
-                List {
-                    Section {
-                        Button {
-                            Task { await session.newConversation(); conversations = await session.conversations() }
-                        } label: {
-                            Label("New Conversation", systemImage: "plus.bubble")
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    Section("Recent") {
-                        ForEach(conversations) { summary in
-                            Button {
-                                Task {
-                                    await session.loadConversation(summary.id)
-                                    isVisible = false
-                                }
-                            } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(summary.title).font(SSTypography.body()).lineLimit(1)
-                                    Text("\(summary.messageCount) messages · \(summary.updatedAt.formatted(date: .abbreviated, time: .shortened))")
-                                        .font(SSTypography.caption())
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .listStyle(.sidebar)
-                .frame(width: 240)
-                Divider()
+        VStack(spacing: SSSpacing.s) {
+            Image("KilnMark").resizable().scaledToFit().frame(width: 44, height: 44).opacity(0.9)
+            if let root = session.workspaceRoot {
+                Text("What should we work on in ").font(.system(size: 24, weight: .light))
+                    + Text(URL(fileURLWithPath: root).lastPathComponent).font(.system(size: 24, weight: .medium)).foregroundColor(SSColor.accent)
+                    + Text("?").font(.system(size: 24, weight: .light))
+            } else {
+                Text("What should we work on?").font(.system(size: 24, weight: .light))
             }
-            .frame(height: 220)
-            .task {
-                conversations = await session.conversations()
-            }
+            Text(session.selectedModelID.isEmpty
+                 ? "Pick a model below to begin."
+                 : "Ask a question, or turn on Agent to let it read, edit, run and build.")
+                .font(SSTypography.caption()).foregroundStyle(.secondary)
+            StarterPromptList(session: session, activity: .agent).padding(.top, SSSpacing.l)
         }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 120)
     }
 }
 
@@ -193,6 +143,15 @@ struct ComposerView: View {
             AgentModeBar(session: session)
             composer
         }
+        .onChange(of: session.draft) { _, text in takeDraft(text) }
+        .onAppear { takeDraft(session.draft) }
+    }
+
+    /// A starter prompt or handed-over context lands in the box for the user to edit and send.
+    private func takeDraft(_ text: String) {
+        guard !text.isEmpty else { return }
+        input = text
+        session.draft = ""
     }
 
     private var composer: some View {

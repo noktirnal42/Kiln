@@ -8,7 +8,6 @@ struct AgentDockView: View {
     @Bindable var workstation: WorkstationModel
 
     @State private var input = ""
-    @State private var showModelPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +25,6 @@ struct AgentDockView: View {
         }
         .frame(width: 360)
         .background(SSColor.canvas)
-        .sheet(isPresented: $showModelPicker) { ModelPickerView(session: session) }
     }
 
     private var header: some View {
@@ -35,17 +33,6 @@ struct AgentDockView: View {
             Text("Agent").font(SSTypography.headline())
             SSBadge(text: context.title, tint: .secondary)
             Spacer()
-            Button { showModelPicker = true } label: {
-                HStack(spacing: 3) {
-                    Text(session.selectedModelID.isEmpty ? "Select model" : shortModel)
-                        .lineLimit(1).font(SSTypography.caption())
-                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
-                }
-                .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(SSColor.surfaceRaised, in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .help(session.selectedModelID.isEmpty ? "Pick a model" : session.selectedModelID)
             Button {
                 Task { await session.newConversation() }
             } label: { Image(systemName: "plus.bubble").frame(width: 24, height: 24) }
@@ -61,18 +48,18 @@ struct AgentDockView: View {
         .padding(.vertical, SSSpacing.s)
     }
 
-    private var shortModel: String {
-        let id = session.selectedModelID
-        return id.count > 22 ? String(id.prefix(21)) + "…" : id
-    }
 
     private var messages: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 if session.messages.isEmpty && !session.isStreaming {
-                    SSEmptyState(symbol: "sparkles", title: "Ask anything",
-                                 message: "Chat with any model you have set up. Pick one above to begin.")
-                        .padding(.top, SSSpacing.xl)
+                    VStack(spacing: SSSpacing.m) {
+                        SSEmptyState(symbol: "sparkles", title: "Ask about this",
+                                     message: "The same conversation as the Agent tab, beside whatever you are working on.")
+                        StarterPromptList(session: session, activity: context, compact: true)
+                            .padding(.horizontal, SSSpacing.m)
+                    }
+                    .padding(.top, SSSpacing.l)
                 }
                 LazyVStack(alignment: .leading, spacing: SSSpacing.m) {
                     ForEach(session.messages) { message in

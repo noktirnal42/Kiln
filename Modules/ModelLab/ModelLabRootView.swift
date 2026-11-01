@@ -35,7 +35,7 @@ struct ModelLabRootView: View {
                 }
             }
         }
-        .frame(minWidth: 900, minHeight: 560)
+        .frame(minWidth: 600, minHeight: 480)
     }
 }
 

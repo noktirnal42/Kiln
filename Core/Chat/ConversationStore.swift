@@ -94,10 +94,11 @@ public actor ConversationStore {
         return try context.fetch(descriptor).map(Self.summary(of:))
     }
 
-    public func renameConversation(_ id: UUID, to title: String) throws {
+    /// `touch: false` keeps the conversation where it sits in the history (used when titling old conversations).
+    public func renameConversation(_ id: UUID, to title: String, touch: Bool = true) throws {
         guard let conversation = try Self.fetchConversation(id, in: context) else { return }
         conversation.title = title
-        conversation.updatedAt = Date()
+        if touch { conversation.updatedAt = Date() }
         try context.save()
     }
 
