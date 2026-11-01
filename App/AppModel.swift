@@ -201,10 +201,7 @@ public final class AppModel {
         await registry.register(NVIDIANIMProvider(
             secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "nvidia-nim")
         ))
-        await registry.register(CustomEndpointProvider(
-            baseURL: await settings.get("providers.custom.baseURL", as: String.self, fallback: ""),
-            secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "custom")
-        ))
+        await registerCustomProvider()
         await registry.register(AppleFoundationProvider())
         await registry.register(MLXProvider())
 
@@ -227,6 +224,20 @@ public final class AppModel {
         chatSession = session
         if let orchestrator { session.attachOrchestrator(orchestrator) }
         await serviceRegistry.register(session, for: ChatSession.self)
+    }
+
+    private func registerCustomProvider() async {
+        await modelRegistry.register(CustomEndpointProvider(
+            baseURL: await settings.get("providers.custom.baseURL", as: String.self, fallback: ""),
+            secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "custom")
+        ))
+    }
+
+    /// Called after a key or the custom endpoint changes in Settings: re-reads the custom base URL
+    /// and refetches every provider's model list so new models appear without a relaunch.
+    public func reloadProviders() async {
+        await registerCustomProvider()
+        _ = await modelRegistry.allModels(forceRefresh: true)
     }
 
     public func shutdown() async {

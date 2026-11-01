@@ -21,6 +21,11 @@ struct KilnApp: App {
                 }
         }
         .windowStyle(.automatic)
+
+        Settings {
+            ProviderSettingsView()
+                .environment(appModel)
+        }
     }
 }
 

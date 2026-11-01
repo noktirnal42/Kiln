@@ -23,6 +23,13 @@ struct ActivityRail: View {
 
             approvalsButton
             utilityButton(symbol: "command", help: "Command palette (⌘K)") { workstation.showPalette = true }
+            SettingsLink {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 15, weight: .medium))
+                    .frame(width: 40, height: 34)
+            }
+            .buttonStyle(SSIconButtonStyle(selected: false))
+            .help("Settings and API keys (⌘,)")
             utilityButton(symbol: workstation.dockVisible ? "sidebar.right" : "sidebar.right",
                           help: workstation.dockVisible ? "Hide agent dock (⌘⌥A)" : "Show agent dock (⌘⌥A)",
                           selected: workstation.dockVisible) { workstation.toggleDock() }
