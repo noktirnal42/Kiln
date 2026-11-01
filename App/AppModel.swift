@@ -35,6 +35,9 @@ public final class AppModel {
     public private(set) var chatSession: ChatSession?
     public var activeModuleID: String?
     public private(set) var bootstrapError: String?
+    /// Bumped whenever providers are registered or reloaded, so screens that show them can refresh. Home loads
+    /// before bootstrap has registered anything; without this it kept an empty list forever.
+    public private(set) var providersGeneration = 0
 
     private var catchAllToken: SubscriptionToken?
 
@@ -204,6 +207,7 @@ public final class AppModel {
         await registerCustomProvider()
         await registry.register(AppleFoundationProvider())
         await registry.register(MLXProvider())
+        defer { providersGeneration += 1 }
 
         let conversations = ConversationStore(container: modelContainer)
         let artifacts = ArtifactStore(container: modelContainer)
@@ -238,6 +242,7 @@ public final class AppModel {
     public func reloadProviders() async {
         await registerCustomProvider()
         _ = await modelRegistry.allModels(forceRefresh: true)
+        providersGeneration += 1
     }
 
     public func shutdown() async {

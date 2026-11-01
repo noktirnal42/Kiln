@@ -34,7 +34,7 @@ struct HomeView: View {
             .frame(maxWidth: 1000, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .task { await load() }
+        .task(id: app.providersGeneration) { await load() }
     }
 
     // MARK: Sections

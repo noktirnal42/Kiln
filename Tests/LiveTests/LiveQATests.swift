@@ -274,4 +274,44 @@ struct LiveQATests {
         let verification = try await rig.chain.verify()
         #expect(verification.ok)
     }
+
+    /// Tool use on the providers the other tests do not cover: Ollama Cloud, a custom OpenAI-compatible endpoint
+    /// (Ollama's own /v1 stands in), and local Ollama. The prompt names no tool.
+    @Test func everyOtherProviderCanUseToolsOnARealTask() async throws {
+        let keychain = KeychainService()
+        let cases: [(label: String, provider: any ModelProvider, pick: ([ModelDescriptor]) -> [String])] = [
+            ("ollama-cloud",
+             OpenCodeProvider(scope: .cloud, secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "ollama-cloud")),
+             { models in ["glm-5.2", "gemma4:31b", "deepseek-v4.1-flash"].compactMap { n in models.first { $0.id.hasSuffix(n) }?.id } }),
+            ("custom(ollama /v1)",
+             CustomEndpointProvider(baseURL: "http://localhost:11434/v1", secretProvider: { nil }),
+             { models in models.filter { $0.id.contains("qwen2.5-coder") }.map(\.id) }),
+            ("ollama-local",
+             OpenCodeProvider(scope: .local),
+             { models in models.filter { $0.id.contains("qwen2.5-coder") }.map(\.id) }),
+        ]
+        var failures: [String] = []
+        for testCase in cases {
+            guard let catalog = try? await testCase.provider.fetchModels() else { failures.append("\(testCase.label): catalog did not load"); continue }
+            var passed = false
+            var last = "no suitable model"
+            for id in testCase.pick(catalog) {
+                let bare = ModelRegistry.bareModelID(id, providerID: testCase.provider.id)
+                let model = Model(provider: testCase.provider, id: bare)
+                let root = try workspace(files: ["notes.txt": "The secret word is \"marmalade\".\n"])
+                defer { try? FileManager.default.removeItem(at: root) }
+                let rig = try rig(registry: builtins(), autoApprove: false)
+                defer { rig.watcher.cancel() }
+                do {
+                    let outcome = try await run(rig, model: model, profile: "Research Assistant",
+                                                prompt: "What is the secret word in notes.txt?", root: root)
+                    report(testCase.label, model, outcome)
+                    last = outcome.text
+                    if outcome.text.lowercased().contains("marmalade") { passed = true; break }
+                } catch { last = String(describing: error); print("QA \(testCase.label) \(bare): \(last.prefix(160))") }
+            }
+            if !passed { failures.append("\(testCase.label): \(last.prefix(140))") }
+        }
+        #expect(failures.isEmpty, "providers that could not use a tool: \(failures)")
+    }
 }

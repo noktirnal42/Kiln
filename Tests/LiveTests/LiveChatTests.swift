@@ -16,6 +16,8 @@ struct LiveChatTests {
         await registry.register(OpenCodeProvider(scope: .local))
         await registry.register(NVIDIANIMProvider(secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "nvidia-nim")))
         await registry.register(OpenRouterProvider(secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "openrouter")))
+        await registry.register(OpenCodeProvider(scope: .cloud, secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "ollama-cloud")))
+        await registry.register(AppleFoundationProvider())
         let session = ChatSession(registry: registry, conversations: ConversationStore(container: container),
                                   artifacts: ArtifactStore(container: container))
         return (session, registry)
@@ -40,4 +42,40 @@ struct LiveChatTests {
 
     @Test func localOllamaAnswersAPlainChat() async throws { try await ask("ollama", modelSuffix: "qwen2.5-coder:3b") }
     @Test func nvidiaNimAnswersAPlainChat() async throws { try await ask("nim", modelSuffix: "z-ai/glm-5.3-flash") }
+
+    /// One real question to every provider the app offers, each with the model(s) it would actually list.
+    @Test func everyProviderAnswersAPlainChat() async throws {
+        let (session, registry) = try await session()
+        let models = await registry.allModels(forceRefresh: true)
+        let byProvider = Dictionary(grouping: models, by: \.providerID)
+        print("CHAT matrix providers in catalog: \(byProvider.keys.sorted()) (\(models.count) models)")
+
+        func candidates(_ provider: String, prefer: [String] = [], tools: Bool = false) -> [ModelDescriptor] {
+            let all = byProvider[provider] ?? []
+            let preferred = prefer.compactMap { name in all.first { $0.id.contains(name) } }
+            let rest = all.filter { (!tools || $0.supportsTools) && ($0.id.hasSuffix(":free") || provider != "openrouter") }
+            return preferred + rest.filter { m in !preferred.contains { $0.id == m.id } }.prefix(6)
+        }
+
+        var failures: [String] = []
+        for (provider, prefer) in [("apple-foundation", []), ("ollama", ["qwen2.5-coder"]), ("ollama-cloud", ["gemma4", "glm-5.2"]),
+                                    ("nvidia-nim", ["glm-5.3-flash"]), ("openrouter", ["auto"])] {
+            var answered = false
+            var last = "no models listed"
+            for model in candidates(provider, prefer: prefer) {
+                session.selectedModelID = model.id
+                await session.newConversation()
+                await session.send("What is 17 plus 25? Answer with just the number.")
+                let reply = session.messages.last(where: { $0.role == .assistant })?.content ?? ""
+                last = reply.isEmpty ? (session.errorText ?? "empty") : reply
+                if session.errorText == nil, reply.contains("42") {
+                    print("CHAT matrix OK   \(provider) [\(model.id)] -> \(reply.prefix(60).debugDescription)")
+                    answered = true; break
+                }
+                print("CHAT matrix try  \(provider) [\(model.id)] -> \(last.prefix(100).debugDescription)")
+            }
+            if !answered { failures.append("\(provider): \(last.prefix(120))") }
+        }
+        #expect(failures.isEmpty, "providers that never answered: \(failures)")
+    }
 }

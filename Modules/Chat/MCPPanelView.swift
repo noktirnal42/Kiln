@@ -107,6 +107,13 @@ struct MCPPanelView: View {
                 .padding(.vertical, 2)
             }
             .listStyle(.sidebar)
+            .overlay {
+                if statuses.isEmpty {
+                    SSEmptyState(symbol: "puzzlepiece.extension", title: "No MCP servers yet",
+                                 message: "Servers you add to Kiln's MCP configuration appear here, each approved before it connects.")
+                        .padding(SSSpacing.m)
+                }
+            }
         }
     }
 

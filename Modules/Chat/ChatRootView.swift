@@ -15,6 +15,11 @@ struct ChatRootView: View {
             Divider()
             ScrollViewReader { proxy in
                 ScrollView {
+                    if session.messages.isEmpty && !session.isStreaming {
+                        SSEmptyState(symbol: "sparkles", title: "Ask anything",
+                                     message: "Chat with any model you have set up, or turn on Agent to let it read files, run commands and use Kiln's tools. Pick a model above to begin.")
+                            .padding(.top, SSSpacing.xl)
+                    }
                     LazyVStack(alignment: .leading, spacing: SSSpacing.m) {
                         ForEach(session.messages) { message in
                             MessageBubble(session: session, message: message)

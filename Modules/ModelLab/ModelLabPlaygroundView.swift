@@ -127,7 +127,10 @@ struct ModelLabPlaygroundView: View {
             return FoundationModelsInferenceProvider()
         case .mlxLocal:
             if let mlxProvider { return mlxProvider }
-            let provider = MLXInferenceProvider(repoID: mlxRepo)
+            // A model already in the shared store is read from there; anything else is downloaded by repo id.
+            let local = UniversalModelStore().installed().last { $0.repoID == mlxRepo && $0.isLanguageModel }
+            let provider = local.map { MLXInferenceProvider(modelDirectory: URL(fileURLWithPath: $0.path)) }
+                ?? MLXInferenceProvider(repoID: mlxRepo)
             mlxProvider = provider
             return provider
         case .trainedSmallLM:

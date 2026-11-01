@@ -18,6 +18,8 @@ struct ModelLabModelsView: View {
     @State private var hfResults: [ModelSearchResult] = []
     @State private var hfError: String?
     @State private var hfLoading = false
+    @State private var storeModels: [InstalledModel] = []
+    @State private var storeScanned = false
 
     var body: some View {
         NavigationSplitView {
@@ -43,6 +45,20 @@ struct ModelLabModelsView: View {
                         }
                     }
                 }
+                Section("Local model store") {
+                    if storeModels.isEmpty {
+                        Text(storeScanned ? "No language models found. Choose your model store folder in Settings (⌘,)." : "Looking…")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(storeModels) { model in
+                        HStack {
+                            Image(systemName: "externaldrive")
+                            Text(model.repoID)
+                            Spacer()
+                            Text(HardwareProfile.formatBytes(Int64(model.totalBytes))).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
                 Section("Hugging Face models") {
                     HStack {
                         TextField("Search models", text: $hfQuery).onSubmit(searchHF)
@@ -58,6 +74,13 @@ struct ModelLabModelsView: View {
                 }
             }
             .navigationTitle("Models")
+            .task {
+                // Walks the store's files to total sizes, which is slow on an external drive: off the main thread.
+                storeModels = await Task.detached(priority: .utility) {
+                    UniversalModelStore().installed().filter(\.isLanguageModel)
+                }.value
+                storeScanned = true
+            }
         } detail: {
             if let record = selection {
                 ModelArtifactDetailView(module: module, record: record)

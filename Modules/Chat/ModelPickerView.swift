@@ -8,6 +8,7 @@ struct ModelPickerView: View {
     @State private var search = ""
     @State private var availability: [String: ProviderAvailability] = [:]
     @State private var loadError: String?
+    @State private var loading = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,6 +29,15 @@ struct ModelPickerView: View {
                     .foregroundStyle(SSColor.warning)
                     .padding(.horizontal, SSSpacing.m)
                     .padding(.vertical, SSSpacing.xs)
+            }
+
+            if loading && models.isEmpty {
+                HStack(spacing: SSSpacing.s) {
+                    ProgressView().controlSize(.small)
+                    Text("Loading models from your providers…").font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, SSSpacing.m)
+                .padding(.vertical, SSSpacing.xs)
             }
 
             List {
@@ -83,6 +93,7 @@ struct ModelPickerView: View {
         } else {
             loadError = "No models available yet. Check provider availability (keys, running local servers, Apple Intelligence)."
         }
+        loading = false
         availability = await session.registry.availabilityMap()
         recents = session.recentModelIDs
     }
