@@ -97,6 +97,10 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Kiln
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         ENABLE_TESTABILITY: YES
+        # Xcode also writes (and XcodeGen presets) an SDK-conditional identity that wins over the
+        # unconditional one above. In Release it was "-" (Sign to Run Locally), which produced archives
+        # with no team that Organizer refuses to distribute. State it explicitly so nothing overrides it.
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development"
     dependencies:
       - package: SwiftTerm
         product: SwiftTerm
