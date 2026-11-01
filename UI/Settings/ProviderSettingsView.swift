@@ -92,7 +92,7 @@ struct ProviderSettingsView: View {
             .padding(SSSpacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: 560, height: 560)
+        .frame(width: 560, height: 700)
         .background(SSColor.canvas)
         .task { model.baseURL = await app.settings.get("providers.custom.baseURL", as: String.self, fallback: "") }
     }
