@@ -171,6 +171,15 @@ public final class AgentOrchestrator: Sendable {
         self.auditHealth = auditHealth
     }
 
+    /// The same orchestrator (approvals, audit, monitor, services) with extra tools registered.
+    /// Used for per-worker tools bound to one agent, such as its bus endpoint.
+    public func withTools(_ extra: [any ToolExecuting]) -> AgentOrchestrator {
+        AgentOrchestrator(
+            toolRegistry: toolRegistry.extended(with: extra), approvalCenter: approvalCenter, services: services,
+            auditChain: auditChain, monitor: monitor, rubric: rubric, auditHealth: auditHealth
+        )
+    }
+
     func resolveCenter() async -> ApprovalCenter {
         if let center = approvalCenter { return center }
         return await MainActor.run { ApprovalCenter.shared }

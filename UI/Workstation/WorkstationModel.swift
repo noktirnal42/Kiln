@@ -4,7 +4,7 @@ import Observation
 /// The places you work in. Each is a whole screen, not a window onto one module: the agent dock stays
 /// beside all of them except Agent itself, so the same agent can drive whatever is on screen.
 enum Activity: String, CaseIterable, Identifiable, Sendable {
-    case home, agent, develop, analyze, lab, audit
+    case home, agent, swarm, develop, analyze, lab, audit
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .home: "Home"
         case .agent: "Agent"
+        case .swarm: "Swarm"
         case .develop: "Develop"
         case .analyze: "Analyze"
         case .lab: "Lab"
@@ -23,6 +24,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .home: "square.grid.2x2"
         case .agent: "sparkles"
+        case .swarm: "person.3.sequence"
         case .develop: "chevron.left.forwardslash.chevron.right"
         case .analyze: "magnifyingglass.circle"
         case .lab: "brain.head.profile"
@@ -34,6 +36,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .home: "Overview of your workstation"
         case .agent: "Converse with a model, with tools"
+        case .swarm: "Give a goal to a team of agents working in parallel"
         case .develop: "Terminal, git, search and MCP servers"
         case .analyze: "Reverse engineering and decryption"
         case .lab: "Datasets, training, evaluation and models"
@@ -47,7 +50,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .agent: ChatModule.identifier
         case .analyze: REModule.identifier
         case .lab: ModelLabModule.identifier
-        case .home, .develop, .audit: nil
+        case .home, .swarm, .develop, .audit: nil
         }
     }
 

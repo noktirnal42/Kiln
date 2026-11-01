@@ -48,6 +48,7 @@ struct MainWindow: View {
     private var activityContent: some View {
         switch workstation.selected {
         case .home: HomeView(workstation: workstation)
+        case .swarm: SwarmView()
         case .develop: DevelopView()
         case .audit: AuditActivityView()
         case .agent, .analyze, .lab:

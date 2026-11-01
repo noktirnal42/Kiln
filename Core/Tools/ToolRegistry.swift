@@ -74,6 +74,12 @@ public final class ToolRegistry: @unchecked Sendable {
         return tools[name]
     }
 
+    /// A new registry with everything here plus `extra` (later entries replace same-named ones).
+    public func extended(with extra: [any ToolExecuting]) -> ToolRegistry {
+        lock.lock(); let current = Array(tools.values); lock.unlock()
+        return ToolRegistry(tools: current + extra)
+    }
+
     public func allSpecs() -> [ToolSpec] {
         lock.lock(); defer { lock.unlock() }
         return tools.values.map(\.spec).sorted { $0.name < $1.name }
