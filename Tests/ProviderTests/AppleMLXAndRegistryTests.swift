@@ -21,51 +21,89 @@ struct AppleAndMLXProviderTests {
         }
     }
 
-    @Test func mlxProviderReportsSpecificEngineReason() async {
-        let provider = MLXProvider()
+    /// Builds a Hugging Face cache layout: weights live in blobs/, the snapshot links to them.
+    private func makeRepo(in root: URL, repo: String, architectures: [String]) throws {
+        let dir = root.appendingPathComponent("models--" + repo.replacingOccurrences(of: "/", with: "--"))
+        let snapshot = dir.appendingPathComponent("snapshots/abc123")
+        try FileManager.default.createDirectory(at: snapshot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("blobs"), withIntermediateDirectories: true)
+        let config = try JSONSerialization.data(withJSONObject: ["architectures": architectures])
+        try config.write(to: snapshot.appendingPathComponent("config.json"))
+        try FileManager.default.createSymbolicLink(
+            atPath: snapshot.appendingPathComponent("model.safetensors").path, withDestinationPath: "../../blobs/weights")
+        try Data("weights".utf8).write(to: dir.appendingPathComponent("blobs/weights"))
+    }
+
+    private func temporaryRoot() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("kiln-store-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    @Test func mlxProviderPointsAtSettingsWhenTheStoreHasNoLanguageModels() async throws {
+        let root = temporaryRoot()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let provider = MLXProvider(store: UniversalModelStore(root: root))
+
         let availability = await provider.checkAvailability()
         #expect(!availability.isAvailable)
-        let reason = availability.reason ?? ""
-        #expect(reason.contains("MLX runtime"))
-        #expect(reason.contains("Phase 2"))
+        #expect(availability.reason?.contains("Settings") == true)
 
         do {
             _ = try await provider.streamChat(
-                ChatRequest(messages: [ChatMessage(role: .user, content: "hi")], model: "mlx-x"),
-                reasoning: nil
-            )
-            Issue.record("streamChat must fail honestly")
+                ChatRequest(messages: [ChatMessage(role: .user, content: "hi")], model: "org/not-installed"), reasoning: nil)
+            Issue.record("a model that is not installed must fail honestly")
         } catch let error as ProviderError {
-            guard case .engineUnavailable(let detail) = error else {
-                Issue.record("unexpected error: \(error)")
-                return
-            }
-            #expect(detail.contains("MLX runtime"))
-        } catch {
-            Issue.record("unexpected error type: \(error)")
+            guard case .notFound(let detail) = error else { Issue.record("unexpected error: \(error)"); return }
+            #expect(detail.contains("org/not-installed"))
         }
     }
 
-    @Test func mlxProviderListsModelsFromSharedCache() async throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kiln-store-\(UUID().uuidString)", isDirectory: true)
+    @Test func mlxProviderListsOnlyLanguageModelsFromTheSharedCache() async throws {
+        let root = temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let repo = root.appendingPathComponent("models--mlx-community--Qwen3-0.6B-4bit")
-        let snapshot = repo.appendingPathComponent("snapshots/abc123")
-        try FileManager.default.createDirectory(at: snapshot, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: repo.appendingPathComponent("blobs"), withIntermediateDirectories: true)
-        try Data("{}".utf8).write(to: snapshot.appendingPathComponent("config.json"))
-        try FileManager.default.createSymbolicLink(
-            atPath: snapshot.appendingPathComponent("model.safetensors").path,
-            withDestinationPath: "../../blobs/weights"
-        )
-        try Data("weights".utf8).write(to: repo.appendingPathComponent("blobs/weights"))
+        try makeRepo(in: root, repo: "mlx-community/Qwen3-0.6B-4bit", architectures: ["Qwen3ForCausalLM"])
+        try makeRepo(in: root, repo: "mlx-community/Kokoro-82M-4bit", architectures: ["KokoroModel"])
+        try makeRepo(in: root, repo: "adefossez/HTDemucs", architectures: [])
 
         let provider = MLXProvider(store: UniversalModelStore(root: root))
         let models = try await provider.fetchModels()
-        #expect(models.map(\.id) == ["mlx-mlx-community/Qwen3-0.6B-4bit"])
+        #expect(models.map(\.id) == ["mlx-mlx-community/Qwen3-0.6B-4bit"], "speech and audio models are not chat models")
         #expect(models.first?.isOnDevice == true)
         #expect(models.first?.tags.contains("mlx") == true)
+        #expect(await provider.checkAvailability().isAvailable)
+    }
+
+    @Test func aChosenStoreFolderBeatsTheEnvironmentAndSurvivesARelaunch() throws {
+        let hub = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: hub) }
+        try makeRepo(in: hub, repo: "org/model", architectures: ["LlamaForCausalLM"])
+        let suite = "kiln.tests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let location = ModelStoreLocation(defaults: defaults)
+        #expect(location.folder == nil && !location.hasChoice)
+        try location.choose(hub)
+        #expect(location.hasChoice)
+        #expect(UniversalModelStore.defaultRoot(location: location).resolvingSymlinksInPath().path == hub.resolvingSymlinksInPath().path)
+
+        // A new process sees the same choice through the saved bookmark.
+        let relaunched = ModelStoreLocation(defaults: defaults)
+        #expect(relaunched.folder?.resolvingSymlinksInPath().path == hub.resolvingSymlinksInPath().path)
+
+        location.clear()
+        #expect(!location.hasChoice && location.folder == nil)
+    }
+
+    @Test func pickingTheHuggingFaceHomeFindsItsHubFolder() throws {
+        let home = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let hub = home.appendingPathComponent("hub", isDirectory: true)
+        try makeRepo(in: hub, repo: "org/model", architectures: ["LlamaForCausalLM"])
+
+        #expect(ModelStoreLocation.hubDirectory(in: home).lastPathComponent == "hub")
+        #expect(ModelStoreLocation.hubDirectory(in: hub).lastPathComponent == "hub")
+        #expect(ModelStoreLocation.hubDirectory(in: temporaryRoot()).lastPathComponent != "hub", "an empty folder is used as given")
     }
 }
 

@@ -6,6 +6,9 @@ public struct InstalledModel: Codable, Identifiable, Equatable, Sendable {
     public var revision: String
     public var path: String
     public var totalBytes: UInt64
+    /// True for text-generation models (config architectures end in `CausalLM`). Speech, vision-only and
+    /// audio models share the cache layout but cannot answer a chat message, so the picker leaves them out.
+    public var isLanguageModel: Bool = true
 }
 
 /// The universal model repository: the standard Hugging Face cache layout,
@@ -23,7 +26,9 @@ public struct UniversalModelStore: Sendable {
         self.root = root ?? UniversalModelStore.defaultRoot()
     }
 
-    public static func defaultRoot() -> URL {
+    public static func defaultRoot(location: ModelStoreLocation = .shared) -> URL {
+        // The folder the user chose in Settings wins: in the sandbox it is the only place that is readable.
+        if let chosen = location.folder { return ModelStoreLocation.hubDirectory(in: chosen) }
         let env = ProcessInfo.processInfo.environment
         if let value = env["HF_HUB_CACHE"], !value.isEmpty { return URL(fileURLWithPath: value) }
         if let value = env["HF_HOME"], !value.isEmpty { return URL(fileURLWithPath: value).appendingPathComponent("hub") }
@@ -38,6 +43,13 @@ public struct UniversalModelStore: Sendable {
             throw ProviderError.engineUnavailable("The universal model store at \(root.path) is not available. Connect the drive that holds it (\(resolved)).")
         }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    }
+
+    static func isLanguageModel(configAt url: URL) -> Bool {
+        guard let data = try? Data(contentsOf: url.resolvingSymlinksInPath()),
+              let config = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return false }
+        let architectures = config["architectures"] as? [String] ?? []
+        return architectures.contains { $0.hasSuffix("CausalLM") }
     }
 
     static func repoDirectoryName(_ repoID: String) -> String {
@@ -73,7 +85,8 @@ public struct UniversalModelStore: Sendable {
                     }
                 }
                 if hasWeights {
-                    found.append(InstalledModel(repoID: repoID, revision: revision, path: directory.path, totalBytes: bytes))
+                    found.append(InstalledModel(repoID: repoID, revision: revision, path: directory.path, totalBytes: bytes,
+                                                isLanguageModel: Self.isLanguageModel(configAt: directory.appendingPathComponent("config.json"))))
                 }
             }
         }

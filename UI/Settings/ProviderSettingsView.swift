@@ -88,6 +88,7 @@ struct ProviderSettingsView: View {
                 ForEach(ProviderKeyEntry.all) { entry in
                     row(entry)
                 }
+                ModelStoreCard()
             }
             .padding(SSSpacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -156,5 +157,92 @@ struct ProviderSettingsView: View {
         let url = model.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         try? await app.settings.set(url, forKey: "providers.custom.baseURL")
         await app.reloadProviders()
+    }
+}
+
+
+/// Points Kiln at the shared model store (Hugging Face cache layout), usually on an external drive. Kiln is
+/// sandboxed, so it can only read the folder after you choose it here; your models are never copied or moved.
+struct ModelStoreCard: View {
+    @Environment(AppModel.self) private var app
+    @State private var path: String?
+    @State private var count: Int?
+    @State private var scanning = false
+    @State private var message: String?
+
+    private var location: ModelStoreLocation { .shared }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SSSpacing.s) {
+            HStack(spacing: SSSpacing.s) {
+                Text("Local model store").font(SSTypography.headline())
+                if scanning {
+                    ProgressView().controlSize(.small)
+                } else if let count {
+                    SSBadge(text: count == 1 ? "1 language model" : "\(count) language models",
+                            tint: count > 0 ? SSColor.success : .secondary)
+                } else {
+                    SSBadge(text: "Not set", tint: .secondary)
+                }
+                Spacer()
+            }
+            Text("Models you already downloaded (the shared Hugging Face cache, with its models--org--repo folders) appear under “MLX (Local)” in the model picker and run on this Mac. Choose the folder that holds them, usually the hub folder inside your huggingface cache. Kiln only reads it.")
+                .font(SSTypography.caption()).foregroundStyle(.secondary)
+            if let path {
+                Text(path).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary).textSelection(.enabled)
+            }
+            HStack {
+                Button("Choose Folder…") { choose() }
+                if location.hasChoice { Button("Clear", role: .destructive) { clear() } }
+            }
+            if let message { Text(message).font(SSTypography.caption()).foregroundStyle(.secondary) }
+        }
+        .padding(SSSpacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ssPanel()
+        .task { await refresh() }
+    }
+
+    private func choose() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Use This Folder"
+        panel.message = "Choose the folder that contains your models--org--repo folders (the Hugging Face hub folder)."
+        if let home = getpwuid(getuid())?.pointee.pw_dir {
+            panel.directoryURL = URL(fileURLWithPath: String(cString: home)).appendingPathComponent(".cache/huggingface")
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try location.choose(url)
+            message = nil
+            Task { await refresh(reload: true) }
+        } catch {
+            message = "Could not remember that folder: \(error.localizedDescription)"
+        }
+    }
+
+    private func clear() {
+        location.clear()
+        message = nil
+        Task { await refresh(reload: true) }
+    }
+
+    /// Counting walks every weight file to total its size, which is slow on an external drive: off the main thread.
+    private func refresh(reload: Bool = false) async {
+        scanning = true
+        let found = await Task.detached(priority: .utility) { () -> (String?, Int?) in
+            guard let folder = ModelStoreLocation.shared.folder else { return (nil, nil) }
+            let store = UniversalModelStore(root: ModelStoreLocation.hubDirectory(in: folder))
+            return (store.root.path, store.installed().filter(\.isLanguageModel).count)
+        }.value
+        path = found.0
+        count = found.1
+        scanning = false
+        if let count, count == 0 {
+            message = "No language models were found there. Pick the folder that directly contains the models--org--repo folders."
+        }
+        if reload { await app.reloadProviders() }
     }
 }

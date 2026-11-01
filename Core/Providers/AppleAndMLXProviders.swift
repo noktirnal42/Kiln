@@ -1,4 +1,5 @@
 import Foundation
+import ModelLabCore
 import FoundationModels
 
 public struct AppleFoundationProvider: ModelProvider {
@@ -103,29 +104,38 @@ public struct AppleFoundationProvider: ModelProvider {
     }
 }
 
-/// MLX local inference. The MLX runtime (mlx-swift) is not linked into this
-/// build; this provider reports that honestly and still lists models from the
-/// shared Hugging Face cache so the model catalog works across modules.
+/// Local MLX inference over the shared Hugging Face cache (the "universal model store"). Lists the
+/// language models installed there and runs them with the MLX engine, reading weights straight from the
+/// snapshot folder; nothing is downloaded.
 public struct MLXProvider: ModelProvider {
     public let id = "mlx"
     public let name = "MLX (Local)"
     public let providerType: ProviderType = .mlx
     public let capabilities: ProviderCapabilities = [.streaming, .onDevice, .metalAcceleration, .removableStore]
 
-    private let store: UniversalModelStore
+    private let store: @Sendable () -> UniversalModelStore
 
-    public init(store: UniversalModelStore = UniversalModelStore()) {
+    /// `store` is resolved on every call, so a folder chosen in Settings takes effect without a restart.
+    public init(store: @escaping @Sendable () -> UniversalModelStore = { UniversalModelStore() }) {
         self.store = store
     }
 
-    public static let unavailabilityReason = "MLX runtime is not linked into this build. Local MLX inference arrives with the Phase 2 Model Lab engine integration (AILab workarounds: MLX.compile(enable:false), GUI-context pattern)."
+    public init(store fixed: UniversalModelStore) {
+        self.store = { fixed }
+    }
+
+    static func missingStoreMessage(_ root: URL) -> String {
+        "No language models were found in the model store (\(root.path)). In Settings → Local model store, choose the folder that holds your models--org--repo folders."
+    }
 
     public func checkAvailability() async -> ProviderAvailability {
-        .unavailable(Self.unavailabilityReason)
+        let current = store()
+        let models = current.installed().filter(\.isLanguageModel)
+        return models.isEmpty ? .unavailable(Self.missingStoreMessage(current.root)) : .available()
     }
 
     public func fetchModels() async throws -> [ModelDescriptor] {
-        store.installed().map { installed in
+        store().installed().filter(\.isLanguageModel).map { installed in
             ModelDescriptor(
                 id: "mlx-\(installed.repoID)",
                 name: installed.repoID,
@@ -143,6 +153,45 @@ public struct MLXProvider: ModelProvider {
         _ request: ChatRequest,
         reasoning: ReasoningConfig?
     ) async throws -> AsyncThrowingStream<ChatChunk, Error> {
-        throw ProviderError.engineUnavailable(Self.unavailabilityReason)
+        let current = store()
+        // The registry hands over the bare repo id ("org/repo").
+        guard let model = current.installed().last(where: { $0.repoID == request.model && $0.isLanguageModel }) else {
+            throw ProviderError.notFound("model '\(request.model)' is not in the model store at \(current.root.path)")
+        }
+        let engine = MLXEngineCache.shared.engine(for: URL(fileURLWithPath: model.path))
+        guard let prompt = request.messages.last(where: { $0.role == .user })?.content else {
+            throw ProviderError.invalidResponse("no user message to answer")
+        }
+        let lastUser = request.messages.lastIndex(where: { $0.role == .user }) ?? request.messages.endIndex
+        let history = request.messages[..<lastUser].map { ChatTurn(role: $0.role.rawValue, text: $0.content) }
+        let stream = engine.streamRespond(prompt: prompt, history: Array(history))
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await piece in stream { continuation.yield(ChatChunk(delta: ChatMessage(role: .assistant, content: piece))) }
+                    continuation.yield(ChatChunk(delta: ChatMessage(role: .assistant, content: ""), finishReason: .stop))
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
+/// Keeps the most recently used model resident. Loading is the slow part, and two multi-gigabyte models
+/// should not be in memory at once, so switching models drops the previous one.
+final class MLXEngineCache: @unchecked Sendable {
+    static let shared = MLXEngineCache()
+    private let lock = NSLock()
+    private var path: String?
+    private var current: MLXInferenceProvider?
+
+    func engine(for directory: URL) -> MLXInferenceProvider {
+        lock.lock(); defer { lock.unlock() }
+        if let current, path == directory.path { return current }
+        let engine = MLXInferenceProvider(modelDirectory: directory)
+        current = engine
+        path = directory.path
+        return engine
     }
 }

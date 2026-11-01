@@ -27,6 +27,9 @@ public actor MLXInferenceProvider: InferenceProvider {
 
     private let repoID: String
     private let adapterDirectory: URL?
+    /// When set, weights and tokenizer are read from this folder (a Hugging Face cache snapshot) and nothing is
+    /// downloaded. Each reply is generated from the history it is given, not from a resident session.
+    private let modelDirectory: URL?
     private var container: ModelContainer?
     private var session: ChatSession?
     public private(set) var loadProgress: Double = 0
@@ -39,6 +42,15 @@ public actor MLXInferenceProvider: InferenceProvider {
     public init(repoID: String, adapterDirectory: URL? = nil) {
         self.repoID = repoID
         self.adapterDirectory = adapterDirectory
+        self.modelDirectory = nil
+        _ = Self.disableCompileCacheWorkaround
+    }
+
+    /// Loads an already-downloaded model from `modelDirectory` (a snapshot with config.json and safetensors).
+    public init(modelDirectory: URL) {
+        self.repoID = modelDirectory.lastPathComponent
+        self.adapterDirectory = nil
+        self.modelDirectory = modelDirectory
         _ = Self.disableCompileCacheWorkaround
     }
 
@@ -49,7 +61,7 @@ public actor MLXInferenceProvider: InferenceProvider {
     public nonisolated func streamRespond(prompt: String, history: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
-                await self.runStream(prompt: prompt, continuation: continuation)
+                await self.runStream(prompt: prompt, history: history, continuation: continuation)
             }
             continuation.onTermination = { _ in task.cancel() }
         }
@@ -58,8 +70,26 @@ public actor MLXInferenceProvider: InferenceProvider {
     /// Keeps `ChatSession` (non-Sendable) entirely inside the actor's
     /// isolation domain; only the Sendable `String` chunks and `Error`
     /// cross the continuation boundary.
-    private func runStream(prompt: String, continuation: AsyncThrowingStream<String, Error>.Continuation) async {
+    private func runStream(prompt: String, history: [ChatTurn], continuation: AsyncThrowingStream<String, Error>.Continuation) async {
         do {
+            if let modelDirectory {
+                guard capability().isAvailable else {
+                    throw InferenceError.unavailable(reason: capability().reason ?? "MLX unavailable.")
+                }
+                let container = try await ensureContainer(from: modelDirectory)
+                let messages: [Chat.Message] = history.compactMap { turn in
+                    switch turn.role {
+                    case "system": .system(turn.text)
+                    case "user": .user(turn.text)
+                    case "assistant": .assistant(turn.text)
+                    default: nil
+                    }
+                }
+                let local = ChatSession(container, history: messages)
+                for try await chunk in local.streamResponse(to: prompt) { continuation.yield(chunk) }
+                continuation.finish()
+                return
+            }
             let session = try await ensureSession()
             for try await chunk in session.streamResponse(to: prompt) {
                 continuation.yield(chunk)
@@ -68,6 +98,13 @@ public actor MLXInferenceProvider: InferenceProvider {
         } catch {
             continuation.finish(throwing: error)
         }
+    }
+
+    private func ensureContainer(from directory: URL) async throws -> ModelContainer {
+        if let container { return container }
+        let loaded = try await loadModelContainer(from: directory, using: #huggingFaceTokenizerLoader())
+        self.container = loaded
+        return loaded
     }
 
     private func ensureSession() async throws -> ChatSession {
