@@ -54,8 +54,28 @@ GGUF conversion depends on external tooling and is not certified by a successful
 
 Layout fixes have addressed pane navigation, embedded Search placement, model-picker loading/search, and clipped analysis tabs. A complete pass still needs narrow/wide windows, light/dark appearance, keyboard focus and shortcuts, VoiceOver labels, long data, and loading/error/empty states across every workspace. Nested sidebars and toolbars need particular attention for cohesion and usable space.
 
+## Composer keys and live streaming are not verified with real input
+
+**Observed:** Return should send and ⌘/⇧/⌥-Return should insert a newline at the caret. A first version crashed (`String.index` out of range in `ComposerView.insertNewline`); the current one uses `NSTextView.insertText`. The user reported an intermediate version moved the caret but not the text after it. Neither was exercised with real keystrokes: the available automation delivers Return as an accessibility value change.
+
+**Needed:** a manual or XCUITest check with real key events, including a caret mid-text, IME composition, and Return while a reply is streaming.
+
+## Time to first byte from some hosted models is very long
+
+**Observed:** NVIDIA NIM `google/gemma-4-31b-it` and `z-ai/glm-5.3-flash` showed no response headers for 25 s to 90 s+ while the endpoint itself answered `/models` in under a second. The UI only shows "Working", then "Still waiting for the model to start responding" after 15 s.
+
+**Needed:** find out whether this is the provider's queue or a request-shape problem (reasoning fields for NIM), then add a configurable first-token timeout with a clear error and a retry/other-model suggestion.
+
+## Local model store scan is slow on external drives
+
+`UniversalModelStore.installed()` stats every weight file and takes minutes on a USB/HDD store. It no longer blocks other work, but the model picker waits on it and it re-runs on every open. **Needed:** cache the result (invalidate on folder mtime), stat lazily, and show store models progressively.
+
+## Standing grants and approval sheet
+
+The Approval Queue sheet now has a Done button and a scrolling grants list; this was checked only by build, not in the running app.
+
 ## Test-status notes
 
-A full regression run exercised 456 tests and found one nested-path indexing failure. It was reproduced as `/var` versus `/private/var` aliasing; the root and enumerated paths are now normalized, and the focused indexing recheck passed. A later full run passed all 463 tests.
+A full regression run exercised 456 tests and found one nested-path indexing failure. It was reproduced as `/var` versus `/private/var` aliasing; the root and enumerated paths are now normalized, and the focused indexing recheck passed. A later full run passed all 463 tests; the suite is now 464.
 
 Live tests require compatible providers, credentials, model availability, and sometimes API credits. A listed model may return a payment error even when another model on the same provider works. A command reporting success with zero selected tests is not verification.

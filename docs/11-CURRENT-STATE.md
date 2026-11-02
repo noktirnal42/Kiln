@@ -12,13 +12,16 @@ Older docs describe the plan; this describes the app.
 - Signing: automatic, team `LH8KLB9N4F`, Apple Development identity; Release archives are re-signed with
   Developer ID at export. `xcodeVersion: 2710` plus the recommended build settings keep Xcode's
   "Update to recommended settings" prompt away. Bump it when moving to a newer Xcode.
-- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (463 tests, no
+- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (464 tests, no
   warnings except four from mlx-swift's Metal kernels, which cannot be silenced from this project; mlx-swift 0.32
   is worse, 76 warnings).
 - **Notarize from Xcode:** Product → Archive, Organizer → Distribute App → Direct Distribution → Export
   Notarized App. **Or from the shell:** archive, then `xcodebuild -exportArchive … destination=upload`, then
   `xcodebuild -exportNotarizedApp` (retry until Apple finishes; both use the Apple ID signed into Xcode).
-  `Scripts/notarize.sh` is the `notarytool` route and needs a one-time `xcrun notarytool store-credentials kiln-notary`.
+  `Scripts/notarize.sh` is the `notarytool` route and needs a one-time `xcrun notarytool store-credentials kiln-notary`
+  (not set up on this Mac as of 2026-11-01; the Xcode Apple ID route above is what shipped the current build).
+  Export options used: `method developer-id`, `teamID LH8KLB9N4F`, `destination upload`, `signingStyle automatic`;
+  `-exportNotarizedApp` answers "archive is processing" until Apple finishes, so retry.
 - This Mac has two "Developer ID Application: Jeremy McVay" certificates; the older (issued 2026-04-05) can be
   deleted. Xcode picks one itself; `codesign --sign "<name>"` reports it ambiguous, so use the hash.
 - Keychain: a change of signing identity (Apple Development ↔ Developer ID) makes macOS ask for the login password
@@ -37,6 +40,15 @@ One window, one sidebar, one conversation.
   The empty chat asks "What should we work on in <project>?" with starter prompts that change with the tool
   (`StarterPrompts`).
 - The agent panel hides itself below 1240pt window width instead of overflowing.
+- **Chat layout** (`Modules/Chat/MessageBubble.swift`, `ChatRootView.swift`): user messages are a right-aligned soft
+  bubble, assistant replies are plain full-width markdown, actions (copy, regenerate, fork, delete) appear on hover,
+  thinking text streams into a collapsible block, and the column is capped at 760pt. Return sends; ⌘/⇧/⌥-Return
+  inserts a newline at the caret (`ComposerView.insertNewline`, via `NSTextView.insertText`).
+- **Streaming:** `ChatChunk.reasoning` carries `reasoning_content` / `reasoning` deltas; the agent loop emits
+  `AgentEvent.reasoningDelta` (not audited, like text deltas). An empty reply is reported instead of silently ending.
+- **Never run the model-store scan on the Swift cooperative pool.** `UniversalModelStore.installed()` stats every
+  weight file; on the external drive that takes minutes and, run from async code, starved every other task (chat
+  streams never started, the UI showed "Working" forever). Use `installedOffPool()` from async code.
 - Settings (⌘,): provider API keys (Keychain, last four shown, each with a "Get an API key" link) and the
   Local model store.
 
@@ -89,7 +101,7 @@ RE import and string search (headless and in the Analyze tab); MCP server (401 w
 `lab_hardware`, audited as an external run); Audit "Verify now" intact; approval sheet and standing grants; Lab
 tabs, HF dataset search, Apple Playground, Terminal, command palette; MLX chat from the drive store.
 
-**Not verified:** the unified sidebar after the last commit was seen only in a development build, not the
+**Not verified:** Return / ⌘Return with real keystrokes (the automation used here sends Return through accessibility, so only the code path is reviewed); a full streamed reply from a hosted reasoning model after the starvation fix (NVIDIA gemma-4-31b sent a request and returned no headers for 25 s+, cause unknown, probably the provider's queue);  the unified sidebar after the last commit was seen only in a development build, not the
 notarized one; the agent panel on a window narrower than 1240pt; Git and Search tabs in Develop; Analyze with a
 freshly imported binary through the file picker (the picker cannot be driven from outside); Ghidra; GGUF export;
 LM Studio's own model folder is not scanned.
