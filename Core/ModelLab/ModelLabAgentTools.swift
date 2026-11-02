@@ -18,6 +18,7 @@ public enum ModelLabAgentTools {
     enum Kind: String, CaseIterable, Sendable {
         case hardware, experiments, datasets
         case experiment = "get_experiment"
+        case startTraining = "start_training"
         case cancelTraining = "cancel_training"
         case searchModels = "search_models"
         case searchDatasets = "search_datasets"
@@ -34,6 +35,9 @@ public enum ModelLabAgentTools {
             case .experiment:
                 ToolSpec(name: "lab_get_experiment", summary: "Read one Model Lab experiment's status, recent metrics and produced artifact.",
                          parameters: [ToolParam(name: "experiment_id", description: "Exact ID from lab_list_experiments")], permission: .read)
+            case .startTraining:
+                ToolSpec(name: "lab_start_training", summary: "Start an existing Create ML classifier experiment using its registered local dataset and saved configuration. Uses compute and writes a new artifact; requires approval. Does not start LoRA or other training types. Poll lab_get_experiment for progress.",
+                         parameters: [ToolParam(name: "experiment_id", description: "Exact ID of a draft, failed or cancelled classifier experiment")], permission: .execute)
             case .cancelTraining:
                 ToolSpec(name: "lab_cancel_training", summary: "Request cancellation of the named running Model Lab experiment. Cancellation is cooperative; poll lab_get_experiment for its final state.",
                          parameters: [ToolParam(name: "experiment_id", description: "Exact ID of the running experiment")], permission: .write)
@@ -69,6 +73,10 @@ struct ModelLabAgentTool: ToolExecuting {
         case .experiment:
             let id = try Self.experimentID(args)
             return try await MainActor.run { try Self.experiment(module, id: id) }
+        case .startTraining:
+            let id = try Self.experimentID(args)
+            try await module.startClassifierExperiment(id: id)
+            return "Training started for experiment \(id). This does not mean training succeeded. Poll lab_get_experiment for status, errors and the produced artifact."
         case .cancelTraining:
             let id = try Self.experimentID(args)
             return try await MainActor.run { try Self.cancelTraining(module, id: id) }

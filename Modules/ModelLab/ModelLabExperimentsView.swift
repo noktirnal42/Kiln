@@ -153,10 +153,14 @@ private struct ExperimentDetailView: View {
         case .textClassification, .tabularClassification, .imageClassification:
             HStack {
                 Button("Train with Create ML") { startCreateML() }
-                    .disabled(runningCoordinator != nil)
+                    .disabled(runningCoordinator != nil || ![.draft, .failed, .cancelled].contains(experiment.status))
                 if module.createMLCoordinator.runningExperimentID == experiment.id {
                     Button("Cancel", role: .destructive) { module.createMLCoordinator.cancel() }
                 }
+            }
+            if experiment.status == .completed {
+                Text("This experiment is complete. Create a new experiment to train again and preserve these results.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         case .mlxFineTuning:
             MLXLoRAControls(module: module, experiment: experiment)
@@ -179,32 +183,14 @@ private struct ExperimentDetailView: View {
     }
 
     private func startCreateML() {
-        guard let dataset = datasetRecord(for: experiment) else { return }
-        let job = TrainingJob(
-            task: experiment.task,
-            datasetFileURL: LibraryPaths.datasets.appendingPathComponent(dataset.localRelativePath ?? ""),
-            textOrFeatureColumns: experiment.textColumn.map { [$0] } ?? experiment.featureColumns,
-            labelColumn: experiment.labelColumn ?? "",
-            validationFraction: Double(experiment.hyperparameters["validationFraction"] ?? "0.2") ?? 0.2,
-            outputName: sanitizedOutputName(experiment.name)
-        )
         do {
-            try module.startCreateMLTraining(experiment: experiment, job: job)
+            try module.startClassifierExperiment(id: experiment.id)
         } catch {
             experiment.errorMessage = error.localizedDescription
         }
     }
 
-    private func datasetRecord(for experiment: ExperimentRecord) -> DatasetRecord? {
-        let context = modelContext
-        let datasetID = experiment.datasetID
-        let descriptor = FetchDescriptor<DatasetRecord>(predicate: #Predicate { $0.id == datasetID })
-        return try? context.fetch(descriptor).first
-    }
 
-    private func sanitizedOutputName(_ name: String) -> String {
-        name.replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "/", with: "-")
-    }
 }
 
 // MARK: - New experiment sheet
