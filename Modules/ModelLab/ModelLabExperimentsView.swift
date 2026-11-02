@@ -153,10 +153,14 @@ private struct ExperimentDetailView: View {
         case .textClassification, .tabularClassification, .imageClassification:
             HStack {
                 Button("Train with Create ML") { startCreateML() }
-                    .disabled(runningCoordinator != nil)
+                    .disabled(runningCoordinator != nil || ![.draft, .failed, .cancelled].contains(experiment.status))
                 if module.createMLCoordinator.runningExperimentID == experiment.id {
                     Button("Cancel", role: .destructive) { module.createMLCoordinator.cancel() }
                 }
+            }
+            if experiment.status == .completed {
+                Text("This experiment is complete. Create a new experiment to train again and preserve these results.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         case .mlxFineTuning:
             MLXLoRAControls(module: module, experiment: experiment)
