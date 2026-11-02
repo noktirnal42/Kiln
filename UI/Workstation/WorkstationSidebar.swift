@@ -24,16 +24,22 @@ struct WorkstationSidebar: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            ScrollView {
-                VStack(alignment: .leading, spacing: SSSpacing.m) {
-                    newChat
-                    ProjectSwitcher()
-                    chats
-                    tools
-                }
-                .padding(.horizontal, SSSpacing.s)
-                .padding(.bottom, SSSpacing.m)
+            VStack(alignment: .leading, spacing: SSSpacing.m) {
+                newChat
+                ProjectSwitcher()
             }
+            .padding(.horizontal, SSSpacing.s)
+            .padding(.bottom, SSSpacing.m)
+            ScrollView {
+                VStack(alignment: .leading, spacing: SSSpacing.m) { chats }
+                    .padding(.horizontal, SSSpacing.s)
+                    .padding(.bottom, SSSpacing.m)
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+            Divider()
+            tools
+                .padding(.horizontal, SSSpacing.s)
+                .padding(.vertical, SSSpacing.s)
             Divider()
             footer
         }

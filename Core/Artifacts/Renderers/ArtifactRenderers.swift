@@ -10,7 +10,7 @@ public enum MarkdownRenderer {
         case heading(level: Int, text: String)
         case paragraph(text: String)
         case codeFence(language: String?, code: String)
-        case listItem(ordered: Bool, text: String, indent: Int)
+        case listItem(number: Int?, text: String, indent: Int)
         case blockquote(text: String)
         case table(header: [String], rows: [[String]])
         case divider
@@ -25,6 +25,7 @@ public enum MarkdownRenderer {
         var blocks: [Block] = []
         let lines = markdown.components(separatedBy: "\n")
         var index = 0
+        var orderedNumbers: [Int: Int] = [:]
 
         while index < lines.count {
             let line = lines[index]
@@ -33,6 +34,9 @@ public enum MarkdownRenderer {
                 index += 1
                 continue
             }
+
+            // A non-list block ends the current list; blank lines permit loose list items.
+            if Self.listItem(of: line) == nil { orderedNumbers.removeAll() }
 
             if line.hasPrefix("```") {
                 let language = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
@@ -72,7 +76,12 @@ public enum MarkdownRenderer {
             }
 
             if let list = Self.listItem(of: line) {
-                blocks.append(.listItem(ordered: list.ordered, text: list.text, indent: list.indent))
+                // The first marker chooses the start; subsequent source markers do not
+                // override sequential numbering. Keep parent counters across nested lists.
+                orderedNumbers = orderedNumbers.filter { $0.key <= list.indent }
+                let number = list.number.map { start in orderedNumbers[list.indent].map { $0 + 1 } ?? start }
+                orderedNumbers[list.indent] = number
+                blocks.append(.listItem(number: number, text: list.text, indent: list.indent))
                 index += 1
                 continue
             }
@@ -116,18 +125,18 @@ public enum MarkdownRenderer {
         return level
     }
 
-    static func listItem(of line: String) -> (ordered: Bool, text: String, indent: Int)? {
+    static func listItem(of line: String) -> (number: Int?, text: String, indent: Int)? {
         let leading = line.prefix(while: { $0 == " " }).count
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ") {
-            return (false, String(trimmed.dropFirst(2)), leading)
+            return (nil, String(trimmed.dropFirst(2)), leading)
         }
         if let match = trimmed.firstIndex(of: "."), trimmed.startIndex..<trimmed.endIndex ~= match {
             let prefix = trimmed[trimmed.startIndex..<match]
-            if !prefix.isEmpty, prefix.allSatisfy(\.isNumber) {
+            if (1...9).contains(prefix.count), prefix.allSatisfy({ $0.isASCII && $0.isNumber }), let start = Int(prefix) {
                 let after = trimmed.index(after: match)
                 guard after < trimmed.endIndex, trimmed[after] == " " else { return nil }
-                return (true, String(trimmed[trimmed.index(after: after)...]), leading)
+                return (start, String(trimmed[trimmed.index(after: after)...]), leading)
             }
         }
         return nil

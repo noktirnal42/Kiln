@@ -208,7 +208,7 @@ struct RendererTests {
         let blocks = MarkdownRenderer.parse(markdown)
         #expect(blocks.contains { if case .heading(let level, let text) = $0 { level == 1 && text == "Title" } else { false } })
         #expect(blocks.contains { if case .codeFence(let language, let code) = $0 { language == "swift" && code == "let x = 1" } else { false } })
-        #expect(blocks.contains { if case .listItem(let ordered, let text, _) = $0 { !ordered && text == "item one" } else { false } })
+        #expect(blocks.contains { if case .listItem(let number, let text, _) = $0 { number == nil && text == "item one" } else { false } })
         #expect(blocks.contains { if case .table(let header, let rows) = $0 { header == ["a", "b"] && rows == [["1", "2"]] } else { false } })
         #expect(blocks.contains { if case .blockquote(let text) = $0 { text == "quoted text" } else { false } })
         #expect(blocks.contains { if case .divider = $0 { true } else { false } })
@@ -217,12 +217,34 @@ struct RendererTests {
 
     @Test func orderedListParsing() {
         let blocks = MarkdownRenderer.parse("3. third item")
-        guard case .listItem(let ordered, let text, _)? = blocks.first else {
+        guard case .listItem(let number, let text, _)? = blocks.first else {
             Issue.record("expected list item")
             return
         }
-        #expect(ordered)
+        #expect(number == 3)
         #expect(text == "third item")
+    }
+
+    @Test func orderedListsAdvanceAcrossBlankLinesAndRetainParentCounters() {
+        let markdown = """
+        3. first
+
+        1. second
+           7. nested
+           1. nested again
+        1. third
+        - bullet
+        4. new list
+
+        # A separate section
+        9. reset
+        """
+        let items = MarkdownRenderer.parse(markdown).compactMap { block -> String? in
+            guard case .listItem(let number, let text, _) = block else { return nil }
+            return "\(number.map(String.init) ?? "bullet"):\(text)"
+        }
+        #expect(items == ["3:first", "4:second", "7:nested", "8:nested again", "5:third",
+                          "bullet:bullet", "4:new list", "9:reset"])
     }
 
     @Test func dataTableParsesJSONAndCSV() throws {

@@ -43,9 +43,9 @@ struct MarkdownBlockView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: SSCornerRadius.small))
 
-        case .listItem(let ordered, let text, let indent):
+        case .listItem(let number, let text, let indent):
             HStack(alignment: .firstTextBaseline, spacing: SSSpacing.xs) {
-                Text(ordered ? "1." : "•")
+                Text(number.map { "\($0)." } ?? "•")
                     .foregroundStyle(.secondary)
                 Text(inline(text))
             }

@@ -143,6 +143,7 @@ struct ComposerView: View {
     let session: ChatSession
     @Binding var input: String
     let onSend: () -> Void
+    @State private var editorWidth: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -169,11 +170,24 @@ struct ComposerView: View {
         }
     }
 
+    /// Match the editor's font and wrapping width, reserving space only for its actual
+    /// content. At the cap, TextEditor's native scrolling handles longer drafts.
+    private var editorHeight: CGFloat {
+        guard editorWidth > 12 else { return 44 }
+        let bounds = (input + " ").boundingRect(
+            with: CGSize(width: editorWidth - 12, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: NSFont.systemFont(ofSize: 14)]
+        )
+        return min(160, max(44, ceil(bounds.height) + 16))
+    }
+
     private var composer: some View {
         HStack(alignment: .bottom, spacing: SSSpacing.s) {
             TextEditor(text: $input)
                 .font(.system(size: 14))
-                .frame(minHeight: 44, maxHeight: 160)
+                .frame(height: editorHeight)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { editorWidth = $0 }
                 .overlay(alignment: .topLeading) {
                     if input.isEmpty {
                         Text("Message…  (@ to reference files, ⏎ to send, ⌘⏎ for a new line)")
