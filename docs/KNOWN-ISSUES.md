@@ -76,6 +76,6 @@ The Approval Queue sheet now has a Done button and a scrolling grants list; this
 
 ## Test-status notes
 
-A full regression run exercised 456 tests and found one nested-path indexing failure. It was reproduced as `/var` versus `/private/var` aliasing; the root and enumerated paths are now normalized, and the focused indexing recheck passed. A later full run passed all 463 tests; the suite is now 464.
+A full regression run exercised 456 tests and found one nested-path indexing failure. It was reproduced as `/var` versus `/private/var` aliasing; the root and enumerated paths are now normalized, and the focused indexing recheck passed. A later full run passed all 463 tests; the suite is now 466.
 
 Live tests require compatible providers, credentials, model availability, and sometimes API credits. A listed model may return a payment error even when another model on the same provider works. A command reporting success with zero selected tests is not verification.

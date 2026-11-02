@@ -131,15 +131,19 @@ enum ShellRunner {
             process.terminate()
             try? await Task.sleep(nanoseconds: 300_000_000)
             if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+            try? await Task.sleep(nanoseconds: 200_000_000)
         }
-        var output = collector.collect()
+        // After a timeout or Stop a grandchild (pip, a dev server) can keep the pipe open, so reading to EOF
+        // would block forever; take what is there instead.
+        var output = timedOut ? collector.collectAvailable() : collector.collect()
         if trimOutput {
             output = output.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         if timedOut {
             output += "\n[command exceeded \(Int(timeout))s and was terminated]"
         }
-        return Result(output: output, exitStatus: process.terminationStatus, timedOut: timedOut)
+        // terminationStatus raises an Objective-C exception (a crash) while the task is still running.
+        return Result(output: output, exitStatus: process.isRunning ? -1 : process.terminationStatus, timedOut: timedOut)
     }
 
     /// Launches detached; output accumulates in a file the job owns.
@@ -162,6 +166,20 @@ final class OutputCollector: @unchecked Sendable {
     private let pipe: Pipe
 
     init(pipe: Pipe) { self.pipe = pipe }
+
+    /// Non-blocking drain: returns what is already in the pipe without waiting for EOF.
+    func collectAvailable() -> String {
+        let descriptor = pipe.fileHandleForReading.fileDescriptor
+        _ = fcntl(descriptor, F_SETFL, fcntl(descriptor, F_GETFL) | O_NONBLOCK)
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 8192)
+        while true {
+            let count = read(descriptor, &buffer, buffer.count)
+            if count <= 0 { break }
+            data.append(buffer, count: count)
+        }
+        return String(data: data, encoding: .utf8) ?? "(non-UTF-8 output)"
+    }
 
     func collect() -> String {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()

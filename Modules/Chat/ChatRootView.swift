@@ -163,7 +163,7 @@ struct ComposerView: View {
     /// Return sends; ⌘/⇧/⌥-Return puts a line break at the caret instead.
     private func insertNewline() {
         if let editor = NSApp.keyWindow?.firstResponder as? NSTextView {
-            editor.insertText("\n", replacementRange: NSRange(location: NSNotFound, length: 0))
+            editor.insertNewlineIgnoringFieldEditor(nil)
         } else {
             input += "\n"
         }

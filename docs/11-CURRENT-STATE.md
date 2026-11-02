@@ -12,7 +12,7 @@ Older docs describe the plan; this describes the app.
 - Signing: automatic, team `LH8KLB9N4F`, Apple Development identity; Release archives are re-signed with
   Developer ID at export. `xcodeVersion: 2710` plus the recommended build settings keep Xcode's
   "Update to recommended settings" prompt away. Bump it when moving to a newer Xcode.
-- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (464 tests, no
+- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (466 tests, no
   warnings except four from mlx-swift's Metal kernels, which cannot be silenced from this project; mlx-swift 0.32
   is worse, 76 warnings).
 - **Notarize from Xcode:** Product → Archive, Organizer → Distribute App → Direct Distribution → Export
