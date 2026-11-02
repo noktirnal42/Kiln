@@ -44,6 +44,7 @@ public final class AppModel {
     public static let appVersion = "0.1.0"
 
     public init() {
+        LegacyContainerMigration.runIfNeeded()
         BuiltInTools.registerAll()
         let schema = Schema([
             Workspace.self, ModuleState.self, Conversation.self, Message.self,

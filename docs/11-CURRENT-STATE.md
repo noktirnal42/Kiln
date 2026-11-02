@@ -115,8 +115,16 @@ in Settings; none are read or printed by the tests.
 
 ## Known limits and ideas
 
-- App Sandbox: child shells cannot set a controlling tty (`zsh: can't set tty pgrp` in Develop → Terminal; harmless)
-  and the system `python3` shim fails (agents fall back to Homebrew Python). Shell commands run inside the sandbox.
+- **Kiln is no longer sandboxed (decided 2026-11-02).** The agent must be able to run real git, package managers and
+  shells in any folder to replace a terminal coding tool such as OpenCode. `Config/Entitlements.plist` is empty; the
+  hardened runtime and notarization still apply. The safety layer is the approval sheet, policy gates A/B, the
+  behavior monitor, tripwires and the audit chain. File tools stay confined to the project root (`WorkspacePathResolver`);
+  `run_command` is not, so a command can touch anything the user can.
+- Data moved from `~/Library/Containers/com.kiln.app/Data/Library/…` to the normal `~/Library/Application Support`.
+  `LegacyContainerMigration` copies Kiln/ModelLab/ReverseEngineering and preferences once at launch (a development
+  copy that is older is kept as `<name>.before-container-migration`; the container is never deleted).
+- Agent mode is on by default with the Workstation Agent profile (it was off, then read-only Research Assistant).
+- `ShellRunner` used to crash the app (`NSTask terminationStatus` on a still-running task) when Stop was pressed during a hung command; fixed 2026-11-02 with tests.
 - Custom endpoint with a 3B model returned "None" after a tool call; the same model is fine on the native Ollama route.
 - `Packages/ModelLabCore/Package.resolved` is rewritten by every build; never commit it.
 - Ideas, in order of value: hand context from a tool to the agent (selected function, dataset) instead of generic

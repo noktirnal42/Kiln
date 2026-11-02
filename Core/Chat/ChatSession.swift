@@ -51,10 +51,13 @@ public final class ChatSession {
     public private(set) var recentModelIDs: [String] = []
 
     /// Agent mode: replies come from the orchestrator (tools, approvals, audit) instead of a bare completion.
-    public var agentEnabled = false
+    /// On by default and on the full Workstation Agent: Kiln is meant to be a working coding agent out of the box,
+    /// and every write, command and network call still waits for approval.
+    public var agentEnabled = true
     /// Text waiting to be put in the message box (a starter prompt, or context handed over from another tool).
     public var draft = ""
-    public var agentProfileIndex = 0
+    public var agentProfileIndex = AgentProfile.builtIns.filter { !$0.toolPermissions.enabledTools.isEmpty }
+        .firstIndex { $0.name == "Workstation Agent" } ?? 0
     public private(set) var orchestrator: AgentOrchestrator?
     /// Tool calls of the current (or last) agent run, in order.
     public private(set) var agentActivity: [ToolCallRecord] = []
@@ -419,6 +422,12 @@ public final class ChatSession {
                 }
             } catch {
                 self?.errorText = AgentRetry.explain(error)
+            }
+            // A Stop (or a failure) mid-call leaves records parked as running; show them as cancelled, not live.
+            if let self {
+                for index in self.agentActivity.indices where !self.agentActivity[index].status.isTerminal {
+                    self.agentActivity[index].status = .cancelled
+                }
             }
             if finalText.isEmpty { finalText = self?.streamingText ?? "" }
             if !finalText.isEmpty, let saved = try? await store.appendMessage(
