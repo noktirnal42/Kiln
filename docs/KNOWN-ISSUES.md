@@ -1,5 +1,7 @@
 # Known issues and verification limits
 
+See the [public work-item index](ISSUE-INDEX.md) for scoped issues and acceptance criteria.
+
 This is the contributor-facing gap list for Kiln's current development state. The [issue tracker](https://github.com/noktirnal42/Kiln/issues) owns assignment, discussion, and implementation status. Specifications describe intended behavior; they are not evidence that a feature is complete.
 
 ## Development workspace is not yet a full IDE
