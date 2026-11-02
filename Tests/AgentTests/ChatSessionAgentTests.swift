@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import SwiftData
 import ModelLabCore
 @testable import Kiln
 
@@ -161,5 +162,50 @@ struct ClassifierTrainingActionTests {
         try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("escape.csv"), withDestinationURL: outside)
         dataset.localRelativePath = "escape.csv"
         #expect(throws: ModelLabModuleError.self) { try ModelLabModule.classifierTrainingJob(experiment: experiment, dataset: dataset, datasetsRoot: root) }
+    }
+}
+
+
+@MainActor
+struct ExperimentDraftConfigurationTests {
+    @Test func savedTabularFeaturesReachTheTrainingJob() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-tabular-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "age,income,label\n23,40000,yes\n45,85000,no\n".write(to: root.appendingPathComponent("data.csv"), atomically: true, encoding: .utf8)
+        let schema = Schema([ExperimentRecord.self, DatasetRecord.self])
+        let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
+        let writer = ModelContext(container)
+        let dataset = DatasetRecord(id: "tabular-fixture", name: "Fixture", sourceKind: .localImport,
+                                    localRelativePath: "data.csv", format: .csv)
+        let draft = ModelLabModule.makeExperimentDraft(name: "Tabular", task: .tabularClassification,
+            datasetID: dataset.id, inputColumnsText: " age, income, ,age ", labelColumnText: " label ")
+        writer.insert(dataset)
+        writer.insert(draft)
+        try writer.save()
+        let reader = ModelContext(container)
+        let saved = try #require(reader.fetch(FetchDescriptor<ExperimentRecord>()).first)
+        let savedDataset = try #require(reader.fetch(FetchDescriptor<DatasetRecord>()).first)
+        let job = try ModelLabModule.classifierTrainingJob(experiment: saved, dataset: savedDataset, datasetsRoot: root)
+        #expect(saved.textColumn == nil)
+        #expect(saved.featureColumns == ["age", "income"])
+        #expect(job.textOrFeatureColumns == ["age", "income"])
+        #expect(job.labelColumn == "label")
+    }
+
+    @Test func textClassificationKeepsASingleColumnName() {
+        let draft = ModelLabModule.makeExperimentDraft(name: "Text", task: .textClassification,
+            datasetID: "fixture", inputColumnsText: " message, body ", labelColumnText: " category ")
+        #expect(draft.textColumn == "message, body")
+        #expect(draft.featureColumns.isEmpty)
+        #expect(draft.labelColumn == "category")
+    }
+
+    @Test func nonClassifierTasksDiscardStaleColumnFields() {
+        let draft = ModelLabModule.makeExperimentDraft(name: "LM", task: .smallLMPretraining,
+            datasetID: "fixture", inputColumnsText: "age,income", labelColumnText: "label")
+        #expect(draft.textColumn == nil)
+        #expect(draft.labelColumn == nil)
+        #expect(draft.featureColumns.isEmpty)
     }
 }
