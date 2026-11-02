@@ -131,6 +131,21 @@ public final class ModelLabModule: @preconcurrency Module, ModuleDefinition, Mod
         seededDemo = true
     }
 
+    /// Maps the experiment form into persisted task-specific configuration.
+    static func makeExperimentDraft(name: String, task: TaskType, datasetID: String,
+                                    inputColumnsText: String, labelColumnText: String) -> ExperimentRecord {
+        let input = inputColumnsText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let label = labelColumnText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var seen = Set<String>()
+        let features = task == .tabularClassification ? input.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted } : []
+        return ExperimentRecord(name: name, task: task, datasetID: datasetID,
+                                textColumn: task == .textClassification ? input : nil,
+                                labelColumn: (task == .textClassification || task == .tabularClassification) ? label : nil,
+                                featureColumns: features)
+    }
+
     // MARK: Training entry points
 
     /// Starts an existing classifier experiment through the same validated path used by the GUI.

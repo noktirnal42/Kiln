@@ -224,7 +224,7 @@ private struct NewExperimentSheet: View {
                 }
             }
             if task == .textClassification || task == .tabularClassification {
-                TextField("Text/feature column", text: $textColumn)
+                TextField(task == .tabularClassification ? "Feature columns (comma-separated)" : "Text column", text: $textColumn)
                 TextField("Label column", text: $labelColumn)
             }
             if let errorMessage {
@@ -249,12 +249,9 @@ private struct NewExperimentSheet: View {
     }
 
     private func create() {
-        let record = ExperimentRecord(
-            name: name,
-            task: task,
-            datasetID: datasetID ?? "",
-            textColumn: task == .textClassification ? textColumn : nil,
-            labelColumn: (task == .textClassification || task == .tabularClassification) ? labelColumn : nil
+        let record = ModelLabModule.makeExperimentDraft(
+            name: name, task: task, datasetID: datasetID ?? "",
+            inputColumnsText: textColumn, labelColumnText: labelColumn
         )
         do {
             try ExperimentStore(context: modelContext).create(record)
