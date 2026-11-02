@@ -15,7 +15,7 @@ incremental agent sessions.
 ## Status
 
 > **Current state (2026-11-01): see [`docs/11-CURRENT-STATE.md`](docs/11-CURRENT-STATE.md)** — what exists, how it was
-> verified, how to build/sign/notarize, and what is still open. The app builds with no warnings of its own, 451 tests
+> verified, how to build/sign/notarize, and what is still open. The app builds with no warnings of its own, 463 tests
 > pass, and a notarized build runs. The sections below record how each phase was built.
 
 ### Phase 1d — Agent Runtime + Tools (complete)

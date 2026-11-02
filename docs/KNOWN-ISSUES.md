@@ -28,7 +28,7 @@ This is the contributor-facing gap list for Kiln's current development state. Th
 
 ## Agent streaming needs visible end-to-end verification
 
-**Observed:** plain chat supports streamed chunks. The agent event model has a text-delta event, but the audited agent turn path accumulated text without emitting it. A fix and regression coverage are being prepared.
+**Observed:** plain chat supports streamed chunks. The agent event model has a text-delta event, but the audited agent turn path accumulated text without emitting it. A fix with regression coverage has since landed; the running GUI has not yet been checked against a real provider.
 
 **Needed:** visible incremental text before the provider finishes, responsive Stop, correct retry/reset behavior, and no duplicated final text. Verify both a deterministic delayed-chunk test and the running GUI with a real provider. Do not equate eventual response delivery with smooth streaming.
 
@@ -56,6 +56,6 @@ Layout fixes have addressed pane navigation, embedded Search placement, model-pi
 
 ## Test-status notes
 
-A full regression run exercised 456 tests and found one nested-path indexing failure. It was reproduced as `/var` versus `/private/var` aliasing; the root and enumerated paths are now normalized, and the focused indexing recheck passed. A new full run is still needed before publishing a clean-suite claim.
+A full regression run exercised 456 tests and found one nested-path indexing failure. It was reproduced as `/var` versus `/private/var` aliasing; the root and enumerated paths are now normalized, and the focused indexing recheck passed. A later full run passed all 463 tests.
 
 Live tests require compatible providers, credentials, model availability, and sometimes API credits. A listed model may return a payment error even when another model on the same provider works. A command reporting success with zero selected tests is not verification.
