@@ -53,6 +53,7 @@ public enum FineTuningError: LocalizedError {
     case emptyTrainingData
     case incompatibleBaseModel(String)
     case cancelled
+    case invalidConfiguration(String)
 
     public var errorDescription: String? {
         switch self {
@@ -61,6 +62,7 @@ public enum FineTuningError: LocalizedError {
         case .incompatibleBaseModel(let id):
             "\(id) doesn't expose LoRA-adaptable layers in mlx-swift-lm's current model support."
         case .cancelled: "Fine-tuning was cancelled."
+        case .invalidConfiguration(let reason): reason
         }
     }
 }
@@ -88,14 +90,35 @@ public struct MLXFineTuningProvider: Sendable {
         CapabilityDetector.detectMLX().status
     }
 
+    public static func validate(job: FineTuningJob) throws {
+        guard job.trainingTexts.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+            throw FineTuningError.emptyTrainingData
+        }
+        guard !job.baseModelRepoID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw FineTuningError.invalidConfiguration("Enter a base model repository.")
+        }
+        guard job.rank > 0, job.numLayers > 0, job.iterations > 0, job.batchSize > 0,
+              job.learningRate.isFinite, job.learningRate > 0 else {
+            throw FineTuningError.invalidConfiguration("Rank, layers, iterations, batch size, and learning rate must be positive.")
+        }
+        guard !job.outputName.isEmpty, job.outputName != ".", job.outputName != "..",
+              !job.outputName.contains("/"), !job.outputName.contains("\\") else {
+            throw FineTuningError.invalidConfiguration("The output name must be a single file name.")
+        }
+    }
+
     public func fineTune(
         job: FineTuningJob, onProgress: @escaping @Sendable (TrainingProgress) -> Void
     ) async throws -> FineTuningResult {
+        try Self.validate(job: job)
         guard capability().isAvailable else {
             throw FineTuningError.unavailable(reason: capability().reason ?? "MLX unavailable.")
         }
-        guard !job.trainingTexts.isEmpty else { throw FineTuningError.emptyTrainingData }
         try Task.checkCancellation()
+        let adapterDirectory = LibraryPaths.models.appendingPathComponent(job.outputName, isDirectory: true)
+        guard !FileManager.default.fileExists(atPath: adapterDirectory.path) else {
+            throw FineTuningError.invalidConfiguration("An artifact with this output name already exists. Choose another name.")
+        }
 
         onProgress(TrainingProgress(phase: .preparingData, message: "Loading base model \(job.baseModelRepoID)"))
         let configuration = ModelConfiguration(id: job.baseModelRepoID)
@@ -105,7 +128,6 @@ public struct MLXFineTuningProvider: Sendable {
 
         try Task.checkCancellation()
 
-        let adapterDirectory = LibraryPaths.models.appendingPathComponent(job.outputName, isDirectory: true)
         try FileManager.default.createDirectory(at: adapterDirectory, withIntermediateDirectories: true)
         let adapterURL = adapterDirectory.appendingPathComponent("adapters.safetensors")
         let configURL = adapterDirectory.appendingPathComponent("adapter_config.json")
@@ -175,7 +197,7 @@ public struct MLXFineTuningProvider: Sendable {
         }
 
         if Task.isCancelled {
-            throw FineTuningError.cancelled
+            throw CancellationError()
         }
 
         onProgress(TrainingProgress(phase: .done, message: "Done"))

@@ -46,7 +46,7 @@ public final class SmallLMCoordinator {
                 try Task.checkCancellation()
 
                 let artifact = try registry.register(
-                    name: job.outputName,
+                    name: experiment.name,
                     format: .mlxScratchModel,
                     origin: .trainedLocally,
                     relativePath: result.relativePath,

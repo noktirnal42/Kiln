@@ -46,7 +46,7 @@ public final class MLXFineTuningCoordinator {
                 try Task.checkCancellation()
 
                 let artifact = try registry.register(
-                    name: job.outputName,
+                    name: experiment.name,
                     format: .mlxLoraAdapter,
                     origin: .trainedLocally,
                     relativePath: result.adapterRelativePath,

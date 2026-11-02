@@ -9,6 +9,7 @@ struct SwarmGraphTests {
 
     @Test func invalidPlansAreRejected() {
         #expect(throws: SwarmGraph.Invalid.empty) { try SwarmGraph(tasks: []) }
+        #expect(throws: SwarmGraph.Invalid.invalidID("Bad ID")) { try SwarmGraph(tasks: [task("Bad ID")]) }
         #expect(throws: SwarmGraph.Invalid.duplicateID("a")) { try SwarmGraph(tasks: [task("a"), task("a")]) }
         #expect(throws: SwarmGraph.Invalid.unknownDependency(task: "a", missing: "zzz")) { try SwarmGraph(tasks: [task("a", after: ["zzz"])]) }
         #expect(throws: SwarmGraph.Invalid.cycle) { try SwarmGraph(tasks: [task("a", after: ["b"]), task("b", after: ["a"])]) }
@@ -41,6 +42,8 @@ struct SwarmGraphTests {
         #expect(SwarmPlanner.parse("no json here") == nil)
         #expect(SwarmPlanner.parse(#"{"tasks":[{"id":"a","title":"x","role":"wizard"}]}"#) == nil)
         #expect(SwarmPlanner.parse(#"{"tasks":[{"id":"a","title":"x","role":"reviewer","depends_on":["a"]}]}"#) == nil)
+        #expect(SwarmPlanner.parse(#"{"tasks":[{"id":"a","title":"x","role":"reviewer","depends_on":"missing"}]}"#) == nil)
+        #expect(SwarmPlanner.parse(#"{"tasks":[{"id":"Task 1","title":"x","role":"reviewer"}]}"#) == nil)
     }
 
     @Test func plannerFallsBackToResearchImplementReviewWhenTheModelFails() async {
@@ -130,6 +133,46 @@ struct SwarmOrchestratorTests {
         #expect(finalGraph(events)?.task("a")?.result == "needs the signing key")
     }
 
+    @Test func retryRegistersTheSameWorkerAfterCleanup() async throws {
+        struct Transient: Error {}
+        let bus = CoordinationBus()
+        let tries = Locked(0)
+        let swarm = SwarmOrchestrator(bus: bus) { _, _, _ in
+            let count = tries.withLock { $0 += 1; return $0 }
+            if count == 1 { throw Transient() }
+            return "recovered"
+        }
+        let graph = try SwarmGraph(tasks: [SwarmTask(id: "a", title: "A", role: .researcher)])
+        let final = try #require(finalGraph(await collect(swarm.run(goal: "g", graph: graph))))
+        #expect(tries.withLock { $0 } == 2)
+        #expect(final.task("a")?.result == "recovered")
+        #expect(await bus.registeredAgents.isEmpty)
+    }
+
+    /// Opt-in live smoke test. It uses a disposable fixture and a local Ollama model only.
+    @Test func liveLocalSwarmReadsAndReviewsAWorkspace() async throws {
+        guard ProcessInfo.processInfo.environment["KILN_LIVE_SWARM_TEST"] == "1" else { return }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-swarm-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "Project: Harbor\nBuild target: macOS\nRelease code: COBALT-731\n".write(
+            to: root.appendingPathComponent("project.txt"), atomically: true, encoding: .utf8)
+        let provider = OpenCodeProvider(scope: .local)
+        let agent = AgentOrchestrator(toolRegistry: ToolRegistry(tools: [ReadFileTool()]))
+        let swarm = SwarmOrchestrator(bus: CoordinationBus(), attemptsPerTask: 1,
+            worker: SwarmWorkers.agent(base: agent, modelID: "ollama-qwen2.5-coder:3b", workspaceRoot: root,
+                chat: { request in try await provider.streamChat(request, reasoning: nil) }))
+        let graph = try SwarmGraph(tasks: [
+            SwarmTask(id: "inspect", title: "Inspect project", details: "Use read_file to read project.txt. Report the release code exactly.", role: .researcher),
+            SwarmTask(id: "review", title: "Review findings", details: "Use read_file to check project.txt independently and report the release code exactly.", role: .reviewer, dependsOn: ["inspect"]),
+        ])
+        let final = try #require(finalGraph(await collect(swarm.run(goal: "Verify the project's release code", graph: graph))))
+        for task in final.tasks {
+            #expect(task.status == .done, "\(task.id): \(task.result ?? "no result")")
+            #expect(task.result?.contains("COBALT-731") == true, "\(task.id): \(task.result ?? "no result")")
+        }
+    }
+
     @Test func workersTalkOnlyThroughTheBusAsThemselves() async throws {
         let bus = CoordinationBus()
         let swarm = SwarmOrchestrator(bus: bus) { task, _, endpoint in
@@ -175,5 +218,19 @@ struct SwarmPolicyTests {
             #expect(set.isEnabled("write_file") == (role == .implementer))
             #expect(!set.isEnabled("delete_file"))
         }
+    }
+}
+
+struct SwarmResultValidationTests {
+    @Test func simulatedCallsAreBlocked() {
+        #expect(throws: SwarmBlocked.self) {
+            try SwarmWorkers.validateSummary(#"{"name":"calculate_total","arguments":{"total_cost":405}}"#)
+        }
+        #expect(throws: SwarmBlocked.self) { try SwarmWorkers.validateSummary("   ") }
+    }
+
+    @Test func plainResultsAndDataAreAccepted() throws {
+        try SwarmWorkers.validateSummary("12 × 19 + 8 × 23 = 412. Independently checked each subtotal.")
+        try SwarmWorkers.validateSummary(#"{"total":412}"#)
     }
 }

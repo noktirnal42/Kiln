@@ -26,7 +26,7 @@ struct MLXLoRAControls: View {
                 HStack {
                     TextField("Learning rate", value: $learningRate, format: .number)
                         .frame(width: 120)
-                    Text("LoRA runs are verified in GUI context on the reference machine; status is environment-sensitive (see Overview).")
+                    Text("Requires a compatible MLX model and sufficient memory. Validation uses training examples when no separate examples are available.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 if let errorText {
@@ -58,7 +58,7 @@ struct MLXLoRAControls: View {
             iterations: iterations,
             learningRate: learningRate,
             batchSize: 1,
-            outputName: experiment.name.replacingOccurrences(of: " ", with: "-")
+            outputName: "run-\(UUID().uuidString)"
         )
         do {
             try module.startMLXLoRA(experiment: experiment, job: job)
@@ -99,6 +99,7 @@ struct MLXLoRAControls: View {
     }
 
     private func split(_ texts: [String]) -> ([String], [String]) {
+        guard texts.count > 1 else { return (texts, []) }
         let validationCount = max(1, texts.count / 5)
         return (Array(texts.dropLast(validationCount)), Array(texts.suffix(validationCount)))
     }
@@ -149,7 +150,7 @@ struct SmallLMControls: View {
             iterations: iterations,
             learningRate: 1e-3,
             batchSize: 8,
-            outputName: experiment.name.replacingOccurrences(of: " ", with: "-")
+            outputName: "run-\(UUID().uuidString)"
         )
         do {
             try SmallLMPretrainingProvider.validate(job: job)
@@ -216,8 +217,8 @@ struct DistillationControls: View {
             iterations: 200,
             learningRate: 1e-4,
             batchSize: 1,
-            datasetOutputName: experiment.name.replacingOccurrences(of: " ", with: "-") + "-distill",
-            adapterOutputName: experiment.name.replacingOccurrences(of: " ", with: "-") + "-student"
+            datasetOutputName: "distill-\(UUID().uuidString)",
+            adapterOutputName: "student-\(UUID().uuidString)"
         )
         do {
             try module.startDistillation(experiment: experiment, job: job)

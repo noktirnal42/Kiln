@@ -91,6 +91,29 @@ struct LiveQATests {
 
     // MARK: Tasks
 
+    /// Keeps the generated bundle available for a separate user-level visual inspection.
+    @Test func theAgentBuildsANativeMacGUIApp() async throws {
+        let model = try await model()
+        let root = try workspace()
+        let rig = try rig(registry: builtins(), autoApprove: true)
+        defer { rig.watcher.cancel() }
+        let outcome = try await run(rig, model: model, profile: "Coding Agent", prompt: """
+            Build a real native macOS AppKit GUI application in this folder named HarborCounter.app.
+            Write Swift source and compile it using xcrun swiftc. Include a valid Info.plist and executable
+            at HarborCounter.app/Contents/MacOS/HarborCounter. The window must show a counter initially 0
+            and an Increment button that updates the count. Add a --self-test argument that tests the
+            same counter logic by incrementing twice, prints COUNTER_OK=2, and exits without opening a window.
+            Run the compiled executable with --self-test and report its actual output. Keep all files here.
+            """, root: root)
+        report("native-macos-app", model, outcome)
+        let binary = root.appendingPathComponent("HarborCounter.app/Contents/MacOS/HarborCounter")
+        let data = try Data(contentsOf: binary)
+        #expect(data.count > 10_000, "A real compiled executable is required")
+        #expect(outcome.succeeded.contains("run_command") || outcome.succeeded.contains("stream_command"))
+        #expect(outcome.text.contains("COUNTER_OK=2"))
+        print("NATIVE_GUI_QA_BUNDLE=\(root.appendingPathComponent("HarborCounter.app").path)")
+    }
+
     @Test func theAgentBuildsAndRunsASmallApp() async throws {
         let model = try await model()
         let root = try workspace()

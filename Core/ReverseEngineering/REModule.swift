@@ -155,6 +155,18 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
         }
     }
 
+    /// Linear native disassembly, including code without recovered symbol names.
+    /// This is a listing, not a claim about function boundaries.
+    public func linearDisassembly(projectID: String) async throws -> String {
+        let (path, slice) = try await MainActor.run {
+            (try self.projectFolder(id: projectID).binaryURL.path,
+             try self.loadedAnalysis(projectID: projectID).slice)
+        }
+        return try await Task.detached(priority: .userInitiated) {
+            try Analyzer.disassemblyListing(path, arch: slice)
+        }.value
+    }
+
     /// Decompiled pseudocode for one function (Ghidra analyses only).
     public func decompilation(projectID: String, address: String) async throws -> String {
         try await MainActor.run {
@@ -190,7 +202,8 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
             }) else { throw REError.unknownFunction }
             let outgoing = function.callees.map { Xref(from: address, to: $0, kind: "call") }
             let incoming = analysis.functions.compactMap { f in
-                f.callees.contains(address) ? Xref(from: f.address, to: address, kind: "call") : nil
+                f.callees.contains(where: { ProjectStore.normalizedAddress($0) == key })
+                    ? Xref(from: f.address, to: address, kind: "call") : nil
             }
             switch direction {
             case "to": return outgoing

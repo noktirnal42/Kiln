@@ -35,6 +35,7 @@ struct ModelLabExperimentsView: View {
                 Button("Compare runs", systemImage: "rectangle.split.2x1") { showsComparison = true }
             }
             .navigationTitle("Experiments")
+            .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
         } detail: {
             if let experiment = selection {
                 ExperimentDetailView(module: module, experiment: experiment)

@@ -41,7 +41,7 @@ struct ModelPickerView: View {
             }
 
             List {
-                if !recents.isEmpty {
+                if !recents.isEmpty && search.isEmpty {
                     Section("Recents") {
                         ForEach(recents, id: \.self) { modelID in
                             row(for: modelID, descriptor: models.first { $0.id == modelID })
@@ -86,16 +86,27 @@ struct ModelPickerView: View {
     }
 
     private func loadModels() async {
-        let allModels = await session.registry.allModels(forceRefresh: false)
-        if !allModels.isEmpty {
-            models = allModels
-            loadError = nil
-        } else {
-            loadError = "No models available yet. Check provider availability (keys, running local servers, Apple Intelligence)."
+        recents = session.recentModelIDs
+        let registry = session.registry
+        let providers = await registry.allProviders()
+        await withTaskGroup(of: (String, ProviderAvailability, [ModelDescriptor]).self) { group in
+            for provider in providers {
+                group.addTask {
+                    let status = await provider.checkAvailability()
+                    let found = status.isAvailable ? ((try? await registry.models(for: provider.id)) ?? []) : []
+                    return (provider.id, status, found)
+                }
+            }
+            for await (providerID, status, found) in group {
+                guard !Task.isCancelled else { break }
+                availability[providerID] = status
+                models.append(contentsOf: found)
+            }
         }
         loading = false
-        availability = await session.registry.availabilityMap()
-        recents = session.recentModelIDs
+        if models.isEmpty {
+            loadError = "No models available yet. Check provider availability (keys, running local servers, Apple Intelligence)."
+        }
     }
 
     @ViewBuilder
@@ -121,6 +132,7 @@ struct ModelPickerView: View {
                         .foregroundStyle(SSColor.accent)
                 }
             }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

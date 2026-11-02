@@ -64,8 +64,12 @@ public final class SwarmOrchestrator: Sendable {
                                 let agentID = "worker.\(next.id)"
                                 do {
                                     let endpoint = try await bus.register(agent: agentID)
-                                    defer { Task { await bus.unregister(agent: agentID) } }
-                                    return (next.id, .success(try await worker(next, prompt, endpoint)))
+                                    let outcome: Result<String, Error>
+                                    do { outcome = .success(try await worker(next, prompt, endpoint)) }
+                                    catch { outcome = .failure(error) }
+                                    // Finish deregistration before the scheduler can retry this ID.
+                                    await bus.unregister(agent: agentID)
+                                    return (next.id, outcome)
                                 } catch { return (next.id, .failure(error)) }
                             }
                         }
@@ -91,6 +95,7 @@ public final class SwarmOrchestrator: Sendable {
                         }
                     }
                 }
+                if lead != nil { await bus.unregister(agent: "orchestrator") }
                 // Anything still pending (cancelled run) is skipped, not left looking in-progress.
                 for pending in graph.tasks where pending.status == .pending || pending.status == .running {
                     graph.update(pending.id) { $0.status = .skipped }

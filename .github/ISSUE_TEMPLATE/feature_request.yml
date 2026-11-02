@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a user workflow or improvement.
+title: "[Feature]: "
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: workflow
+    attributes:
+      label: What are you trying to accomplish?
+      description: Describe the task, who benefits, and the current limitation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain the intended experience, including how it fits Kiln's shared workspace and agent tools.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How would we know it works?
+      description: Suggest observable acceptance criteria and a real example.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and dependencies
+      description: Include workarounds, provider/tool requirements, and compatibility constraints.
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Would you like to help?
+      options:
+        - I can provide examples or test the result
+        - I would like to contribute an implementation
+        - I am sharing the idea

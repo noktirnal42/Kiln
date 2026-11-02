@@ -18,7 +18,6 @@ struct SearchPanelView: View {
                     Text(root).font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Button("Open Folder…") { openFolder() }
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
             .padding(SSSpacing.m)
             HStack {
@@ -39,6 +38,7 @@ struct SearchPanelView: View {
                 } description: {
                     Text(indexedRoot == nil ? "Open a workspace folder to index file names (FTS5 + Spotlight)." : "Nothing matched '\(query)'.")
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Text("\(resultCount) results — merged from FTS5 index and Spotlight")
                     .font(SSTypography.caption())

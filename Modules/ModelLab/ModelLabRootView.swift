@@ -4,29 +4,44 @@ import ModelLabCore
 
 struct ModelLabRootView: View {
     @Bindable var module: ModelLabModule
+    @State private var section: Section = .overview
+
+    private enum Section: String, CaseIterable, Identifiable {
+        case overview = "Overview", experiments = "Experiments", datasets = "Datasets"
+        case models = "Models", playground = "Playground", evaluation = "Evaluation", redTeam = "Red Team"
+        var id: String { rawValue }
+    }
 
     var body: some View {
         Group {
             if let container = module.container {
-                TabView {
-                    ModelLabOverviewView(module: module)
-                        .tabItem { Label("Overview", systemImage: "gauge") }
-                    ModelLabExperimentsView(module: module)
-                        .tabItem { Label("Experiments", systemImage: "flask") }
-                        .modelContainer(container)
-                    ModelLabDatasetsView(module: module)
-                        .tabItem { Label("Datasets", systemImage: "tablecells") }
-                        .modelContainer(container)
-                    ModelLabModelsView(module: module)
-                        .tabItem { Label("Models", systemImage: "cube") }
-                        .modelContainer(container)
-                    ModelLabPlaygroundView(module: module)
-                        .tabItem { Label("Playground", systemImage: "bubble") }
-                    ModelLabEvaluationView(module: module)
-                        .tabItem { Label("Evaluation", systemImage: "chart.bar") }
-                    ModelLabRedTeamView(module: module)
-                        .tabItem { Label("Red Team", systemImage: "shield.lefthalf.filled") }
+                VStack(spacing: 0) {
+                    ScrollView(.horizontal) {
+                        Picker("Model Lab", selection: $section) {
+                            ForEach(Section.allCases) { section in
+                                Text(section.rawValue).tag(section)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                        .padding(SSSpacing.s)
+                    }
+                    Divider()
+                    Group {
+                        switch section {
+                        case .overview: ModelLabOverviewView(module: module)
+                        case .experiments: ModelLabExperimentsView(module: module)
+                        case .datasets: ModelLabDatasetsView(module: module)
+                        case .models: ModelLabModelsView(module: module)
+                        case .playground: ModelLabPlaygroundView(module: module)
+                        case .evaluation: ModelLabEvaluationView(module: module)
+                        case .redTeam: ModelLabRedTeamView(module: module)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
+                .modelContainer(container)
             } else {
                 ContentUnavailableView {
                     Label("Model Lab store unavailable", systemImage: "externaldrive.badge.exclamationmark")
@@ -75,7 +90,7 @@ struct ModelLabOverviewView: View {
             }
             Section("MLX status is environment-sensitive") {
                 Label(
-                    "Per AILab CAPABILITIES.md: MLX generation and LoRA training completed in GUI context on the reference machine, but the underlying scheduler issue is upstream and intermittent — this panel reflects a live probe, never a cached 'working' claim.",
+                    "MLX availability indicates the runtime is linked. A successful model download and run are needed to verify generation or training on this Mac.",
                     systemImage: "info.circle"
                 )
                 .font(.caption)

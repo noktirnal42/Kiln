@@ -68,6 +68,15 @@ struct REModuleTests {
         #expect(matches.isEmpty)
     }
 
+    @Test func strippedSystemBinaryHasLinearDisassembly() async throws {
+        let module = REModule()
+        _ = try await module.importBinary(at: try copySystemBinary())
+        let id = try #require(module.selected?.id)
+        let listing = try await module.linearDisassembly(projectID: id)
+        #expect(listing.contains("__text"))
+        #expect(listing.contains("ret"))
+    }
+
     @Test func mcpToolDefinitionsHaveUniqueNames() {
         let names = REMCPTools.definitions.map(\.name)
         #expect(Set(names).count == names.count)

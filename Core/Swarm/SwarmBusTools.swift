@@ -82,7 +82,7 @@ public enum SwarmWorkers {
             let profile = AgentProfile(
                 name: "Swarm \(task.role.rawValue)", iconSymbol: "person.3",
                 systemPrompt: task.role.instructions
-                    + " You work in a team. Use swarm_post to share progress, swarm_report_blocker if you cannot continue, and finish with a short plain summary of your result.",
+                    + " You work in a team. Use only the tools actually provided through the tool-call protocol. Never invent functions or simulate a tool call in your answer. Use swarm_post to share progress, swarm_report_blocker if you cannot continue, and finish with a short plain summary containing the result and evidence. Reviewers must independently check earlier results and explicitly report discrepancies.",
                 mode: task.role == .implementer ? .act : .review,
                 modelID: modelID,
                 toolPermissions: ToolPermissionSet(
@@ -96,7 +96,19 @@ public enum SwarmWorkers {
                 if case .finished(let summary) = event { finalText = summary.finalText }
             }
             if let reason = blocker.reason { throw SwarmBlocked(reason) }
+            try validateSummary(finalText)
             return finalText
+        }
+    }
+
+    static func validateSummary(_ text: String) throws {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw SwarmBlocked("The worker returned no result.") }
+        let payload = trimmed.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if let data = payload.data(using: .utf8),
+           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           (object["name"] != nil && object["arguments"] != nil) || object["tool_calls"] != nil {
+            throw SwarmBlocked("The worker returned a simulated tool call instead of a verified result. Try a model with stronger tool support.")
         }
     }
 }

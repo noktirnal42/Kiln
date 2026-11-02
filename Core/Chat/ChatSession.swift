@@ -395,6 +395,7 @@ public final class ChatSession {
                     guard let self else { return }
                     switch event {
                     case .textDelta(let delta): self.streamingText += delta
+                    case .textReset: self.streamingText = ""
                     case .roundStarted(let round): self.agentRound = round; self.streamingText = ""
                     case .retryScheduled(let attempt, let delay, let reason):
                         self.agentNotice = "Retrying (\(attempt)) in \(Int(delay))s: \(reason)"

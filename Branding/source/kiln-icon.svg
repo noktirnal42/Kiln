@@ -1,40 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <!-- macOS-style squircle body: 824pt square on a 1024pt canvas, per Apple's icon grid -->
-    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2A1A14"/>
-      <stop offset="1" stop-color="#120C0B"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.92" r="0.62">
-      <stop offset="0" stop-color="#E8442E" stop-opacity="0.65"/>
-      <stop offset="0.55" stop-color="#E8442E" stop-opacity="0.12"/>
-      <stop offset="1" stop-color="#E8442E" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="ember" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFE3A3"/>
-      <stop offset="0.45" stop-color="#FF8A3D"/>
-      <stop offset="1" stop-color="#E8442E"/>
-    </linearGradient>
-    <linearGradient id="tileFired" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FF8A3D"/>
-      <stop offset="1" stop-color="#E8442E"/>
-    </linearGradient>
-    <clipPath id="squircle">
-      <rect x="100" y="100" width="824" height="824" rx="186" ry="186"/>
-    </clipPath>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#382823"/><stop offset=".5" stop-color="#211916"/><stop offset="1" stop-color="#15110F"/></linearGradient>
+    <radialGradient id="heat" cx=".5" cy=".72" r=".55"><stop stop-color="#A52F1C" stop-opacity=".55"/><stop offset="1" stop-color="#A52F1C" stop-opacity="0"/></radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#FFF1DF"/><stop offset="1" stop-color="#BDA18D"/></linearGradient>
+    <linearGradient id="inside" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#120F0E"/><stop offset="1" stop-color="#4B2018"/></linearGradient>
+    <linearGradient id="fire" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#FFE3A7"/><stop offset=".35" stop-color="#FF994F"/><stop offset="1" stop-color="#E3472B"/></linearGradient>
+    <clipPath id="clip"><rect x="100" y="100" width="824" height="824" rx="190"/></clipPath>
   </defs>
-
-  <rect x="100" y="100" width="824" height="824" rx="186" ry="186" fill="url(#body)"/>
-  <rect x="100" y="100" width="824" height="824" fill="url(#glow)" clip-path="url(#squircle)"/>
-
-  <!-- Kiln arch: the chamber -->
-  <path d="M334 698 V438 A178 178 0 0 1 690 438 V698" fill="none" stroke="#F4E4D0" stroke-width="36" stroke-linejoin="round" stroke-linecap="round"/>
-
-  <!-- Fired flame inside the chamber -->
-  <path d="M512 330 C540 390 600 440 600 512 C600 580 560 628 512 628 C464 628 424 580 424 512 C424 462 466 420 512 330 Z" fill="url(#ember)"/>
-
-  <!-- Mosaic tiles: the components, fired together. The centre tile is the one that came out of the kiln. -->
-  <rect x="300" y="732" width="134" height="34" rx="8" fill="#F4E4D0"/>
-  <rect x="446" y="732" width="134" height="34" rx="8" fill="url(#tileFired)"/>
-  <rect x="592" y="732" width="134" height="34" rx="8" fill="#F4E4D0"/>
+  <g clip-path="url(#clip)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#body)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#heat)"/>
+    <path d="M100 240 Q512 90 924 240 V100 H100Z" fill="#fff" opacity=".025"/>
+    <rect x="104" y="104" width="816" height="816" rx="186" fill="none" stroke="#FFF2E0" stroke-opacity=".14" stroke-width="3"/>
+    <!-- A kiln chamber, with a recessed opening and a single fired form. -->
+    <path d="M290 694V455C290 324 389 229 512 229S734 324 734 455V694H675V455C675 356 605 288 512 288S349 356 349 455V694Z" fill="#100D0C" opacity=".48" transform="translate(0 12)"/>
+    <path d="M290 694V455C290 324 389 229 512 229S734 324 734 455V694H675V455C675 356 605 288 512 288S349 356 349 455V694Z" fill="url(#rim)"/>
+    <path d="M372 690V460C372 373 430 312 512 312S652 373 652 460V690Z" fill="url(#inside)"/>
+    <path d="M512 354C548 418 598 464 598 529C598 590 562 630 512 630S426 590 426 529C426 482 461 436 512 354Z" fill="url(#fire)"/>
+    <path d="M512 433C531 469 555 496 555 530C555 560 538 580 512 580S469 560 469 530C469 503 491 469 512 433Z" fill="#FFF0CE" opacity=".24"/>
+    <rect x="289" y="728" width="446" height="32" rx="16" fill="#0D0B0A" opacity=".4" transform="translate(0 8)"/>
+    <rect x="289" y="728" width="130" height="32" rx="10" fill="#D9C5B2"/><rect x="447" y="728" width="130" height="32" rx="10" fill="url(#fire)"/><rect x="605" y="728" width="130" height="32" rx="10" fill="#D9C5B2"/>
+  </g>
 </svg>

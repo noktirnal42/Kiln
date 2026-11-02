@@ -48,12 +48,13 @@ public struct SwarmGraph: Sendable, Equatable {
     public private(set) var tasks: [SwarmTask]
 
     public enum Invalid: Error, Equatable, CustomStringConvertible {
-        case empty, tooMany(Int), duplicateID(String), unknownDependency(task: String, missing: String), cycle
+        case empty, tooMany(Int), invalidID(String), duplicateID(String), unknownDependency(task: String, missing: String), cycle
 
         public var description: String {
             switch self {
             case .empty: "The plan has no tasks."
             case .tooMany(let limit): "The plan has more than \(limit) tasks."
+            case .invalidID(let id): "Task id '\(id)' must use lowercase letters, numbers, dots, underscores or hyphens and be at most 57 characters."
             case .duplicateID(let id): "Two tasks share the id '\(id)'."
             case .unknownDependency(let task, let missing): "Task '\(task)' depends on unknown task '\(missing)'."
             case .cycle: "The plan's dependencies form a cycle."
@@ -67,6 +68,11 @@ public struct SwarmGraph: Sendable, Equatable {
         guard !tasks.isEmpty else { throw Invalid.empty }
         guard tasks.count <= Self.maxTasks else { throw Invalid.tooMany(Self.maxTasks) }
         var seen = Set<String>()
+        // Worker IDs are registered as "worker.<id>" on the bus (64-character limit).
+        let validID = try! NSRegularExpression(pattern: "^[a-z0-9][a-z0-9._-]{0,56}$")
+        for task in tasks where validID.firstMatch(in: task.id, range: NSRange(task.id.startIndex..., in: task.id)) == nil {
+            throw Invalid.invalidID(task.id)
+        }
         for task in tasks where !seen.insert(task.id).inserted { throw Invalid.duplicateID(task.id) }
         for task in tasks {
             for dependency in task.dependsOn where !seen.contains(dependency) {
@@ -129,6 +135,7 @@ public enum SwarmPlanner {
     public static let prompt = """
     Break the user's goal into at most 8 tasks for a small team. Reply with JSON only:
     {"tasks":[{"id":"short-id","title":"...","details":"...","role":"researcher|implementer|reviewer","depends_on":["other-id"]}]}
+    IDs must be lowercase and use only letters, digits, dots, underscores or hyphens, at most 57 characters.
     Tasks with no dependency on each other run in parallel. Use researcher for reading, implementer for changes, reviewer for checking.
     """
 
@@ -142,6 +149,7 @@ public enum SwarmPlanner {
         for row in rows {
             guard let id = row["id"] as? String, !id.isEmpty, let title = row["title"] as? String,
                   let role = (row["role"] as? String).flatMap(SwarmRole.init(rawValue:)) else { return nil }
+            if row["depends_on"] != nil && !(row["depends_on"] is [String]) { return nil }
             tasks.append(SwarmTask(id: id, title: title, details: row["details"] as? String ?? "", role: role,
                                    dependsOn: row["depends_on"] as? [String] ?? []))
         }

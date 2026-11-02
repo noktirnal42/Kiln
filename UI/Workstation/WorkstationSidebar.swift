@@ -132,7 +132,7 @@ struct WorkstationSidebar: View {
                     .background(selected ? SSColor.accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
                 }
                 .buttonStyle(.plain)
-                .help("\\(activity.title) — \\(activity.summary) (⌘\\(String(activity.shortcutKey)))")
+                .help("\(activity.title) — \(activity.summary) (⌘\(String(activity.shortcutKey)))")
             }
         }
     }
@@ -145,13 +145,13 @@ struct WorkstationSidebar: View {
                     .frame(width: 28, height: 26)
                     .overlay(alignment: .topTrailing) {
                         if pending > 0 {
-                            Text("\\(pending)").font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                            Text("\(pending)").font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
                                 .padding(.horizontal, 4).background(SSColor.accent, in: Capsule()).offset(x: 2, y: -2)
                         }
                     }
             }
             .buttonStyle(SSIconButtonStyle(selected: pending > 0))
-            .help(pending > 0 ? "\\(pending) tool call(s) waiting for you" : "Approvals and standing grants")
+            .help(pending > 0 ? "\(pending) tool call(s) waiting for you" : "Approvals and standing grants")
             SettingsLink { Image(systemName: "gearshape").frame(width: 28, height: 26) }
                 .buttonStyle(SSIconButtonStyle())
                 .help("Settings and API keys (⌘,)")

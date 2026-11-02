@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Setup and usage help
+    url: https://github.com/noktirnal42/Kiln/blob/main/SUPPORT.md
+    about: Start with support guidance and known issues.
+  - name: Security reporting
+    url: https://github.com/noktirnal42/Kiln/security/policy
+    about: Read the policy before reporting a sensitive vulnerability.

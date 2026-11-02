@@ -1,34 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="640" viewBox="0 0 1600 640">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1E1411"/>
-      <stop offset="1" stop-color="#0E0908"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0.22" cy="0.5" r="0.55">
-      <stop offset="0" stop-color="#E8442E" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#E8442E" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="ember" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFE3A3"/>
-      <stop offset="0.45" stop-color="#FF8A3D"/>
-      <stop offset="1" stop-color="#E8442E"/>
-    </linearGradient>
-    <linearGradient id="tileFired" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FF8A3D"/>
-      <stop offset="1" stop-color="#E8442E"/>
-    </linearGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#30211D"/><stop offset="1" stop-color="#120F0E"/></linearGradient>
+    <radialGradient id="glow" cx=".25" cy=".55" r=".5"><stop stop-color="#B34426" stop-opacity=".32"/><stop offset="1" stop-color="#B34426" stop-opacity="0"/></radialGradient>
+    <linearGradient id="fire" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#FFE3A7"/><stop offset=".4" stop-color="#FF994F"/><stop offset="1" stop-color="#E3472B"/></linearGradient>
   </defs>
-  <rect width="1600" height="640" fill="url(#bg)"/>
-  <rect width="1600" height="640" fill="url(#glow)"/>
-  <!-- Mark, scaled to 420px tall, placed at left -->
-  <g transform="translate(120,110) scale(0.41)">
-    <path d="M334 698 V438 A178 178 0 0 1 690 438 V698" fill="none" stroke="#F4E4D0" stroke-width="36" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="M512 330 C540 390 600 440 600 512 C600 580 560 628 512 628 C464 628 424 580 424 512 C424 462 466 420 512 330 Z" fill="url(#ember)"/>
-    <rect x="300" y="732" width="134" height="34" rx="8" fill="#F4E4D0"/>
-    <rect x="446" y="732" width="134" height="34" rx="8" fill="url(#tileFired)"/>
-    <rect x="592" y="732" width="134" height="34" rx="8" fill="#F4E4D0"/>
+  <rect width="1600" height="640" fill="url(#bg)"/><rect width="1600" height="640" fill="url(#glow)"/>
+  <g transform="translate(94,51) scale(.53)">
+    <path d="M290 694V455C290 324 389 229 512 229S734 324 734 455V694H675V455C675 356 605 288 512 288S349 356 349 455V694Z" fill="#F0DFCD"/>
+    <path d="M512 354C548 418 598 464 598 529C598 590 562 630 512 630S426 590 426 529C426 482 461 436 512 354Z" fill="url(#fire)"/>
+    <rect x="289" y="728" width="130" height="32" rx="10" fill="#D9C5B2"/><rect x="447" y="728" width="130" height="32" rx="10" fill="url(#fire)"/><rect x="605" y="728" width="130" height="32" rx="10" fill="#D9C5B2"/>
   </g>
-  <text x="620" y="330" font-family="Arial Rounded MT Bold, Arial Rounded Bold, Helvetica Neue, sans-serif" font-weight="700" font-size="220" fill="#F4E4D0" letter-spacing="-6">Kiln</text>
-  <text x="626" y="402" font-family="Helvetica Neue, Arial, sans-serif" font-weight="400" font-size="48" fill="#E9B98F" letter-spacing="1">Fire your tools into one workbench.</text>
-  <text x="626" y="470" font-family="Helvetica Neue, Arial, sans-serif" font-weight="400" font-size="30" fill="#8C7466" letter-spacing="2">IDE · REVERSE ENGINEERING · MODEL LAB · AGENTS</text>
+  <text x="620" y="305" font-family="Helvetica Neue, sans-serif" font-weight="700" font-size="198" fill="#F6EADD" letter-spacing="-7">Kiln</text>
+  <text x="630" y="377" font-family="Helvetica Neue, sans-serif" font-weight="400" font-size="42" fill="#D5B9A7">One place to make, investigate, and learn.</text>
+  <text x="630" y="445" font-family="Helvetica Neue, sans-serif" font-weight="500" font-size="25" fill="#A58E81" letter-spacing="2">DEVELOPMENT  ·  ANALYSIS  ·  MODELS  ·  AGENTS</text>
 </svg>

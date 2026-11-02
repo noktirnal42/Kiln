@@ -12,6 +12,7 @@ final class SwarmModel {
     private(set) var feed: [CoordinationMessage] = []
     private(set) var note: String?
     private var task: Task<Void, Never>?
+    private var runID: UUID?
 
     func start(app: AppModel) {
         let text = goal.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -21,30 +22,41 @@ final class SwarmModel {
         let registry = app.modelRegistry
         let root = session.workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
         let recorder = app.auditChain.map { AgentAuditRecorder(chain: $0, health: app.auditHealth) }
+        let id = UUID()
+        runID = id
         isRunning = true; graph = nil; feed = []; note = nil
         task = Task { [weak self] in
             let bus = CoordinationBus(audit: recorder)
             let observer = Task { [weak self] in
-                for await message in await bus.observe() { self?.feed.append(message) }
+                for await message in await bus.observe() {
+                    guard self?.runID == id else { break }
+                    self?.feed.append(message)
+                }
             }
             let planned = await SwarmPlanner.plan(goal: text) { system, goal in
                 try await registry.completeSilently(ChatRequest(
                     messages: [ChatMessage(role: .system, content: system), ChatMessage(role: .user, content: goal)],
                     model: modelID, temperature: 0, maxTokens: 1200))
             }
+            guard !Task.isCancelled, self?.runID == id else {
+                observer.cancel()
+                await recorder?.finish()
+                return
+            }
             let swarm = SwarmOrchestrator(bus: bus, worker: SwarmWorkers.agent(
                 base: base, modelID: modelID, workspaceRoot: root,
                 chat: { request in try await registry.streamChat(request, reasoning: nil) }))
             for await event in swarm.run(goal: text, graph: planned.graph, usedFallback: planned.usedFallback) {
+                guard self?.runID == id else { break }
                 self?.apply(event)
             }
             observer.cancel()
             await recorder?.finish()
-            self?.isRunning = false
+            if self?.runID == id { self?.isRunning = false; self?.runID = nil }
         }
     }
 
-    func stop() { task?.cancel(); task = nil; isRunning = false; note = "Stopped." }
+    func stop() { runID = nil; task?.cancel(); task = nil; isRunning = false; note = "Stopped." }
 
     func apply(_ event: SwarmEvent) {
         switch event {

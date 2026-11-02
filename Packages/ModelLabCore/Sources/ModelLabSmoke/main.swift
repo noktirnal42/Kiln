@@ -4,6 +4,11 @@ import ModelLabCore
 @main
 struct ModelLabSmoke {
     static func main() async {
+        if CommandLine.arguments.dropFirst().first == "lora" {
+            await runLoRASmoke()
+            return
+        }
+
         if CommandLine.arguments.dropFirst().first == "smalllm" {
             await runSmallLMSmoke()
             return
@@ -68,7 +73,7 @@ struct ModelLabSmoke {
             iterations: 150,
             learningRate: 3e-3,
             batchSize: 16,
-            outputName: "smoke-small-lm"
+            outputName: "smoke-small-lm-\(UUID().uuidString)"
         )
 
         do {
@@ -86,6 +91,31 @@ struct ModelLabSmoke {
             print("generated (sampled, temperature=0.8, topK=20)=\(sampled1)")
             let sampled2 = try provider.generate(modelDirectory: modelDirectory, prompt: "Model Lab", maxNewTokens: 60, temperature: 0.8, topK: 20)
             print("generated (sampled, temperature=0.8, topK=20, 2nd run)=\(sampled2)")
+        } catch {
+            print("result=failed: \(error.localizedDescription)")
+            Foundation.exit(1)
+        }
+    }
+
+    /// Exercises a small real LoRA run and saves an adapter for inspection.
+    static func runLoRASmoke() async {
+        let examples = [
+            "The kiln heats clay until it becomes ceramic.",
+            "SwiftUI builds native interfaces using declarative views.",
+            "A LoRA adapter trains a small set of low-rank weights.",
+            "A test should verify behavior with representative inputs."
+        ]
+        let job = FineTuningJob(
+            baseModelRepoID: "mlx-community/Qwen3-0.6B-4bit",
+            trainingTexts: examples, validationTexts: [examples[0]], rank: 4,
+            numLayers: 2, iterations: 5, learningRate: 1e-4, batchSize: 1,
+            outputName: "smoke-lora-\(UUID().uuidString)"
+        )
+        do {
+            let result = try await MLXFineTuningProvider().fineTune(job: job) { progress in
+                print("[\(progress.phase)] \(progress.message)")
+            }
+            print("result=ok adapter=\(result.adapterRelativePath) loss=\(String(describing: result.finalTrainingLoss))")
         } catch {
             print("result=failed: \(error.localizedDescription)")
             Foundation.exit(1)

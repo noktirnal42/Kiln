@@ -61,7 +61,7 @@ struct HomeView: View {
     private var actions: some View {
         VStack(alignment: .leading, spacing: SSSpacing.s) {
             SSSectionLabel("Work")
-            HStack(alignment: .top, spacing: SSSpacing.m) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: SSSpacing.m)], alignment: .leading, spacing: SSSpacing.m) {
                 ForEach(Activity.allCases.filter { $0 != .home }) { activity in
                     Button { workstation.select(activity, app: app) } label: {
                         VStack(alignment: .leading, spacing: SSSpacing.s) {

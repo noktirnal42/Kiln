@@ -128,6 +128,7 @@ struct MCPPanelView: View {
                 Text("Prompts (\(prompts.count))").tag("prompts")
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .padding(SSSpacing.m)
             Divider()
             if registryTab == "tools" {

@@ -213,3 +213,76 @@ struct SafetySupportTests {
         #expect(ToolOutputCap.fit("short", from: "t") == "short")
     }
 }
+
+private actor AgentStreamingProbe {
+    var providerFinished = false
+    var attempts = 0
+    func finish() { providerFinished = true }
+    func nextAttempt() -> Int { attempts += 1; return attempts }
+}
+
+struct AgentStreamingTests {
+    @Test func textArrivesBeforeTheProviderFinishes() async throws {
+        let probe = AgentStreamingProbe()
+        let orchestrator = AgentOrchestrator(toolRegistry: ToolRegistry(tools: []))
+        let profile = AgentProfile(name: "stream", mode: .askOnly, toolPermissions: ToolPermissionSet(enabledTools: []))
+        var deltas: [String] = []
+        let stream = orchestrator.run(profile: profile, prompt: "hello", workspaceRoot: nil, chat: { _ in
+            AsyncThrowingStream { continuation in
+                let task = Task {
+                    continuation.yield(ChatChunk(delta: ChatMessage(role: .assistant, content: "First ")))
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                    continuation.yield(ChatChunk(delta: ChatMessage(role: .assistant, content: "second")))
+                    await probe.finish()
+                    continuation.finish()
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            }
+        })
+        for try await event in stream {
+            if case .textDelta(let delta) = event {
+                if deltas.isEmpty { #expect(await probe.providerFinished == false) }
+                deltas.append(delta)
+            }
+        }
+        #expect(deltas == ["First ", "second"])
+    }
+
+    @Test func retryReplacesPartialOutputInsteadOfDuplicatingIt() async throws {
+        let probe = AgentStreamingProbe()
+        let orchestrator = AgentOrchestrator(toolRegistry: ToolRegistry(tools: []))
+        let profile = AgentProfile(name: "retry-stream", mode: .askOnly, toolPermissions: ToolPermissionSet(enabledTools: []))
+        let (events, error) = await collectRun(orchestrator, profile: profile, prompt: "hello", backoffUnitSeconds: 0, chat: { _ in
+            let attempt = await probe.nextAttempt()
+            return AsyncThrowingStream { continuation in
+                continuation.yield(ChatChunk(delta: ChatMessage(role: .assistant, content: attempt == 1 ? "discarded" : "recovered")))
+                if attempt == 1 { continuation.finish(throwing: ProviderError.rateLimited) }
+                else { continuation.finish() }
+            }
+        })
+        #expect(error == nil)
+        var visible = ""
+        for event in events {
+            switch event {
+            case .textDelta(let delta): visible += delta
+            case .textReset: visible = ""
+            default: break
+            }
+        }
+        #expect(visible == "recovered")
+        #expect(events.contains { if case .textReset = $0 { true } else { false } })
+    }
+
+    @Test func streamedSecretsAreRedactedAndFinalTextAgrees() async throws {
+        let secret = "sk-" + String(repeating: "A", count: 24)
+        let orchestrator = AgentOrchestrator(toolRegistry: ToolRegistry(tools: []))
+        let profile = AgentProfile(name: "redacted-stream", mode: .askOnly, toolPermissions: ToolPermissionSet(enabledTools: []))
+        let chat = ScriptedChat(turns: [ScriptedTurn(text: "Token: " + secret)])
+        let (events, error) = await collectRun(orchestrator, profile: profile, prompt: "hello", chat: chat.factory)
+        #expect(error == nil)
+        let streamed = events.compactMap { event -> String? in if case .textDelta(let text) = event { text } else { nil } }.joined()
+        let final = events.compactMap { event -> String? in if case .finished(let summary) = event { summary.finalText } else { nil } }.last
+        #expect(!streamed.contains(secret))
+        #expect(streamed == final)
+    }
+}

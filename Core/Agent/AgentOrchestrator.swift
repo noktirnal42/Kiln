@@ -5,6 +5,8 @@ import Foundation
 /// Everything a run reports to the UI as it happens.
 public enum AgentEvent: Sendable {
     case textDelta(String)
+    /// Clears partial output before a retry or when text is reclassified as a tool call.
+    case textReset
     case roundStarted(Int)
     case toolCallStarted(ToolCallRecord)
     case toolCallFinished(ToolCallRecord)
@@ -404,6 +406,7 @@ public final class AgentOrchestrator: Sendable {
                 chat: chat,
                 stop: stop,
                 backoffUnitSeconds: backoffUnitSeconds,
+                redactSecrets: profile.redactSecrets,
                 yield: yield
             )
             // Small local models often write a tool call as JSON text instead of a structured call.
@@ -412,6 +415,7 @@ public final class AgentOrchestrator: Sendable {
                let call = TextToolCall.parse(turn.text, offered: Set(offered.map(\.name))) {
                 turn.toolCalls = [call]
                 turn.text = ""
+                yield(.textReset)
             }
 
             summary.totalTokens += turn.usageTotalTokens
@@ -516,6 +520,7 @@ public final class AgentOrchestrator: Sendable {
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>,
         stop: AgentStopFlag,
         backoffUnitSeconds: Double,
+        redactSecrets: Bool,
         yield: @escaping @Sendable (AgentEvent) -> Void
     ) async throws -> TurnResult {
         for attempt in 0..<AgentRetry.attempts {
@@ -525,6 +530,7 @@ public final class AgentOrchestrator: Sendable {
             if stop.stopped { throw AgentRunError.stopped }
             do {
                 var text = ""
+                var visibleText = ""
                 var toolCalls: [ToolCall] = []
                 var tokens = 0
                 let stream = try await chat(request)
@@ -532,6 +538,17 @@ public final class AgentOrchestrator: Sendable {
                     if stop.stopped { throw AgentRunError.stopped }
                     if let delta = chunk.delta, !delta.content.isEmpty {
                         text += delta.content
+                        let visible = redactSecrets ? SecretRedactor.redact(text).text : text
+                        // Redaction can change a prefix once a split key becomes recognizable.
+                        // Replace that prefix rather than appending a stale partial value.
+                        if visible.hasPrefix(visibleText) {
+                            let delta = String(visible.dropFirst(visibleText.count))
+                            if !delta.isEmpty { yield(.textDelta(delta)) }
+                        } else {
+                            yield(.textReset)
+                            if !visible.isEmpty { yield(.textDelta(visible)) }
+                        }
+                        visibleText = visible
                     }
                     for call in chunk.toolCalls {
                         merge(call, into: &toolCalls)
@@ -546,6 +563,7 @@ public final class AgentOrchestrator: Sendable {
                 if attempt == AgentRetry.attempts - 1 || !AgentRetry.worthRetrying(error) {
                     throw error
                 }
+                yield(.textReset)
                 let delay = pow(2.0, Double(attempt)) * backoffUnitSeconds // 1s, 2s, 4s, 8s at full scale
                 yield(.retryScheduled(
                     attempt: attempt + 1,

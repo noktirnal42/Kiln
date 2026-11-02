@@ -103,7 +103,7 @@ public final class AgentAuditRecorder: @unchecked Sendable {
 
     static func entry(for event: AgentEvent) -> (type: String, payload: [String: AuditValue])? {
         switch event {
-        case .textDelta:
+        case .textDelta, .textReset:
             return nil
         case .roundStarted(let round):
             return ("agent.round", ["round": .int(round)])

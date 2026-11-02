@@ -81,7 +81,6 @@ struct GitPanelView: View {
                 Spacer()
                 Button("Refresh") { Task { await model.refresh() } }
                 Button("Open Repo…") { openRepo() }
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
             .padding(SSSpacing.m)
             Divider()

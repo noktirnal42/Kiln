@@ -19,15 +19,19 @@ struct REProjectDetail: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("View", selection: $tab) {
-                Text("Functions").tag(REFindingsTab?.none)
-                ForEach(REFindingsTab.allCases) { tab in
-                    Text(tab.rawValue).tag(REFindingsTab?.some(tab))
+            ScrollView(.horizontal) {
+                Picker("View", selection: $tab) {
+                    Text("Functions").tag(REFindingsTab?.none)
+                    ForEach(REFindingsTab.allCases) { tab in
+                        Text(tab.rawValue).tag(REFindingsTab?.some(tab))
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .padding(8)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(8)
+            .scrollIndicators(.visible)
             Divider()
             if let tab {
                 REFindingsView(module: module, projectID: project.id, tab: tab)
@@ -56,10 +60,12 @@ struct REProjectDetail: View {
                 if let function = selectedFunction {
                     REFunctionDetail(module: module, projectID: project.id, analysis: analysis, function: function)
                 } else if analysis.functions.isEmpty {
-                    ContentUnavailableView("No functions recovered", systemImage: "function",
-                                           description: Text("Native inspection found no named code symbols. "
-                                               + "The binary is probably stripped. Strings, crypto, format and "
-                                               + "gadget analyses still work; Ghidra can recover stripped functions."))
+                    if analysis.format.contains("Mach-O") {
+                        REUnlabeledDisassembly(module: module, projectID: project.id)
+                    } else {
+                        ContentUnavailableView("No functions recovered", systemImage: "function",
+                                               description: Text("Native disassembly supports Mach-O binaries. Configure Ghidra to analyze this format."))
+                    }
                 } else {
                     ContentUnavailableView("No function selected", systemImage: "function",
                                            description: Text("Select a function from the list."))
@@ -133,6 +139,46 @@ struct REFunctionDetail: View {
                     .padding(10)
                     .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
             }
+        }
+    }
+}
+
+/// A linear listing gives analysts access to stripped code without inventing
+/// function boundaries. The visible text is bounded to keep the UI responsive.
+private struct REUnlabeledDisassembly: View {
+    let module: REModule
+    let projectID: String
+    @State private var listing: String?
+    @State private var error: String?
+    @State private var truncated = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Linear disassembly").font(.headline)
+            Text("No named functions were recovered. This listing does not identify function boundaries; run Ghidra for deeper analysis.")
+                .font(.caption).foregroundStyle(.secondary)
+            if let error {
+                ContentUnavailableView("Disassembly unavailable", systemImage: "exclamationmark.triangle", description: Text(error))
+            } else if let listing {
+                if truncated { Text("Showing the first 200,000 characters.").font(.caption).foregroundStyle(.secondary) }
+                ScrollView([.vertical, .horizontal]) {
+                    Text(listing).font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                ProgressView("Loading disassembly…")
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .task(id: projectID) {
+            listing = nil
+            error = nil
+            do {
+                let text = try await module.linearDisassembly(projectID: projectID)
+                truncated = text.count > 200_000
+                listing = String(text.prefix(200_000))
+            } catch { self.error = error.localizedDescription }
         }
     }
 }

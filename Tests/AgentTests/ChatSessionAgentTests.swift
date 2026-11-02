@@ -90,3 +90,23 @@ struct ApprovalActivityTests {
         #expect(activity[0].status == .running)
     }
 }
+
+struct ModelLabActionToolTests {
+    @Test func statusIsReadOnlyAndCancellationRequiresWriteApproval() {
+        #expect(ModelLabAgentTools.Kind.experiment.spec.permission == .read)
+        #expect(ModelLabAgentTools.Kind.cancelTraining.spec.permission == .write)
+        #expect(ModelLabAgentTools.Kind.cancelTraining.spec.name == "lab_cancel_training")
+    }
+
+    @Test func exactExperimentIDIsRequired() throws {
+        #expect(throws: ModelLabToolError.self) { try ModelLabAgentTool.experimentID([:]) }
+        #expect(throws: ModelLabToolError.self) { try ModelLabAgentTool.experimentID(["experiment_id": "  "]) }
+        #expect(try ModelLabAgentTool.experimentID(["experiment_id": " run-1 "]) == "run-1")
+    }
+
+    @MainActor
+    @Test func cancellationNeverTargetsAnUnrelatedRun() {
+        let module = ModelLabModule()
+        #expect(throws: ModelLabToolError.self) { try ModelLabAgentTool.cancelTraining(module, id: "unknown-run") }
+    }
+}

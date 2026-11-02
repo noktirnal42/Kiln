@@ -37,6 +37,7 @@ struct DevelopView: View {
             .padding(SSSpacing.s)
             Divider()
             content
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .onAppear(perform: prepare)
     }

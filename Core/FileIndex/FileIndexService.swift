@@ -83,14 +83,15 @@ public actor FileIndexService {
     }
 
     nonisolated static func scan(root: String) -> [IndexedFile] {
-        let rootURL = URL(fileURLWithPath: root)
+        let rootURL = URL(fileURLWithPath: root).resolvingSymlinksInPath().standardizedFileURL
         guard let enumerator = FileManager.default.enumerator(
             at: rootURL,
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey],
             options: [.skipsPackageDescendants]
         ) else { return [] }
         var results: [IndexedFile] = []
-        for case let url as URL in enumerator {
+        for case let entryURL as URL in enumerator {
+            let url = entryURL.resolvingSymlinksInPath().standardizedFileURL
             if Task.isCancelled { break }
             if url.pathComponents.contains(where: { ignoredDirectories.contains($0) }) {
                 if url.hasDirectoryPath { enumerator.skipDescendants() }

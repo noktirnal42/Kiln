@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="100 100 824 824">
+  <defs>
+    <linearGradient id="ember" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE3A3"/>
+      <stop offset="0.45" stop-color="#FF8A3D"/>
+      <stop offset="1" stop-color="#E8442E"/>
+    </linearGradient>
+    <linearGradient id="tileFired" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF8A3D"/>
+      <stop offset="1" stop-color="#E8442E"/>
+    </linearGradient>
+  </defs>
+  <!-- Transparent mark for light and dark surfaces. -->
+  <path d="M334 698 V438 A178 178 0 0 1 690 438 V698" fill="none" stroke="#F4E4D0" stroke-width="36" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M512 330 C540 390 600 440 600 512 C600 580 560 628 512 628 C464 628 424 580 424 512 C424 462 466 420 512 330 Z" fill="url(#ember)"/>
+  <rect x="300" y="732" width="134" height="34" rx="8" fill="#F4E4D0"/>
+  <rect x="446" y="732" width="134" height="34" rx="8" fill="url(#tileFired)"/>
+  <rect x="592" y="732" width="134" height="34" rx="8" fill="#F4E4D0"/>
+</svg>

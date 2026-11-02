@@ -48,7 +48,7 @@ public final class DistillationCoordinator {
 
                 let datasetRecord = DatasetRecord(
                     id: UUID().uuidString,
-                    name: job.datasetOutputName,
+                    name: "\(experiment.name) — Distillation Dataset",
                     sourceKind: .localImport,
                     format: .jsonl,
                     downloadStatus: .completed,
@@ -59,7 +59,7 @@ public final class DistillationCoordinator {
                 try context.save()
 
                 let artifact = try registry.register(
-                    name: job.adapterOutputName,
+                    name: "\(experiment.name) — Student Adapter",
                     format: .mlxLoraAdapter,
                     origin: .trainedLocally,
                     relativePath: result.fineTuning.adapterRelativePath,
