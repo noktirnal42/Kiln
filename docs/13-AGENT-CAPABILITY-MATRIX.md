@@ -10,7 +10,7 @@ Kiln exposes application services as ordinary tools. The Workstation Agent profi
 | Development | Run/stream/background commands; Git status, diff, commit, branch, log; file-name search | Source editor, build-target selection, debugger, breakpoints and project settings |
 | Reverse engineering | `re_import_binary`, `re_analyze_function`, `re_get_disassembly`, `re_get_decompilation`, `re_search_strings`, `re_get_xrefs`, `re_scan_crypto`, `re_auto_decrypt`, `re_find_gadgets`, `re_carve_formats` | Project selection, annotation editing, scan-rule management, forensics/script workflows and device-bench operations need dedicated adapters |
 | Model Lab discovery | Hardware report, experiment/dataset lists, Hugging Face model/dataset search | Dataset import/validation, model download/library registration and deletion |
-| Model Lab experiment control | `lab_get_experiment` reads status, recent metrics and artifact ID; `lab_cancel_training` requests cancellation only for the exact running experiment | Experiment creation, training configuration/start, LoRA/distillation start, evaluation, comparison, inference and export |
+| Model Lab experiment control | `lab_get_experiment` reads status, recent metrics and artifact ID; `lab_cancel_training` requests cancellation only for the exact running experiment; `lab_start_training` starts an existing Create ML classifier through shared GUI/job validation | Experiment creation, training configuration changes, LoRA/distillation start, evaluation, comparison, inference and export |
 | Swarm | Workers use team messaging, shared memory and blocker tools | No ordinary top-level tool yet to create, inspect or cancel another swarm run |
 | Chat and artifacts | Shared model registry and tool-run loop underpin chat | Conversation management, artifact creation/rendering/export and provider configuration need explicit tools |
 | Audit and approvals | Every agent run records decisions and tool results; writes and execution can require approval | Agent-facing audit queries and verification tools are missing; agents must never approve themselves or alter the approval policy |
@@ -32,10 +32,16 @@ A new application action should:
 5. Preserve cancellation and report cancellation as requested until the coordinator reaches its final state.
 6. Include behavior tests for the real service boundary, permissions and failure handling.
 
-Training start actions should first centralize job construction and dataset validation in a shared Model Lab service. Currently some configuration lives in SwiftUI controls; copying that logic into a tool would make GUI and agent behavior diverge. Resource-intensive jobs also need explicit iteration/model/memory limits and a single-job concurrency policy.
+Create ML classifier job construction and dataset validation now live in `ModelLabModule.classifierTrainingJob`, used by both the GUI and `lab_start_training`. The action targets an exact existing draft/failed/cancelled experiment, permits only a local library-contained dataset, validates saved settings, writes a unique artifact, and refuses to start while any training coordinator is active. It reports that training has started, not that it has succeeded; use `lab_get_experiment` to follow the outcome. LoRA/distillation and other start actions still need shared configuration builders and explicit resource limits.
 
 ## Current verification
 
 The repository's live QA has exercised file and shell tools, reverse-engineering import/string search, Model Lab hardware reporting over MCP, shared approval gates, and a hosted researcher → implementer → reviewer swarm. Plain chat has answered through Apple Foundation Models, local Ollama, Ollama Cloud, NVIDIA NIM and OpenRouter. A smaller local model has also failed tool-use scenarios; provider connectivity alone does not establish agent reliability.
 
 The new streaming and Model Lab status/cancel adapters have syntax checks and focused regression tests in source. Their runtime test result must be recorded after the integrated Xcode test run completes.
+
+## Classifier training start (2026-11-02)
+
+The `lab_start_training` adapter uses the same `startClassifierExperiment` service as the GUI's Create ML button. It accepts only an experiment ID, so it cannot replace the saved dataset or hyperparameters in the tool call. Starting a job is execution-gated, and only one training coordinator may be active. Completed experiments must be preserved by creating a new experiment rather than restarting them in place.
+
+Six focused regression tests passed for the status/cancel/start tool contracts and classifier job validation, including path traversal, symlink escapes, missing datasets, invalid fractions and unique output paths. This verifies construction and failure handling; a real agent-driven classifier lifecycle through training completion, artifact reload and GUI inspection still requires an end-to-end check. LoRA, distillation, experiment creation and export tools remain open work.

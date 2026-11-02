@@ -133,6 +133,64 @@ public final class ModelLabModule: @preconcurrency Module, ModuleDefinition, Mod
 
     // MARK: Training entry points
 
+    /// Starts an existing classifier experiment through the same validated path used by the GUI.
+    public func startClassifierExperiment(id: String) throws {
+        try requireCapabilities([.fileSystemWrite, .neuralEngine])
+        guard let mainContext else { throw ModelLabModuleError.storeUnavailable("The Model Lab store is unavailable.") }
+        guard ![createMLCoordinator.runningExperimentID, mlxFineTuningCoordinator.runningExperimentID,
+                smallLMCoordinator.runningExperimentID, distillationCoordinator.runningExperimentID].contains(where: { $0 != nil }) else {
+            throw ModelLabModuleError.invalidTrainingConfiguration("Another training job is running. Wait or cancel that exact experiment first.")
+        }
+        let query = FetchDescriptor<ExperimentRecord>(predicate: #Predicate { $0.id == id })
+        guard let experiment = try mainContext.fetch(query).first else {
+            throw ModelLabModuleError.invalidTrainingConfiguration("No experiment with ID \(id).")
+        }
+        let datasetID = experiment.datasetID
+        let datasets = FetchDescriptor<DatasetRecord>(predicate: #Predicate { $0.id == datasetID })
+        guard let dataset = try mainContext.fetch(datasets).first else {
+            throw ModelLabModuleError.invalidTrainingConfiguration("The experiment's dataset is not registered.")
+        }
+        let job = try Self.classifierTrainingJob(experiment: experiment, dataset: dataset, datasetsRoot: LibraryPaths.datasets)
+        try startCreateMLTraining(experiment: experiment, job: job)
+    }
+
+    static func classifierTrainingJob(experiment: ExperimentRecord, dataset: DatasetRecord, datasetsRoot: URL) throws -> TrainingJob {
+        func invalid(_ message: String) -> ModelLabModuleError { .invalidTrainingConfiguration(message) }
+        guard let task = TaskType(rawValue: experiment.taskRaw),
+              [.textClassification, .tabularClassification, .imageClassification].contains(task) else {
+            throw invalid("This action supports Create ML classifiers only. LoRA and other training actions are not exposed by this tool yet.")
+        }
+        guard let status = ExperimentStatus(rawValue: experiment.statusRaw), [.draft, .failed, .cancelled].contains(status) else {
+            throw invalid("Only a draft, failed or cancelled experiment can start. Create a new experiment to preserve completed results.")
+        }
+        guard dataset.id == experiment.datasetID, let relative = dataset.localRelativePath, !relative.isEmpty,
+              !relative.hasPrefix("/"), !relative.split(separator: "/").contains("..") else {
+            throw invalid("The experiment needs a local dataset path inside the Model Lab dataset library.")
+        }
+        let root = datasetsRoot.resolvingSymlinksInPath().standardizedFileURL
+        let file = root.appendingPathComponent(relative).resolvingSymlinksInPath().standardizedFileURL
+        guard file.path.hasPrefix(root.path + "/"), FileManager.default.fileExists(atPath: file.path) else {
+            throw invalid("The local dataset is missing or outside the dataset library. Import it again before training.")
+        }
+        let fractionText = experiment.hyperparameters["validationFraction"] ?? "0.2"
+        guard let fraction = Double(fractionText), fraction.isFinite, fraction > 0, fraction < 1 else {
+            throw invalid("validationFraction must be a finite number between 0 and 1.")
+        }
+        let columns = experiment.textColumn.map { [$0] } ?? experiment.featureColumns
+        let label = experiment.labelColumn ?? ""
+        if experiment.task != .imageClassification {
+            guard !columns.isEmpty, columns.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
+                  !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw invalid("Choose input and label columns before training.")
+            }
+        }
+        let labelPrefix = String(experiment.name.lowercased().map { character in
+            character.isASCII && (character.isLetter || character.isNumber) ? character : "-"
+        }.prefix(48))
+        return TrainingJob(task: experiment.task, datasetFileURL: file, textOrFeatureColumns: columns,
+                           labelColumn: label, validationFraction: fraction, outputName: "classifier-" + labelPrefix + "-" + UUID().uuidString)
+    }
+
     /// Create ML classifier training (text/tabular/image), the verified
     /// engine path. Dataset import + training write artifacts, so both file
     /// capabilities are required.
@@ -201,10 +259,11 @@ public final class ModelLabModule: @preconcurrency Module, ModuleDefinition, Mod
 
 public enum ModelLabModuleError: LocalizedError {
     case storeUnavailable(String)
+    case invalidTrainingConfiguration(String)
 
     public var errorDescription: String? {
         switch self {
-        case .storeUnavailable(let reason): reason
+        case .storeUnavailable(let reason), .invalidTrainingConfiguration(let reason): reason
         }
     }
 }

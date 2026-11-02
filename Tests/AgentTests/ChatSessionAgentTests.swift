@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import ModelLabCore
 @testable import Kiln
 
 @MainActor
@@ -108,5 +109,57 @@ struct ModelLabActionToolTests {
     @Test func cancellationNeverTargetsAnUnrelatedRun() {
         let module = ModelLabModule()
         #expect(throws: ModelLabToolError.self) { try ModelLabAgentTool.cancelTraining(module, id: "unknown-run") }
+    }
+}
+
+@MainActor
+struct ClassifierTrainingActionTests {
+    private func fixture() throws -> (URL, ExperimentRecord, DatasetRecord) {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-classifier-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try "text,label\ngreat,positive\npoor,negative\n".write(to: root.appendingPathComponent("data.csv"), atomically: true, encoding: .utf8)
+        let dataset = DatasetRecord(id: "fixture", name: "Fixture", sourceKind: .localImport, localRelativePath: "data.csv", format: .csv)
+        let experiment = ExperimentRecord(name: "../../untrusted display name", task: .textClassification, datasetID: dataset.id, textColumn: "text", labelColumn: "label")
+        return (root, experiment, dataset)
+    }
+
+    @Test func usesSavedConfigurationAndUniqueSafeArtifacts() throws {
+        let (root, experiment, dataset) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = try ModelLabModule.classifierTrainingJob(experiment: experiment, dataset: dataset, datasetsRoot: root)
+        let second = try ModelLabModule.classifierTrainingJob(experiment: experiment, dataset: dataset, datasetsRoot: root)
+        #expect(first.textOrFeatureColumns == ["text"])
+        #expect(first.labelColumn == "label")
+        #expect(first.validationFraction == 0.2)
+        #expect(!first.outputName.contains("/") && first.outputName != second.outputName)
+        #expect(ModelLabAgentTools.Kind.startTraining.spec.permission == .execute)
+    }
+
+    @Test func rejectsEscapesMissingDataAndCompletedRuns() throws {
+        let (root, experiment, dataset) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        for path in ["../outside.csv", "/tmp/outside.csv", "missing.csv", ""] {
+            dataset.localRelativePath = path
+            #expect(throws: ModelLabModuleError.self) { try ModelLabModule.classifierTrainingJob(experiment: experiment, dataset: dataset, datasetsRoot: root) }
+        }
+        dataset.localRelativePath = "data.csv"
+        experiment.status = .completed
+        #expect(throws: ModelLabModuleError.self) { try ModelLabModule.classifierTrainingJob(experiment: experiment, dataset: dataset, datasetsRoot: root) }
+    }
+
+    @Test func rejectsInvalidConfigurationAndSymlinkEscapes() throws {
+        let (root, experiment, dataset) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        for fraction in ["nan", "1", "0", "invalid"] {
+            experiment.hyperparameters = ["validationFraction": fraction]
+            #expect(throws: ModelLabModuleError.self) { try ModelLabModule.classifierTrainingJob(experiment: experiment, dataset: dataset, datasetsRoot: root) }
+        }
+        experiment.hyperparameters = [:]
+        let outside = root.deletingLastPathComponent().appendingPathComponent("outside-\(UUID().uuidString).csv")
+        try "outside".write(to: outside, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: outside) }
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("escape.csv"), withDestinationURL: outside)
+        dataset.localRelativePath = "escape.csv"
+        #expect(throws: ModelLabModuleError.self) { try ModelLabModule.classifierTrainingJob(experiment: experiment, dataset: dataset, datasetsRoot: root) }
     }
 }
