@@ -14,7 +14,7 @@ struct ChatRootView: View {
                     if session.messages.isEmpty && !session.isStreaming {
                         ChatHero(session: session)
                     }
-                    LazyVStack(alignment: .leading, spacing: SSSpacing.m) {
+                    LazyVStack(alignment: .leading, spacing: SSSpacing.l) {
                         ForEach(session.messages) { message in
                             MessageBubble(session: session, message: message)
                                 .id(message.id)
@@ -31,17 +31,23 @@ struct ChatRootView: View {
                                     modelID: session.selectedModelID,
                                     createdAt: Date()
                                 ),
-                                isStreaming: true
+                                isStreaming: true,
+                                liveReasoning: session.streamingReasoning
                             )
                             .id("streaming")
                         }
                     }
                     .padding(SSSpacing.m)
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
                 }
                 .onChange(of: session.messages.count) { _, _ in
                     scrollToBottom(proxy)
                 }
                 .onChange(of: session.streamingText) { _, _ in
+                    scrollToBottom(proxy)
+                }
+                .onChange(of: session.streamingReasoning) { _, _ in
                     scrollToBottom(proxy)
                 }
             }
@@ -154,14 +160,23 @@ struct ComposerView: View {
         session.draft = ""
     }
 
+    /// Return sends; ⌘/⇧/⌥-Return puts a line break at the caret instead.
+    private func insertNewline() {
+        if let editor = NSApp.keyWindow?.firstResponder as? NSTextView {
+            editor.insertText("\n", replacementRange: NSRange(location: NSNotFound, length: 0))
+        } else {
+            input += "\n"
+        }
+    }
+
     private var composer: some View {
         HStack(alignment: .bottom, spacing: SSSpacing.s) {
             TextEditor(text: $input)
-                .font(.system(size: 13, design: .monospaced))
+                .font(.system(size: 14))
                 .frame(minHeight: 44, maxHeight: 160)
                 .overlay(alignment: .topLeading) {
                     if input.isEmpty {
-                        Text("Message…  (@ to reference files, ⌘⏎ to send)")
+                        Text("Message…  (@ to reference files, ⏎ to send, ⌘⏎ for a new line)")
                             .foregroundStyle(.tertiary)
                             .font(SSTypography.caption())
                             .padding(.horizontal, 6)
@@ -169,7 +184,15 @@ struct ComposerView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .onSubmit { onSend() }
+                .onKeyPress(.return, phases: .down) { press in
+                    if press.modifiers.isDisjoint(with: [.command, .shift, .option]) {
+                        let ready = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        if ready && !session.isStreaming { onSend() }
+                        return .handled
+                    }
+                    insertNewline()
+                    return .handled
+                }
 
             if session.isStreaming {
                 Button { session.stopStreaming() } label: {
@@ -182,8 +205,7 @@ struct ComposerView: View {
                         .font(.title2)
                 }
                 .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .keyboardShortcut(.return, modifiers: .command)
-                .help("Send (⌘⏎)")
+                .help("Send (⏎)")
             }
         }
         .padding(.horizontal, SSSpacing.m)

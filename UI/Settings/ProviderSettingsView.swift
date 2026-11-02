@@ -232,11 +232,13 @@ struct ModelStoreCard: View {
     /// Counting walks every weight file to total its size, which is slow on an external drive: off the main thread.
     private func refresh(reload: Bool = false) async {
         scanning = true
-        let found = await Task.detached(priority: .utility) { () -> (String?, Int?) in
-            guard let folder = ModelStoreLocation.shared.folder else { return (nil, nil) }
+        let found: (String?, Int?)
+        if let folder = ModelStoreLocation.shared.folder {
             let store = UniversalModelStore(root: ModelStoreLocation.hubDirectory(in: folder))
-            return (store.root.path, store.installed().filter(\.isLanguageModel).count)
-        }.value
+            found = (store.root.path, await store.installedOffPool().filter(\.isLanguageModel).count)
+        } else {
+            found = (nil, nil)
+        }
         path = found.0
         count = found.1
         scanning = false

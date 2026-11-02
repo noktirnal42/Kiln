@@ -11,6 +11,7 @@ struct ApprovalQueueView: View {
     @ObservedObject var center: ApprovalCenter
 
     @State private var showGrants = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,6 +24,7 @@ struct ApprovalQueueView: View {
             }
             Divider()
             grantsSection
+                .frame(maxHeight: showGrants ? 260 : nil)
         }
         .frame(minWidth: 480, idealWidth: 560, minHeight: 420, idealHeight: 520)
         .background(SSColor.background)
@@ -44,6 +46,8 @@ struct ApprovalQueueView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Button("Done") { dismiss() }
+                .keyboardShortcut(.cancelAction)
         }
         .padding(SSSpacing.m)
     }
@@ -102,7 +106,7 @@ struct ApprovalQueueView: View {
             .padding(.vertical, SSSpacing.s)
 
             if showGrants {
-                GrantList(center: center)
+                ScrollView { GrantList(center: center) }
             }
         }
     }

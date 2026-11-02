@@ -1,144 +1,174 @@
 import SwiftUI
 
+/// One message, laid out like the reference chat apps: the user's words in a soft right-aligned bubble,
+/// the assistant's reply as plain full-width text with no chrome, and a quiet action row that appears on hover.
 struct MessageBubble: View {
     let session: ChatSession
     let message: MessageSnapshot
     var isStreaming = false
+    /// Live thinking text while a reasoning model is still working on its answer.
+    var liveReasoning = ""
     @State private var showReasoning = false
+    @State private var hovering = false
+
+    private var isUser: Bool { message.role == .user }
+    private var reasoningText: String {
+        isStreaming ? liveReasoning : (message.reasoning ?? "")
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SSSpacing.s) {
-            HStack(spacing: SSSpacing.xs) {
-                Image(systemName: icon)
-                    .foregroundStyle(color)
-                    .font(SSTypography.caption())
-                Text(roleName)
-                    .font(SSTypography.caption())
-                    .foregroundStyle(.secondary)
-                if let model = message.modelID, !model.isEmpty {
-                    Text(model)
-                        .font(SSTypography.caption())
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                }
-                Spacer()
-                if message.tokenCount > 0 {
-                    Text("\(message.tokenCount) tok")
-                        .font(SSTypography.caption())
-                        .foregroundStyle(.tertiary)
-                }
-                Text(message.createdAt, style: .time)
-                    .font(SSTypography.caption())
-                    .foregroundStyle(.tertiary)
-            }
+        Group {
+            if isUser { userBody } else { assistantBody }
+        }
+        .onHover { hovering = $0 }
+        .contextMenu {
+            Button("Copy") { copy() }
+            Button("Fork from here") { Task { await session.fork(at: message.id) } }
+            Button("Delete", role: .destructive) { Task { await session.deleteMessage(message.id) } }
+        }
+    }
 
-            if let reasoning = message.reasoning, !reasoning.isEmpty {
-                DisclosureGroup(isExpanded: $showReasoning) {
-                    Text(reasoning)
-                        .font(.system(size: 11, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(SSSpacing.s)
-                        .background(Color.secondary.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: SSCornerRadius.small))
-                } label: {
-                    Text("Reasoning").font(SSTypography.caption())
-                }
+    // MARK: User
+
+    private var userBody: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack {
+                Spacer(minLength: 60)
+                Text(message.content)
+                    .font(.system(size: 14))
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
+            actionRow
+        }
+    }
+
+    // MARK: Assistant
+
+    private var assistantBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if !reasoningText.isEmpty { reasoningView }
 
             if !message.content.isEmpty {
                 MarkdownBlockView(text: message.content)
                     .textSelection(.enabled)
-            } else if isStreaming {
-                Text("…")
-                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            if isStreaming { ThinkingDots(label: message.content.isEmpty && reasoningText.isEmpty ? "Working" : nil) }
 
             if !message.toolCalls.isEmpty {
                 ToolCallChipsView(calls: message.toolCalls)
             }
 
-            if !isStreaming {
-                HStack(spacing: SSSpacing.xs) {
-                    Button {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(message.content, forType: .string)
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Copy")
+            if !isStreaming { actionRow }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-                    if message.role == .assistant {
-                        Button {
-                            Task { await session.regenerate() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("Regenerate")
-                    }
-
-                    Button {
-                        Task { await session.fork(at: message.id) }
-                    } label: {
-                        Image(systemName: "arrow.triangle.branch")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Fork conversation from here")
-
-                    Button {
-                        Task { await session.deleteMessage(message.id) }
-                    } label: {
-                        Image(systemName: "trash")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Delete message")
+    private var reasoningView: some View {
+        let open = isStreaming ? true : showReasoning
+        return VStack(alignment: .leading, spacing: 4) {
+            Button {
+                if !isStreaming { showReasoning.toggle() }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: open ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
+                    Text(isStreaming ? "Thinking…" : "Thought process").font(.system(size: 12))
                 }
-                .font(SSTypography.caption())
                 .foregroundStyle(.secondary)
             }
-        }
-        .padding(SSSpacing.m)
-        .background(isStreaming ? Color.accentColor.opacity(0.04) : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: SSCornerRadius.medium))
-        .contextMenu {
-            Button("Copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(message.content, forType: .string)
-            }
-            Button("Fork from here") {
-                Task { await session.fork(at: message.id) }
-            }
-            Button("Delete", role: .destructive) {
-                Task { await session.deleteMessage(message.id) }
+            .buttonStyle(.plain)
+            if open {
+                ScrollView {
+                    Text(reasoningText)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: isStreaming ? 120 : 220)
+                .padding(.leading, 10)
+                .overlay(alignment: .leading) { Rectangle().fill(Color.secondary.opacity(0.3)).frame(width: 2) }
             }
         }
     }
 
-    private var icon: String {
-        switch message.role {
-        case .user: return "person.crop.circle"
-        case .assistant: return "sparkles"
-        case .system: return "gearshape"
-        case .tool: return "wrench.and.screwdriver"
+    // MARK: Actions
+
+    private var actionRow: some View {
+        HStack(spacing: 2) {
+            actionButton("doc.on.doc", "Copy") { copy() }
+            if message.role == .assistant {
+                actionButton("arrow.clockwise", "Regenerate") { Task { await session.regenerate() } }
+            }
+            actionButton("arrow.triangle.branch", "Fork conversation from here") { Task { await session.fork(at: message.id) } }
+            actionButton("trash", "Delete message") { Task { await session.deleteMessage(message.id) } }
+            if message.role == .assistant {
+                Text(meta)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 6)
+                    .lineLimit(1)
+            }
         }
+        .opacity(hovering ? 1 : 0)
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 
-    private var color: Color {
-        switch message.role {
-        case .user: return SSColor.accent
-        case .assistant: return SSColor.success
-        case .system: return .secondary
-        case .tool: return SSColor.warning
-        }
+    private var meta: String {
+        var parts: [String] = []
+        if let model = message.modelID, !model.isEmpty { parts.append(model) }
+        if message.tokenCount > 0 { parts.append("\(message.tokenCount) tok") }
+        parts.append(message.createdAt.formatted(date: .omitted, time: .shortened))
+        return parts.joined(separator: " · ")
     }
 
-    private var roleName: String {
-        switch message.role {
-        case .user: return "You"
-        case .assistant: return "Assistant"
-        case .system: return "System"
-        case .tool: return "Tool"
+    private func actionButton(_ symbol: String, _ help: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 12)).frame(width: 24, height: 22)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help(help)
+    }
+
+    private func copy() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(message.content, forType: .string)
+    }
+}
+
+/// Three softly pulsing dots shown while a reply is still arriving.
+struct ThinkingDots: View {
+    var label: String?
+    @State private var phase = false
+    @State private var since = Date()
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            dots(waited: context.date.timeIntervalSince(since))
+        }
+        .onAppear { phase = true; since = Date() }
+        .accessibilityLabel("Assistant is responding")
+    }
+
+    private func dots(waited: TimeInterval) -> some View {
+        HStack(spacing: 5) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(Color.secondary)
+                    .frame(width: 5, height: 5)
+                    .opacity(phase ? 1 : 0.25)
+                    .animation(.easeInOut(duration: 0.6).repeatForever().delay(Double(index) * 0.2), value: phase)
+            }
+            if let label {
+                Text(waited > 15 ? "Still waiting for the model to start responding" : label)
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            }
         }
     }
 }

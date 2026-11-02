@@ -94,6 +94,16 @@ struct OpenAICompatibleTransportTests {
         #expect(try OpenAICompatibleTransport.decodeEvent(usageOnlyData) == nil)
     }
 
+    @Test func decodeEventSurfacesStreamedReasoning() throws {
+        let nim = Data(#"{"choices":[{"delta":{"reasoning_content":"Let me think","content":null}}]}"#.utf8)
+        let chunk = try #require(try OpenAICompatibleTransport.decodeEvent(nim))
+        #expect(chunk.reasoning == "Let me think")
+        #expect(chunk.delta?.content == "")
+
+        let openRouter = Data(#"{"choices":[{"delta":{"reasoning":"Hmm"}}]}"#.utf8)
+        #expect(try OpenAICompatibleTransport.decodeEvent(openRouter)?.reasoning == "Hmm")
+    }
+
     @Test func errorMappingByStatus() {
         #expect(OpenAICompatibleTransport.providerError(status: 401, body: Data()) == .authenticationFailed)
         #expect(OpenAICompatibleTransport.providerError(status: 429, body: Data()) == .rateLimited)

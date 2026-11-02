@@ -130,12 +130,12 @@ public struct MLXProvider: ModelProvider {
 
     public func checkAvailability() async -> ProviderAvailability {
         let current = store()
-        let models = current.installed().filter(\.isLanguageModel)
+        let models = await current.installedOffPool().filter(\.isLanguageModel)
         return models.isEmpty ? .unavailable(Self.missingStoreMessage(current.root)) : .available()
     }
 
     public func fetchModels() async throws -> [ModelDescriptor] {
-        store().installed().filter(\.isLanguageModel).map { installed in
+        await store().installedOffPool().filter(\.isLanguageModel).map { installed in
             ModelDescriptor(
                 id: "mlx-\(installed.repoID)",
                 name: installed.repoID,
@@ -155,7 +155,7 @@ public struct MLXProvider: ModelProvider {
     ) async throws -> AsyncThrowingStream<ChatChunk, Error> {
         let current = store()
         // The registry hands over the bare repo id ("org/repo").
-        guard let model = current.installed().last(where: { $0.repoID == request.model && $0.isLanguageModel }) else {
+        guard let model = await current.installedOffPool().last(where: { $0.repoID == request.model && $0.isLanguageModel }) else {
             throw ProviderError.notFound("model '\(request.model)' is not in the model store at \(current.root.path)")
         }
         let engine = MLXEngineCache.shared.engine(for: URL(fileURLWithPath: model.path))

@@ -44,6 +44,7 @@ public final class ChatSession {
     public private(set) var messages: [MessageSnapshot]
     public private(set) var isStreaming = false
     public private(set) var streamingText = ""
+    public private(set) var streamingReasoning = ""
     public private(set) var streamingToolCalls: [ToolCall] = []
     public private(set) var errorText: String?
     public private(set) var lastUsage: ChatChunk.Usage?
@@ -277,6 +278,7 @@ public final class ChatSession {
         }
         isStreaming = true
         streamingText = ""
+        streamingReasoning = ""
         streamingToolCalls = []
         if agentEnabled, let orchestrator, let profile = agentProfile {
             await runAgent(orchestrator: orchestrator, profile: profile, conversationID: conversationID)
@@ -297,6 +299,7 @@ public final class ChatSession {
 
         let task = Task { [weak self] in
             var content = ""
+            var reasoningText = ""
             var toolAccumulator = ToolCallAccumulator()
             var usage: ChatChunk.Usage?
             do {
@@ -304,6 +307,10 @@ public final class ChatSession {
                 guard let stream else { return }
                 for try await chunk in stream {
                     try Task.checkCancellation()
+                    if let thinking = chunk.reasoning, !thinking.isEmpty {
+                        self?.streamingReasoning += thinking
+                        reasoningText += thinking
+                    }
                     if let delta = chunk.delta?.content, !delta.isEmpty {
                         content += delta
                         self?.streamingText = content
@@ -329,7 +336,7 @@ public final class ChatSession {
                 conversationID: conversationID,
                 role: .assistant,
                 content: content,
-                reasoning: nil,
+                reasoning: reasoningText.isEmpty ? nil : reasoningText,
                 tokenCount: tokenCount,
                 toolCalls: toolAccumulator.completed,
                 modelID: request.model
@@ -337,7 +344,11 @@ public final class ChatSession {
                 self?.messages.append(saved)
                 if let usage { self?.lastUsage = usage }
             }
+            if content.isEmpty && toolAccumulator.completed.isEmpty {
+                self?.errorText = "The model returned an empty response. Try again or pick another model."
+            }
             self?.streamingText = ""
+            self?.streamingReasoning = ""
             self?.streamingToolCalls = []
             self?.isStreaming = false
         }
@@ -396,7 +407,8 @@ public final class ChatSession {
                     switch event {
                     case .textDelta(let delta): self.streamingText += delta
                     case .textReset: self.streamingText = ""
-                    case .roundStarted(let round): self.agentRound = round; self.streamingText = ""
+                    case .reasoningDelta(let thinking): self.streamingReasoning += thinking
+                    case .roundStarted(let round): self.agentRound = round; self.streamingText = ""; self.streamingReasoning = ""
                     case .retryScheduled(let attempt, let delay, let reason):
                         self.agentNotice = "Retrying (\(attempt)) in \(Int(delay))s: \(reason)"
                     case .policyDenied(let tool, _, let reason): self.agentNotice = "\(tool) was blocked: \(reason)"
@@ -416,6 +428,7 @@ public final class ChatSession {
                 self?.messages.append(saved)
             }
             self?.streamingText = ""
+            self?.streamingReasoning = ""
             self?.isStreaming = false
             self?.agentStop = nil
         }

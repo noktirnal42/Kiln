@@ -5,6 +5,8 @@ import Foundation
 /// Everything a run reports to the UI as it happens.
 public enum AgentEvent: Sendable {
     case textDelta(String)
+    /// Thinking text from reasoning models, streamed before the answer.
+    case reasoningDelta(String)
     /// Clears partial output before a retry or when text is reclassified as a tool call.
     case textReset
     case roundStarted(Int)
@@ -536,6 +538,7 @@ public final class AgentOrchestrator: Sendable {
                 let stream = try await chat(request)
                 for try await chunk in stream {
                     if stop.stopped { throw AgentRunError.stopped }
+                    if let thinking = chunk.reasoning, !thinking.isEmpty { yield(.reasoningDelta(thinking)) }
                     if let delta = chunk.delta, !delta.content.isEmpty {
                         text += delta.content
                         let visible = redactSecrets ? SecretRedactor.redact(text).text : text

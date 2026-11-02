@@ -223,14 +223,18 @@ public struct ChatChunk: Codable, Equatable, Sendable {
     public var finishReason: FinishReason?
     public var usage: Usage?
     public var toolCalls: [ToolCall]
+    /// Reasoning/thinking text some models stream before (or beside) the answer.
+    public var reasoning: String?
 
     public init(
         id: String = UUID().uuidString,
         delta: ChatMessage? = nil,
         finishReason: FinishReason? = nil,
         usage: Usage? = nil,
-        toolCalls: [ToolCall] = []
+        toolCalls: [ToolCall] = [],
+        reasoning: String? = nil
     ) {
+        self.reasoning = reasoning
         self.id = id
         self.delta = delta
         self.finishReason = finishReason

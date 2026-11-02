@@ -76,9 +76,7 @@ struct ModelLabModelsView: View {
             .navigationTitle("Models")
             .task {
                 // Walks the store's files to total sizes, which is slow on an external drive: off the main thread.
-                storeModels = await Task.detached(priority: .utility) {
-                    UniversalModelStore().installed().filter(\.isLanguageModel)
-                }.value
+                storeModels = await UniversalModelStore().installedOffPool().filter(\.isLanguageModel)
                 storeScanned = true
             }
         } detail: {

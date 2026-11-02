@@ -60,6 +60,17 @@ public struct UniversalModelStore: Sendable {
         root.appendingPathComponent(Self.repoDirectoryName(repoID))
     }
 
+    /// `installed()` stats every weight file, which is slow on an external drive. Run it on a
+    /// dispatch thread: on the cooperative pool it blocks every other async task (chat streams
+    /// included) for as long as the scan takes.
+    public func installedOffPool() async -> [InstalledModel] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: self.installed())
+            }
+        }
+    }
+
     /// Models usable by an MLX LM: a snapshot with `config.json` and at least
     /// one resolvable `.safetensors` file.
     public func installed() -> [InstalledModel] {

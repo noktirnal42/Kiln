@@ -61,7 +61,7 @@ struct AgentDockView: View {
                     }
                     .padding(.top, SSSpacing.l)
                 }
-                LazyVStack(alignment: .leading, spacing: SSSpacing.m) {
+                LazyVStack(alignment: .leading, spacing: SSSpacing.l) {
                     ForEach(session.messages) { message in
                         MessageBubble(session: session, message: message).id(message.id)
                     }
@@ -73,7 +73,8 @@ struct AgentDockView: View {
                                 id: UUID(), role: .assistant, content: session.streamingText,
                                 toolCalls: session.streamingToolCalls, modelID: session.selectedModelID,
                                 createdAt: Date()),
-                            isStreaming: true
+                            isStreaming: true,
+                            liveReasoning: session.streamingReasoning
                         )
                         .id("streaming")
                     }
@@ -82,6 +83,7 @@ struct AgentDockView: View {
             }
             .onChange(of: session.messages.count) { _, _ in scroll(proxy) }
             .onChange(of: session.streamingText) { _, _ in scroll(proxy) }
+            .onChange(of: session.streamingReasoning) { _, _ in scroll(proxy) }
         }
     }
 

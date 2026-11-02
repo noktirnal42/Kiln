@@ -113,7 +113,8 @@ public enum OpenAICompatibleTransport {
             finishReason: finish,
             toolCalls: choice.delta?.toolCalls?.map {
                 ToolCall(id: $0.id ?? "", name: $0.function?.name ?? "", arguments: $0.function?.arguments ?? "", index: $0.index)
-            } ?? []
+            } ?? [],
+            reasoning: choice.delta?.reasoning
         )
     }
 
@@ -231,7 +232,15 @@ public enum OpenAICompatibleTransport {
     private struct Delta: Decodable {
         let content: String?
         let toolCalls: [Call]?
-        enum CodingKeys: String, CodingKey { case content; case toolCalls = "tool_calls" }
+        let reasoningContent: String?
+        let reasoningAlt: String?
+        var reasoning: String? { reasoningContent ?? reasoningAlt }
+        enum CodingKeys: String, CodingKey {
+            case content
+            case toolCalls = "tool_calls"
+            case reasoningContent = "reasoning_content"
+            case reasoningAlt = "reasoning"
+        }
     }
 
     private struct Call: Decodable {
