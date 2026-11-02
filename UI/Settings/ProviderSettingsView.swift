@@ -235,7 +235,7 @@ struct ModelStoreCard: View {
         let found: (String?, Int?)
         if let folder = ModelStoreLocation.shared.folder {
             let store = UniversalModelStore(root: ModelStoreLocation.hubDirectory(in: folder))
-            found = (store.root.path, await store.installedOffPool().filter(\.isLanguageModel).count)
+            found = (store.root.path, await store.installedOffPool(forceRefresh: reload).filter(\.isLanguageModel).count)
         } else {
             found = (nil, nil)
         }

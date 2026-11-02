@@ -126,9 +126,11 @@ public enum OpenAICompatibleTransport {
         session: URLSession = ProviderSessions.shared,
         headers: [String: String] = [:],
         extraFields: [String: ProviderJSON] = [:],
-        useCompletionTokens: Bool = false
+        useCompletionTokens: Bool = false,
+        firstChunkTimeout: TimeInterval = 90
     ) -> AsyncThrowingStream<ChatChunk, Error> {
         AsyncThrowingStream { continuation in
+            let gotFirstChunk = FirstChunkFlag()
             let task = Task {
                 do {
                     var wire = URLRequest(url: url)
@@ -172,6 +174,7 @@ public enum OpenAICompatibleTransport {
                         if payload == "[DONE]" { break }
                         guard !payload.isEmpty else { continue }
                         if let chunk = try decodeEvent(Data(payload.utf8)) {
+                            gotFirstChunk.set()
                             continuation.yield(chunk)
                             if chunk.finishReason != nil { break }
                         }
@@ -181,7 +184,16 @@ public enum OpenAICompatibleTransport {
                     continuation.finish(throwing: error)
                 }
             }
-            continuation.onTermination = { _ in task.cancel() }
+            // Some hosted models queue a request for a minute or more without sending a byte. Say so instead of
+            // leaving the UI on "Working" until the 180 s transport timeout.
+            let watchdog = Task {
+                try? await Task.sleep(nanoseconds: UInt64(firstChunkTimeout * 1_000_000_000))
+                guard !Task.isCancelled, !gotFirstChunk.isSet else { return }
+                continuation.finish(throwing: ProviderError.invalidResponse(
+                    "No response after \(Int(firstChunkTimeout)) s. The provider may be queueing requests; try again or pick another model."))
+                task.cancel()
+            }
+            continuation.onTermination = { _ in task.cancel(); watchdog.cancel() }
         }
     }
 
@@ -345,4 +357,11 @@ final class MockURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+}
+
+final class FirstChunkFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+    func set() { lock.lock(); value = true; lock.unlock() }
 }

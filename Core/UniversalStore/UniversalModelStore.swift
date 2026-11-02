@@ -63,12 +63,26 @@ public struct UniversalModelStore: Sendable {
     /// `installed()` stats every weight file, which is slow on an external drive. Run it on a
     /// dispatch thread: on the cooperative pool it blocks every other async task (chat streams
     /// included) for as long as the scan takes.
-    public func installedOffPool() async -> [InstalledModel] {
-        await withCheckedContinuation { continuation in
+    public func installedOffPool(forceRefresh: Bool = false) async -> [InstalledModel] {
+        let key = root.resolvingSymlinksInPath().path
+        let rootStamp = Self.modificationDate(of: key)
+        if !forceRefresh, let hit = Self.cache.value(for: key, rootStamp: rootStamp, maxAge: Self.cacheLifetime) { return hit }
+        let found: [InstalledModel] = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 continuation.resume(returning: self.installed())
             }
         }
+        Self.cache.store(found, for: key, rootStamp: rootStamp)
+        return found
+    }
+
+    /// Scans are minutes long on a USB drive and the picker, provider checks and Settings all ask for the list,
+    /// so a result is reused for two minutes, or until the store folder itself changes.
+    static let cacheLifetime: TimeInterval = 120
+    private static let cache = InstalledModelCache()
+
+    private static func modificationDate(of path: String) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
     }
 
     /// Models usable by an MLX LM: a snapshot with `config.json` and at least
@@ -102,5 +116,23 @@ public struct UniversalModelStore: Sendable {
             }
         }
         return found.sorted { ($0.repoID, $0.revision) < ($1.repoID, $1.revision) }
+    }
+}
+
+private final class InstalledModelCache: @unchecked Sendable {
+    private struct Entry { var models: [InstalledModel]; var stamp: Date; var rootStamp: Date? }
+    private let lock = NSLock()
+    private var entries: [String: Entry] = [:]
+
+    func value(for key: String, rootStamp: Date?, maxAge: TimeInterval) -> [InstalledModel]? {
+        lock.lock(); defer { lock.unlock() }
+        guard let entry = entries[key], entry.rootStamp == rootStamp,
+              Date().timeIntervalSince(entry.stamp) < maxAge else { return nil }
+        return entry.models
+    }
+
+    func store(_ models: [InstalledModel], for key: String, rootStamp: Date?) {
+        lock.lock(); defer { lock.unlock() }
+        entries[key] = Entry(models: models, stamp: Date(), rootStamp: rootStamp)
     }
 }
