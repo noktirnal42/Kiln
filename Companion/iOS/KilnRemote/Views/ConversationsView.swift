@@ -112,12 +112,26 @@ struct WatchSection: View {
             row("Watch paired with this iPhone", watch.watchPaired)
             row("Kiln Remote installed on watch", watch.watchAppInstalled)
             row("Watch reachable now", watch.reachable)
+            LabeledContent("Watch bridge") {
+                Text(bridgeText).foregroundStyle(bridgeOn ? .green : .secondary)
+            }
+            if let seen = WatchBridge.shared.lastWatchActivity {
+                LabeledContent("Last watch request", value: seen.formatted(date: .omitted, time: .standard))
+            }
             LabeledContent("Pairing sent", value: watch.lastSent.map { $0.formatted(date: .omitted, time: .standard) } ?? "Not yet")
             if let blocked = watch.blocked { Text(blocked).font(.footnote).foregroundStyle(.orange) }
             Button("Send pairing to watch") { watch.resend() }
                 .accessibilityHint("Sends the Mac pairing to the Kiln Remote app on your Apple Watch")
         }
     }
+
+    private var bridgeOn: Bool { watch.activated && watch.watchPaired && session.isConnected }
+    private var bridgeText: String {
+        if bridgeOn { return "on" }
+        if !watch.watchPaired { return "off: no watch" }
+        return "off: not connected to the Mac"
+    }
+    @Environment(RemoteSession.self) private var session
 
     private func row(_ title: String, _ on: Bool) -> some View {
         LabeledContent(title) {

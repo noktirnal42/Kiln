@@ -34,6 +34,8 @@ final class RemoteSession {
     @ObservationIgnored var onAssistantMessage: (@MainActor (RemoteMessage) -> Void)?
     /// Called when the pairing is saved or removed (the watch hand-off listens).
     @ObservationIgnored var onPairingChanged: (@MainActor (PairedMac?) -> Void)?
+    /// Every event from the Mac, before the session applies it (the watch bridge forwards these).
+    @ObservationIgnored var onEvent: (@MainActor (RemoteEvent) -> Void)?
     @ObservationIgnored var onApprovalRequested: (@MainActor (RemoteApproval) -> Void)?
 
     @ObservationIgnored private let store: PairingStoring
@@ -270,6 +272,7 @@ final class RemoteSession {
     // MARK: events
 
     func handle(_ event: RemoteEvent) {
+        onEvent?(event)
         switch event {
         case .welcome(let host, let version):
             hostName = host

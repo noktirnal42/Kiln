@@ -23,8 +23,12 @@ final class PhoneLink: NSObject, WCSessionDelegate, @unchecked Sendable {
     private let onChange: @Sendable @MainActor (PairingPayload?) -> Void
     /// Plain-language state of the phone link, for the screen.
     private let onStatus: @Sendable @MainActor (String) -> Void
+    private let bridge: PhoneBridge?
+    private let onReachable: @Sendable @MainActor () -> Void
 
-    init(onChange: @escaping @Sendable @MainActor (PairingPayload?) -> Void, onStatus: @escaping @Sendable @MainActor (String) -> Void) {
+    init(onChange: @escaping @Sendable @MainActor (PairingPayload?) -> Void, onStatus: @escaping @Sendable @MainActor (String) -> Void, bridge: PhoneBridge? = nil, onReachable: @escaping @Sendable @MainActor () -> Void = {}) {
+        self.bridge = bridge
+        self.onReachable = onReachable
         self.onChange = onChange
         self.onStatus = onStatus
         super.init()
@@ -68,6 +72,8 @@ final class PhoneLink: NSObject, WCSessionDelegate, @unchecked Sendable {
     }
 
     private func apply(_ message: [String: Any], source: String) {
+        if let json = message[PhoneBridge.eventKey] as? String { bridge?.deliver(json); return }
+        if message[PhoneBridge.commandKey] != nil || message[PhoneBridge.controlKey] != nil { return }
         guard message[Self.contextKey] != nil else {
             pairingLog.notice("\(source): no pairing yet")
             report("iPhone has not sent pairing yet. Open Kiln Remote and pair it with your Mac.")
@@ -91,7 +97,11 @@ final class PhoneLink: NSObject, WCSessionDelegate, @unchecked Sendable {
 
     func sessionReachabilityDidChange(_ session: WCSession) {
         pairingLog.notice("reachability: \(session.isReachable)")
-        if session.isReachable { refresh() }
+        if session.isReachable {
+            refresh()
+            let onReachable = onReachable
+            Task { @MainActor in onReachable() }
+        }
     }
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {

@@ -19,6 +19,30 @@ enum ManualAddress {
 enum MacConnector {
     typealias Progress = @Sendable @MainActor (String) -> Void
 
+    /// iPhone bridge first (a real watch usually has no LAN path of its own), then the Mac directly.
+    static func channel(_ pairing: PairingPayload, bridge: PhoneBridge?, manual: String? = ManualAddress.value, progress: Progress) async throws -> RemoteChannel {
+        var failures: [String] = []
+        if let bridge {
+            if bridge.isReachable {
+                await progress("Connecting via iPhone…")
+                do {
+                    _ = try await bridge.open()
+                    return bridge
+                } catch {
+                    failures.append("iPhone: " + describe(error))
+                }
+            } else {
+                failures.append("iPhone not reachable")
+            }
+        }
+        do {
+            let transport = try await connect(pairing, manual: manual, progress: progress)
+            return RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: "Apple Watch")
+        } catch RemoteError.attemptsFailed(let direct) {
+            throw RemoteError.attemptsFailed(failures + direct)
+        }
+    }
+
     static func connect(_ pairing: PairingPayload, manual: String? = ManualAddress.value, progress: Progress) async throws -> RemoteTransport {
         var failures: [String] = []
         var addresses = manual.map { [$0] } ?? []
@@ -62,6 +86,7 @@ enum MacConnector {
         case RemoteError.timeout: "timed out"
         case RemoteError.notFound: "not found"
         case RemoteError.closed: "closed"
+        case RemoteError.bridge(let reason): reason
         default: (error as NSError).localizedDescription.lowercased()
         }
     }

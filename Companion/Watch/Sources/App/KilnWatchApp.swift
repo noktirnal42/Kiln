@@ -5,12 +5,15 @@ import SwiftUI
 struct KilnWatchApp: App {
     @State private var session: RemoteSession
     private let phoneLink: PhoneLink
+    private let bridge: PhoneBridge
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        let bridge = PhoneBridge(messenger: WCMessenger())
+        self.bridge = bridge
         let session = RemoteSession(
             store: KeychainPairingStore(),
-            connector: { pairing, progress in try await MacConnector.connect(pairing, progress: progress) },
+            connector: { pairing, progress in try await MacConnector.channel(pairing, bridge: bridge, progress: progress) },
             transcriber: DictationTranscriber(),
             speaker: SystemSpeaker(),
             haptics: WatchHaptics()
@@ -26,7 +29,7 @@ struct KilnWatchApp: App {
         }
         #endif
         _session = State(initialValue: session)
-        phoneLink = PhoneLink(onChange: { [session] payload in session.pairingChanged(payload) }, onStatus: { [session] text in session.phoneStatus = text })
+        phoneLink = PhoneLink(onChange: { [session] payload in session.pairingChanged(payload) }, onStatus: { [session] text in session.phoneStatus = text }, bridge: bridge, onReachable: { [session] in if !session.isConnected { session.connect() } })
         phoneLink.activate()
     }
 

@@ -17,6 +17,7 @@ struct KilnRemoteApp: App {
         _voice = State(initialValue: VoiceController(session: session))
         AppDelegate.session = session
         session.onPairingChanged = { WatchHandoff.shared.publish($0) }
+        WatchBridge.shared.attach(session)
         WatchHandoff.shared.activate()
         WatchHandoff.shared.publish(session.mac)
     }

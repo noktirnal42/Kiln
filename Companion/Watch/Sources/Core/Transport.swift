@@ -6,6 +6,8 @@ enum RemoteError: Error, Equatable {
     case timeout, closed, badHandshake, notReady, notFound
     /// Every way of reaching the Mac failed; one line per attempt ("192.168.1.20:47900: timed out").
     case attemptsFailed([String])
+    /// The iPhone could not bridge (its Mac connection is down, or it is not paired).
+    case bridge(String)
 }
 
 /// Carries opaque binary frames to the Mac. `send` is synchronous and ordered so the encrypted frame counter

@@ -238,3 +238,88 @@ struct ManualAddressTests {
         session.unpair()
     }
 }
+
+@MainActor
+struct WatchBridgeTests {
+    private func connected() async throws -> (FakeMacServer, RemoteSession) {
+        let server = FakeMacServer()
+        try await server.start()
+        let mac = PairedMac(hostName: server.hostName, serviceName: "unused", key: server.key, address: "127.0.0.1:\(server.port)")
+        let session = RemoteSession(store: MemoryPairingStore(mac), deviceName: "Test Phone", backoff: [.milliseconds(100)])
+        session.start()
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !(session.isConnected && !session.messages.isEmpty), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        return (server, session)
+    }
+
+    @Test func helloGetsASnapshotAndCommandsReachTheMac() async throws {
+        let (server, session) = try await connected()
+        defer { server.stop(); session.stop() }
+        let bridge = WatchBridge()
+        var events: [RemoteEvent] = []
+        bridge.sink = { events.append($0) }
+        bridge.attach(session)
+
+        bridge.receive(try RemoteCoding.encode(RemoteCommand.hello(deviceName: "Watch", protocolVersion: kilnRemoteProtocolVersion)))
+        #expect(events.contains { if case .welcome = $0 { true } else { false } })
+        #expect(events.contains { if case .conversations(let list) = $0 { list.count == 3 } else { false } })
+        #expect(events.contains { if case .opened = $0 { true } else { false } })
+
+        bridge.receive(try RemoteCoding.encode(RemoteCommand.send(text: "from the watch", spoken: true)))
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !server.receivedCommands.contains(.send(text: "from the watch", spoken: true)), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(server.receivedCommands.contains(.send(text: "from the watch", spoken: true)))
+        // The Mac's streamed reply is forwarded back to the watch.
+        let replyDeadline = ContinuousClock.now + .seconds(5)
+        while !events.contains(where: { if case .message(let m) = $0 { m.role == .assistant && m.text.contains("from the watch") } else { false } }), ContinuousClock.now < replyDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(events.contains { if case .delta = $0 { true } else { false } })
+        #expect(events.contains { if case .message(let m) = $0 { m.role == .assistant && m.text.contains("from the watch") } else { false } })
+    }
+
+    @Test func approvalIsForwardedAndTheWatchDecisionReachesTheMac() async throws {
+        let (server, session) = try await connected()
+        defer { server.stop(); session.stop() }
+        let bridge = WatchBridge()
+        var events: [RemoteEvent] = []
+        bridge.sink = { events.append($0) }
+        bridge.attach(session)
+
+        session.send("approve this")
+        var approvalID: String?
+        let deadline = ContinuousClock.now + .seconds(5)
+        while approvalID == nil, ContinuousClock.now < deadline {
+            for case .approvalRequested(let a) in events { approvalID = a.id }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let id = try #require(approvalID)
+        bridge.receive(try RemoteCoding.encode(RemoteCommand.decide(approvalID: id, decision: .deny)))
+        let decideDeadline = ContinuousClock.now + .seconds(5)
+        while !server.receivedCommands.contains(.decide(approvalID: id, decision: .deny)), ContinuousClock.now < decideDeadline { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(server.receivedCommands.contains(.decide(approvalID: id, decision: .deny)))
+        #expect(session.approvals.isEmpty)
+    }
+
+    @Test func commandsWhileDisconnectedAreHeldAndRunOnReconnect() async throws {
+        let server = FakeMacServer()
+        try await server.start()
+        defer { server.stop() }
+        let mac = PairedMac(hostName: server.hostName, serviceName: "unused", key: server.key, address: "127.0.0.1:\(server.port)")
+        let session = RemoteSession(store: MemoryPairingStore(mac), deviceName: "Test Phone", backoff: [.milliseconds(100)])
+        defer { session.stop() }
+        let bridge = WatchBridge()
+        var events: [RemoteEvent] = []
+        bridge.sink = { events.append($0) }
+        bridge.attach(session)
+
+        // Not started yet, so not connected: the command is held and the watch is told.
+        bridge.receive(try RemoteCoding.encode(RemoteCommand.send(text: "held until online", spoken: false)))
+        #expect(events.contains { if case .error = $0 { true } else { false } })
+        #expect(!server.receivedCommands.contains(.send(text: "held until online", spoken: false)))
+        session.start()
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !server.receivedCommands.contains(.send(text: "held until online", spoken: false)), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(server.receivedCommands.contains(.send(text: "held until online", spoken: false)))
+    }
+}

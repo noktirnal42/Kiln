@@ -3,14 +3,16 @@ import KilnRemoteKit
 
 /// One authenticated connection: runs the nonce handshake from docs/14-REMOTE-CONTROL.md, seals every command and
 /// opens every event with `SecureChannel`. Reuses the package, adds no protocol of its own.
-actor RemoteClient {
+actor RemoteClient: RemoteChannel {
+    nonisolated let route: String
     private let transport: RemoteTransport
     private let pairingKey: Data
     private let deviceName: String
     private var channel: SecureChannel?
     private var pump: Task<Void, Never>?
 
-    init(transport: RemoteTransport, pairingKey: Data, deviceName: String) {
+    init(transport: RemoteTransport, pairingKey: Data, deviceName: String, route: String = "on Wi-Fi") {
+        self.route = route
         self.transport = transport
         self.pairingKey = pairingKey
         self.deviceName = deviceName

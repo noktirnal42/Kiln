@@ -14,11 +14,13 @@ final class RemoteSession {
     }
 
     /// The second argument reports which step is running ("Looking for Mac…").
-    typealias Connector = @Sendable (PairingPayload, @Sendable @MainActor (String) -> Void) async throws -> RemoteTransport
+    typealias Connector = @Sendable (PairingPayload, @Sendable @MainActor (String) -> Void) async throws -> RemoteChannel
 
     private(set) var link = Link.unpaired
     /// What the watch is doing or waiting for, in words.
     private(set) var stage = ""
+    /// How the connection is carried, once connected ("via iPhone", "on Wi-Fi").
+    private(set) var route = ""
     /// State of the link to the iPhone, shown while unpaired.
     var phoneStatus = "Starting phone link"
     private(set) var talk = Talk.idle
@@ -35,7 +37,7 @@ final class RemoteSession {
     private let speaker: Speaking
     private let haptics: Haptics
     private let deviceName: String
-    private var client: RemoteClient?
+    private var client: RemoteChannel?
     private var eventsTask: Task<Void, Never>?
     private var awaitingSpokenReply = false
     private var conversationOpen = false
@@ -97,11 +99,11 @@ final class RemoteSession {
 
     private func run(_ pairing: PairingPayload) async {
         do {
-            let transport = try await connector(pairing) { [weak self] text in
+            let client = try await connector(pairing) { [weak self] text in
                 self?.stage = text
                 pairingLog.notice("stage: \(text)")
             }
-            let client = RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: deviceName)
+            route = client.route
             self.client = client
             let events = await client.connect()
             for try await event in events { handle(event) }
@@ -132,7 +134,7 @@ final class RemoteSession {
         switch event {
         case .welcome(let host, _):
             link = .connected(host: host)
-            stage = "Connected to \(host)"
+            stage = "Connected to \(host) \(route)"
             pairingLog.notice("connected")
             send(.listConversations)
         case .conversations(let list):

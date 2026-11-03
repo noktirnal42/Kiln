@@ -24,10 +24,10 @@ final class SessionTests: XCTestCase {
         let url = server.url
         let session = RemoteSession(
             store: store,
-            connector: { _, _ in
+            connector: { pairing, _ in
                 let transport = NWTransport(url: url)
                 try await transport.start()
-                return transport
+                return RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: "Test Watch")
             },
             transcriber: StubTranscriber(text: dictated), speaker: speaker, haptics: haptics
         )

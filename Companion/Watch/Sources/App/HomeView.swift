@@ -9,7 +9,7 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 8) {
-                StatusRow(link: session.link, stage: session.stage)
+                StatusRow(link: session.link, stage: session.stage, route: session.route)
                 if session.link == .unpaired {
                     UnpairedView(status: session.phoneStatus, pair: pair)
                 } else {
@@ -49,12 +49,13 @@ struct HomeView: View {
 struct StatusRow: View {
     let link: RemoteSession.Link
     var stage = ""
+    var route = ""
 
     private var text: String {
         switch link {
         case .unpaired: "Not paired"
         case .connecting: stage.isEmpty ? "Connecting…" : stage
-        case .connected(let host): host
+        case .connected(let host): route.isEmpty ? host : "\(host) \(route)"
         case .offline: "Offline"
         }
     }

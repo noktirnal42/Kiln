@@ -58,7 +58,7 @@ final class WatchHandoff: NSObject {
         let payload = ["kilnPairing": link]
         do { try session.updateApplicationContext(payload) } catch { NSLog("KilnRemote watch: context failed: %@", error.localizedDescription) }
         // Replace any earlier queued transfer so the watch never replays an old (revoked) pairing after a newer one.
-        for transfer in session.outstandingUserInfoTransfers { transfer.cancel() }
+        for transfer in session.outstandingUserInfoTransfers where transfer.userInfo["kilnPairing"] != nil { transfer.cancel() }
         session.transferUserInfo(payload)
         blocked = hasPairing ? nil : "Pairing removed from the watch."
         lastSent = Date()
@@ -77,6 +77,14 @@ extension WatchHandoff: WCSessionDelegate {
     }
     /// The watch asks for the pairing ("kilnPairingRequest"); answer with it (empty if not paired) and push again.
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        if message["kilnBridge"] as? String == "open" {
+            let reply = ReplyBox(replyHandler)
+            Task { @MainActor in
+                if let host = WatchBridge.shared.connectedHost { reply.send(["kilnBridge": "ready", "host": host]) }
+                else { reply.send(["kilnBridge": "error", "reason": "Open Kiln Remote and connect to your Mac"]) }
+            }
+            return
+        }
         guard message["kilnPairingRequest"] != nil else { replyHandler([:]); return }
         let reply = ReplyBox(replyHandler)
         Task { @MainActor in
@@ -84,8 +92,31 @@ extension WatchHandoff: WCSessionDelegate {
             self.send()
         }
     }
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        guard let json = message["kilnBridgeCommand"] as? String else { return }
+        Task { @MainActor in WatchBridge.shared.receive(Data(json.utf8)) }
+    }
+    /// Watch commands for the bridge (`RemoteCoding`-encoded `RemoteCommand`).
+    nonisolated func session(_ session: WCSession, didReceiveMessageData messageData: Data) {
+        Task { @MainActor in WatchBridge.shared.receive(messageData) }
+    }
+    nonisolated func session(_ session: WCSession, didReceiveMessageData messageData: Data, replyHandler: @escaping (Data) -> Void) {
+        let reply = DataReplyBox(replyHandler)
+        Task { @MainActor in
+            reply.send(Data())
+            WatchBridge.shared.receive(messageData)
+        }
+    }
+    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        guard let json = userInfo["kilnBridgeCommand"] as? String else { return }
+        let data = Data(json.utf8)
+        Task { @MainActor in WatchBridge.shared.receive(data) }
+    }
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
-        Task { @MainActor in self.send() }
+        Task { @MainActor in
+            self.send()
+            if WCSession.default.isReachable { WatchBridge.shared.sendSnapshot() }
+        }
     }
 }
 
@@ -94,4 +125,10 @@ private final class ReplyBox: @unchecked Sendable {
     private let handler: ([String: Any]) -> Void
     init(_ handler: @escaping ([String: Any]) -> Void) { self.handler = handler }
     func send(_ reply: [String: Any]) { handler(reply) }
+}
+
+private final class DataReplyBox: @unchecked Sendable {
+    private let handler: (Data) -> Void
+    init(_ handler: @escaping (Data) -> Void) { self.handler = handler }
+    func send(_ data: Data) { handler(data) }
 }
