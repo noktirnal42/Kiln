@@ -26,6 +26,7 @@ struct ConversationView: View {
                     }
                     .padding()
                 }
+                .defaultScrollAnchor(.bottom)
                 .onChange(of: session.messages.count) { withAnimation { proxy.scrollTo("bottom") } }
                 .onChange(of: session.streamingText) { proxy.scrollTo("bottom") }
             }

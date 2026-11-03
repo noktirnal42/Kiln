@@ -147,7 +147,7 @@ final class RemoteSession {
                 case .closed(let reason, let sawFrames):
                     self.link = nil
                     NSLog("KilnRemote: closed (%@) handshook=%d frames=%d", reason, handshook ? 1 : 0, sawFrames ? 1 : 0)
-                    if !welcomed { lastError = reason }
+                    if !welcomed { lastError = reason; cachedAddress = nil }   // the Mac may have restarted on another port
                     resetLiveState()
                     if handshook, !sawFrames { return .rejected }
                     return welcomed ? .welcomed : .failed

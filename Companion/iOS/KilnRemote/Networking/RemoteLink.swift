@@ -141,7 +141,7 @@ final class RemoteLink: @unchecked Sendable {
 
 /// Finds the Mac's address from its Bonjour service name.
 enum BonjourResolver {
-    static func resolve(serviceName: String, timeout: Duration = .seconds(6)) async throws -> (String, UInt16) {
+    static func resolve(serviceName: String, timeout: Duration = .seconds(10)) async throws -> (String, UInt16) {
         let browser = NWBrowser(for: .bonjour(type: kilnRemoteServiceType, domain: nil), using: .tcp)
         let found = AsyncStream<NWEndpoint> { continuation in
             browser.browseResultsChangedHandler = { results, _ in
