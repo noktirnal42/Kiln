@@ -133,6 +133,7 @@ final class RemoteSession {
     private func connectOnce(_ mac: PairedMac) async -> Outcome {
         do {
             let (host, port) = try await address(for: mac)
+            NSLog("KilnRemote: connecting to %@:%d", host, Int(port))
             let link = RemoteLink(pairingKey: mac.key, deviceName: deviceName)
             self.link = link
             try link.connect(host: host, port: port)
@@ -145,6 +146,7 @@ final class RemoteSession {
                     handle(event)
                 case .closed(let reason, let sawFrames):
                     self.link = nil
+                    NSLog("KilnRemote: closed (%@) handshook=%d frames=%d", reason, handshook ? 1 : 0, sawFrames ? 1 : 0)
                     if !welcomed { lastError = reason }
                     resetLiveState()
                     if handshook, !sawFrames { return .rejected }
@@ -154,6 +156,7 @@ final class RemoteSession {
             return .failed
         } catch {
             cachedAddress = nil
+            NSLog("KilnRemote: connect failed: %@", error.localizedDescription)
             lastError = error.localizedDescription
             return .failed
         }
