@@ -8,7 +8,7 @@ This is the contributor-facing gap list for Kiln's current development state. Th
 
 **Observed:** Develop → Editor can open, edit and save files, build and jump to compiler errors (see `docs/11-CURRENT-STATE.md`). It has no language server, debugger, run/launch, previews, scheme/target selection, test navigator, inline git changes, split editors or editor settings (font, theme, tab width).
 
-**Needed:** each of those is a separate scoped issue (#15–#22). Do not describe Kiln as having Xcode parity.
+**Needed:** each of those is a separate scoped issue (#15–#21). Do not describe Kiln as having Xcode parity.
 
 ## Small local model tool use is unreliable
 
