@@ -132,6 +132,37 @@ struct ChatSessionTests {
         #expect(stored.messages[1].content == "part")
     }
 
+    @Test func reasoningStreamsBeforeTheAnswerAndTimingSeparatesFirstTokenFromTotal() async throws {
+        let (session, conversations, _) = try makeSession()
+        await registerStreamingProvider(
+            session.registry,
+            chunks: [
+                ChatChunk(reasoning: "thinking…"),
+                ChatChunk(delta: ChatMessage(role: .assistant, content: "answer")),
+                ChatChunk(finishReason: .stop),
+            ],
+            chunkDelays: [.milliseconds(300), .milliseconds(300), nil]
+        )
+        await session.newConversation()
+        session.selectedModelID = "stub-m1"
+
+        let sendTask = Task { await session.send("q") }
+        for _ in 0..<100 where session.streamingReasoning.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(session.streamingReasoning == "thinking…")
+        #expect(session.streamingText.isEmpty)            // the reasoning is visible before any answer text
+        #expect(session.isStreaming)
+        await sendTask.value
+
+        let timing = try #require(session.lastTiming)
+        let first = try #require(timing.firstTokenSeconds)
+        #expect(first >= 0.25 && first < timing.totalSeconds)
+        #expect(timing.totalSeconds >= 0.55)
+        let stored = try await conversations.messages(conversationID: session.conversationID!)
+        #expect(stored.messages[1].content == "answer")     // no duplicated final text
+        #expect(stored.messages[1].reasoning == "thinking…")
+        #expect(session.streamingText.isEmpty && session.streamingReasoning.isEmpty && !session.isStreaming)
+    }
+
     @Test func forkViaSessionProducesBranchedConversation() async throws {
         let (session, conversations, _) = try makeSession()
         await registerStreamingProvider(session.registry, chunks: [

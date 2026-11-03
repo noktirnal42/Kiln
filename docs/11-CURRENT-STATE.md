@@ -34,6 +34,15 @@ One window, one sidebar, one conversation.
 - **Sidebar** (`UI/Workstation/WorkstationSidebar.swift`): New chat, project switcher, chat history grouped by day
   (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit. The Kiln logo opens
   Overview (the old Home). ⌘1–⌘7 and ⌘K still work.
+- **Develop → Editor** (`UI/Workstation/EditorView.swift`, `Core/Editor/*`): file navigator (new/rename/trash, hidden-file toggle),
+  tabs, native text editing (system undo, find bar, line numbers, auto-indent, regex syntax colouring), Open Quickly (⌘P),
+  Find in Project, go to line (⌘L), save (⌘S / ⇧⌘S). Documents live in `AppModel.editor`, so unsaved edits survive switching tools;
+  recovery copies of unsaved work are written to `Application Support/Kiln/EditorRecovery` and offered back; files changed on
+  disk by an agent, git or another editor reload when clean and raise a Reload / Keep mine / Overwrite banner when edited; binary,
+  over 2 MB and unreadable files are refused with a reason. **Build** (⌘B) detects xcodebuild / swift / cargo / go / npm / make (or
+  runs a custom command through a login shell), streams output and turns `file:line:col: error:` into clickable problems, with
+  "Ask the agent to fix the errors". **Not an IDE like Xcode:** no language server (completion, go to definition, live
+  diagnostics), debugger, run/launch, SwiftUI previews, scheme/target picker, test navigator or inline git changes.
 - **Project** = the folder the agent works in. `WorkspaceStore` keeps a security-scoped bookmark per recent folder;
   without it the sandbox forgets the folder on every relaunch.
 - **Composer** (model, Agent toggle, agent profile) is shared by the Agent view and the panel beside every tool.

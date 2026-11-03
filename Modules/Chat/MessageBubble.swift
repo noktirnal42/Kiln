@@ -123,6 +123,10 @@ struct MessageBubble: View {
         var parts: [String] = []
         if let model = message.modelID, !model.isEmpty { parts.append(model) }
         if message.tokenCount > 0 { parts.append("\(message.tokenCount) tok") }
+        if message.id == session.messages.last?.id, let timing = session.lastTiming {
+            if let first = timing.firstTokenSeconds { parts.append(String(format: "first token %.1f s", first)) }
+            parts.append(String(format: "total %.1f s", timing.totalSeconds))
+        }
         parts.append(message.createdAt.formatted(date: .omitted, time: .shortened))
         return parts.joined(separator: " · ")
     }

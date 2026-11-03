@@ -84,6 +84,7 @@ struct AgentDockView: View {
             .onChange(of: session.messages.count) { _, _ in scroll(proxy) }
             .onChange(of: session.streamingText) { _, _ in scroll(proxy) }
             .onChange(of: session.streamingReasoning) { _, _ in scroll(proxy) }
+            .onChange(of: session.isStreaming) { _, _ in scroll(proxy) }
         }
     }
 
@@ -94,6 +95,9 @@ struct AgentDockView: View {
     }
 
     private func scroll(_ proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo("streaming", anchor: .bottom) }
+        withAnimation(.easeOut(duration: 0.15)) {
+            if session.isStreaming { proxy.scrollTo("streaming", anchor: .bottom) }
+            else if let last = session.messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
+        }
     }
 }

@@ -4,13 +4,11 @@ See the [public work-item index](ISSUE-INDEX.md) for scoped issues and acceptanc
 
 This is the contributor-facing gap list for Kiln's current development state. The [issue tracker](https://github.com/noktirnal42/Kiln/issues) owns assignment, discussion, and implementation status. Specifications describe intended behavior; they are not evidence that a feature is complete.
 
-## Development workspace is not yet a full IDE
+## Development workspace is a text editor with a build button, not an IDE like Xcode
 
-**Observed:** Develop exposes terminal, Git, workspace filename search, and MCP panels. It has no source editor and does not provide Xcode-level project, build, debugger, preview, or diagnostics workflows.
+**Observed:** Develop → Editor can open, edit and save files, build and jump to compiler errors (see `docs/11-CURRENT-STATE.md`). It has no language server, debugger, run/launch, previews, scheme/target selection, test navigator, inline git changes, split editors or editor settings (font, theme, tab width).
 
-**Reproduce:** open Develop and inspect the available tools.
-
-**Needed:** a native editor and coherent project lifecycle, built on shared workspace state. Acceptance should cover opening/editing/saving files, unsaved changes and conflicts, keyboard navigation, diagnostics, and a real build/debug example. Avoid claiming Xcode parity from a text editor or terminal alone.
+**Needed:** each of those is a separate scoped issue (#15–#22). Do not describe Kiln as having Xcode parity.
 
 ## Small local model tool use is unreliable
 

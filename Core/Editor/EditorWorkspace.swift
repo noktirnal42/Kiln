@@ -41,7 +41,7 @@ public final class EditorWorkspace {
         root = url
     }
 
-    public static let ignoredNames: Set<String> = [
+    public nonisolated static let ignoredNames: Set<String> = [
         ".git", ".build", "DerivedData", "node_modules", ".DS_Store", "build", "dist", "xcuserdata", "__pycache__", ".venv",
         ".swiftpm", "Pods", "target",
     ]
@@ -125,6 +125,64 @@ public final class EditorWorkspace {
         if activeID == document.id {
             activeID = documents.indices.contains(index) ? documents[index].id : documents.last?.id
         }
+    }
+
+    // MARK: File operations
+
+    public enum FileOperationError: Error, LocalizedError {
+        case exists(String), invalidName, failed(String)
+        public var errorDescription: String? {
+            switch self {
+            case .exists(let name): "\(name) already exists."
+            case .invalidName: "Use a name without slashes."
+            case .failed(let reason): reason
+            }
+        }
+    }
+
+    private func validated(_ name: String, in directory: URL) throws -> URL {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("/"), trimmed != ".", trimmed != ".." else { throw FileOperationError.invalidName }
+        let target = directory.appendingPathComponent(trimmed)
+        guard !FileManager.default.fileExists(atPath: target.path) else { throw FileOperationError.exists(trimmed) }
+        return target
+    }
+
+    @discardableResult
+    public func createFile(named name: String, in directory: URL) throws -> URL {
+        let target = try validated(name, in: directory)
+        guard FileManager.default.createFile(atPath: target.path, contents: Data()) else {
+            throw FileOperationError.failed("Could not create \(target.lastPathComponent).")
+        }
+        open(target)
+        return target
+    }
+
+    @discardableResult
+    public func createFolder(named name: String, in directory: URL) throws -> URL {
+        let target = try validated(name, in: directory)
+        do { try FileManager.default.createDirectory(at: target, withIntermediateDirectories: false) }
+        catch { throw FileOperationError.failed(error.localizedDescription) }
+        return target
+    }
+
+    /// Renames a file or folder. Open tabs for it must be saved first; they are reopened under the new name.
+    @discardableResult
+    public func rename(_ url: URL, to name: String) throws -> URL {
+        let target = try validated(name, in: url.deletingLastPathComponent())
+        let affected = documents.filter { $0.url == url || $0.url.path.hasPrefix(url.path + "/") }
+        guard !affected.contains(where: \.isDirty) else { throw FileOperationError.failed("Save or discard your changes in the open files first.") }
+        do { try FileManager.default.moveItem(at: url, to: target) } catch { throw FileOperationError.failed(error.localizedDescription) }
+        let wasActive = affected.contains { $0.id == activeID }
+        for document in affected { close(document) }
+        if wasActive, url.hasDirectoryPath == false { open(target) }
+        return target
+    }
+
+    /// Moves to the Trash (recoverable). Open tabs for it are closed; unsaved edits in them are dropped.
+    public func trash(_ url: URL) throws {
+        do { try FileManager.default.trashItem(at: url, resultingItemURL: nil) } catch { throw FileOperationError.failed(error.localizedDescription) }
+        for document in documents where document.url == url || document.url.path.hasPrefix(url.path + "/") { close(document) }
     }
 
     // MARK: Safety nets

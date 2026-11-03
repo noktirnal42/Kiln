@@ -77,9 +77,9 @@ extension ModelLabModule {
         return record
     }
 
-    /// Copies a produced model out of the library in a portable format. The destination must not exist yet.
+    /// Copies a produced model out of the library in a portable format, into an existing folder.
     @MainActor
-    public func exportArtifact(id: String, format: ModelExporters.ExportFormat, destination: URL) throws -> URL {
+    public func exportArtifact(id: String, format: ModelExporters.ExportFormat, destinationFolder destination: URL) throws -> URL {
         try requireCapabilities([.fileSystemWrite])
         guard let context = mainContext else { throw ModelLabModuleError.storeUnavailable("The Model Lab store is unavailable.") }
         let descriptor = FetchDescriptor<ModelArtifactRecord>(predicate: #Predicate { $0.id == id })
@@ -88,9 +88,9 @@ extension ModelLabModule {
         }
         let absolute = record.format == .mlxHubRepository
             ? nil : ModelLabCore.ArtifactStore().absoluteURL(for: record.localRelativePath, in: .models)
-        let folder = destination.deletingLastPathComponent()
-        guard FileManager.default.fileExists(atPath: folder.path) else {
-            throw ModelLabModuleError.invalidTrainingConfiguration("The destination folder \(folder.path) does not exist.")
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: destination.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw ModelLabModuleError.invalidTrainingConfiguration("The destination folder \(destination.path) does not exist.")
         }
         return try ModelExporters().export(record: record, absoluteURL: absolute, format: format, to: destination)
     }

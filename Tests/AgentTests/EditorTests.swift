@@ -180,3 +180,56 @@ struct SyntaxAndBuildTests {
         #expect(QuickOpenMatcher.rank(files, query: "rdm", root: nil).map(\.lastPathComponent) == ["README.md"])
     }
 }
+
+@MainActor
+struct EditorFileOperationTests {
+    private func project() throws -> (URL, EditorWorkspace) {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-ops-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let workspace = EditorWorkspace(recovery: EditorRecoveryStore(directory: dir.appendingPathComponent(".r")))
+        workspace.setRoot(dir.path)
+        return (dir, workspace)
+    }
+
+    @Test func createsRenamesAndTrashesFilesKeepingTabsInStep() throws {
+        let (dir, workspace) = try project()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = try workspace.createFile(named: "a.txt", in: dir)
+        #expect(workspace.active?.url == file.standardizedFileURL)
+        #expect(throws: EditorWorkspace.FileOperationError.self) { try workspace.createFile(named: "a.txt", in: dir) }
+        #expect(throws: EditorWorkspace.FileOperationError.self) { try workspace.createFile(named: "x/y", in: dir) }
+
+        let renamed = try workspace.rename(file, to: "b.txt")
+        #expect(FileManager.default.fileExists(atPath: renamed.path) && !FileManager.default.fileExists(atPath: file.path))
+        #expect(workspace.documents.map(\.name) == ["b.txt"])
+
+        let folder = try workspace.createFolder(named: "sub", in: dir)
+        #expect(FileManager.default.fileExists(atPath: folder.path))
+        try workspace.trash(renamed)
+        #expect(workspace.documents.isEmpty && !FileManager.default.fileExists(atPath: renamed.path))
+    }
+
+    @Test func renameRefusesWhileAnOpenFileHasUnsavedEdits() throws {
+        let (dir, workspace) = try project()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = try workspace.createFile(named: "c.txt", in: dir)
+        workspace.active?.text = "unsaved"
+        #expect(throws: EditorWorkspace.FileOperationError.self) { try workspace.rename(file, to: "d.txt") }
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test func projectSearchFindsLinesAndSkipsBuildOutputAndBinaries() throws {
+        let (dir, _) = try project()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try "one\nNeedle here\nthree\n".write(to: dir.appendingPathComponent("a.swift"), atomically: true, encoding: .utf8)
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("node_modules"), withIntermediateDirectories: true)
+        try "needle in deps".write(to: dir.appendingPathComponent("node_modules/x.js"), atomically: true, encoding: .utf8)
+        try Data([0x6E, 0x65, 0x65, 0x64, 0x6C, 0x65, 0x00]).write(to: dir.appendingPathComponent("bin.dat"))
+
+        let hits = ProjectSearch.search(root: dir, query: "needle")
+        #expect(hits.count == 1)
+        #expect(hits.first?.line == 2 && hits.first?.column == 1 && hits.first?.path.hasSuffix("a.swift") == true)
+        #expect(ProjectSearch.search(root: dir, query: "needle", caseSensitive: true).isEmpty)
+        #expect(ProjectSearch.search(root: dir, query: "").isEmpty)
+    }
+}

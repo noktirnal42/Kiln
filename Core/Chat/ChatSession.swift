@@ -45,6 +45,12 @@ public final class ChatSession {
     public private(set) var isStreaming = false
     public private(set) var streamingText = ""
     public private(set) var streamingReasoning = ""
+    /// How long the last reply took to start and to finish. First-token time is provider latency; the rest is streaming.
+    public struct ResponseTiming: Equatable, Sendable {
+        public var firstTokenSeconds: Double?
+        public var totalSeconds: Double
+    }
+    public private(set) var lastTiming: ResponseTiming?
     public private(set) var streamingToolCalls: [ToolCall] = []
     public private(set) var errorText: String?
     public private(set) var lastUsage: ChatChunk.Usage?
@@ -300,9 +306,11 @@ public final class ChatSession {
         let reasoning = reasoning
         let store = conversations
 
+        let startedAt = Date()
         let task = Task { [weak self] in
             var content = ""
             var reasoningText = ""
+            var firstTokenAt: Date?
             var toolAccumulator = ToolCallAccumulator()
             var usage: ChatChunk.Usage?
             do {
@@ -310,6 +318,7 @@ public final class ChatSession {
                 guard let stream else { return }
                 for try await chunk in stream {
                     try Task.checkCancellation()
+                    if firstTokenAt == nil, !(chunk.reasoning ?? "").isEmpty || !(chunk.delta?.content ?? "").isEmpty { firstTokenAt = Date() }
                     if let thinking = chunk.reasoning, !thinking.isEmpty {
                         self?.streamingReasoning += thinking
                         reasoningText += thinking
@@ -334,6 +343,8 @@ public final class ChatSession {
                 self?.isStreaming = false
                 return
             }
+            self?.lastTiming = ResponseTiming(firstTokenSeconds: firstTokenAt.map { $0.timeIntervalSince(startedAt) },
+                                              totalSeconds: Date().timeIntervalSince(startedAt))
             let tokenCount = usage.map { $0.promptTokens + $0.completionTokens } ?? content.count / 4
             if let saved = try? await store.appendMessage(
                 conversationID: conversationID,
@@ -397,9 +408,11 @@ public final class ChatSession {
         let store = conversations
         let model = selectedModelID
 
+        let startedAt = Date()
         let task = Task { [weak self] in
             var finalText = ""
             var tokens = 0
+            var firstTokenAt: Date?
             let stream = orchestrator.run(
                 profile: profile, prompt: prompt, history: Array(history), workspaceRoot: root, stop: stop,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
@@ -408,9 +421,13 @@ public final class ChatSession {
                 for try await event in stream {
                     guard let self else { return }
                     switch event {
-                    case .textDelta(let delta): self.streamingText += delta
+                    case .textDelta(let delta):
+                        if firstTokenAt == nil { firstTokenAt = Date() }
+                        self.streamingText += delta
                     case .textReset: self.streamingText = ""
-                    case .reasoningDelta(let thinking): self.streamingReasoning += thinking
+                    case .reasoningDelta(let thinking):
+                        if firstTokenAt == nil { firstTokenAt = Date() }
+                        self.streamingReasoning += thinking
                     case .roundStarted(let round): self.agentRound = round; self.streamingText = ""; self.streamingReasoning = ""
                     case .retryScheduled(let attempt, let delay, let reason):
                         self.agentNotice = "Retrying (\(attempt)) in \(Int(delay))s: \(reason)"
@@ -423,6 +440,8 @@ public final class ChatSession {
             } catch {
                 self?.errorText = AgentRetry.explain(error)
             }
+            self?.lastTiming = ResponseTiming(firstTokenSeconds: firstTokenAt.map { $0.timeIntervalSince(startedAt) },
+                                              totalSeconds: Date().timeIntervalSince(startedAt))
             // A Stop (or a failure) mid-call leaves records parked as running; show them as cancelled, not live.
             if let self {
                 for index in self.agentActivity.indices where !self.agentActivity[index].status.isTerminal {

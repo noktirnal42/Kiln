@@ -50,6 +50,9 @@ struct ChatRootView: View {
                 .onChange(of: session.streamingReasoning) { _, _ in
                     scrollToBottom(proxy)
                 }
+                .onChange(of: session.isStreaming) { _, _ in
+                    scrollToBottom(proxy)
+                }
             }
             Divider()
             if let error = session.errorText {
@@ -107,7 +110,9 @@ struct ChatRootView: View {
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         withAnimation(.easeOut(duration: 0.15)) {
-            proxy.scrollTo("streaming", anchor: .bottom)
+            // The live bubble is replaced by the saved message when a reply ends; follow it instead of jumping to the top.
+            if session.isStreaming { proxy.scrollTo("streaming", anchor: .bottom) }
+            else if let last = session.messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
         }
     }
 }

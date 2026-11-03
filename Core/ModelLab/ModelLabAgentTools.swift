@@ -75,11 +75,11 @@ public enum ModelLabAgentTools {
                             ToolParam(name: "references", type: "array", description: "Reference strings in the same order"),
                          ], permission: .read)
             case .exportModel:
-                ToolSpec(name: "lab_export_model", summary: "Export a produced model artifact (Create ML .mlmodel/.mlpackage as core_ml, or MLX artifacts as mlx_package) to a new path. The destination must not exist; GGUF is not available.",
+                ToolSpec(name: "lab_export_model", summary: "Export a produced model artifact (Create ML .mlmodel/.mlpackage as core_ml, or MLX artifacts as mlx_package) into an existing folder, keeping its file name (a numbered suffix is added rather than overwriting). GGUF is not available.",
                          parameters: [
                             ToolParam(name: "artifact_id", description: "Artifact ID from lab_get_experiment"),
                             ToolParam(name: "format", description: "core_ml or mlx_package"),
-                            ToolParam(name: "destination", description: "Absolute path for the exported file or folder (must not exist; its parent must)"),
+                            ToolParam(name: "destination_folder", description: "Absolute path of an existing folder to copy the export into"),
                          ], permission: .write)
             }
         }
@@ -153,12 +153,13 @@ struct ModelLabAgentTool: ToolExecuting {
             case "mlx_package", "mlx": format = .mlxPackage
             default: throw ModelLabToolError.invalid("format must be core_ml or mlx_package (GGUF is unavailable)")
             }
-            let destination = URL(fileURLWithPath: try Self.requiredString(args, "destination"))
-            guard destination.path.hasPrefix("/") else { throw ModelLabToolError.invalid("destination must be an absolute path") }
-            guard !FileManager.default.fileExists(atPath: destination.path) else {
-                throw ModelLabToolError.invalid("\(destination.path) already exists; choose a new path so nothing is overwritten")
+            let folder = try Self.requiredString(args, "destination_folder")
+            var isDirectory: ObjCBool = false
+            guard folder.hasPrefix("/"), FileManager.default.fileExists(atPath: folder, isDirectory: &isDirectory), isDirectory.boolValue else {
+                throw ModelLabToolError.invalid("destination_folder must be the absolute path of an existing folder")
             }
-            let exported = try await MainActor.run { try module.exportArtifact(id: id, format: format, destination: destination) }
+            let destination = URL(fileURLWithPath: folder, isDirectory: true)
+            let exported = try await MainActor.run { try module.exportArtifact(id: id, format: format, destinationFolder: destination) }
             return "Exported to \(exported.path)"
         case .searchModels:
             let query = try Self.query(args)

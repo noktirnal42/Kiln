@@ -50,7 +50,7 @@ struct ModelLabLifecycleTests {
 
     @Test func exportRefusesUnknownArtifactsAndMissingFolders() throws {
         let module = try module()
-        #expect(throws: (any Error).self) { try module.exportArtifact(id: "missing", format: .coreML, destination: URL(fileURLWithPath: "/tmp/out.mlmodel")) }
+        #expect(throws: (any Error).self) { try module.exportArtifact(id: "missing", format: .coreML, destinationFolder: URL(fileURLWithPath: "/tmp")) }
     }
 
     @Test func toolsAreRegisteredWithTheRightPermissions() {

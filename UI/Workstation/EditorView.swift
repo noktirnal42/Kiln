@@ -13,6 +13,23 @@ struct EditorView: View {
     @State private var goToLineText = ""
     @State private var closing: EditorDocument?
     @State private var treeVersion = 0
+    @State private var navigatorMode = NavigatorMode.files
+    @State private var searchQuery = ""
+    @State private var searchHits: [ProjectHit] = []
+    @State private var searching = false
+    @State private var fileAction: FileAction?
+    @State private var fileActionName = ""
+    @State private var fileError: String?
+
+    enum NavigatorMode: String, CaseIterable { case files = "Files", search = "Find" }
+
+    /// A pending create/rename/delete the user has to confirm with a name or a click.
+    struct FileAction: Identifiable {
+        enum Kind { case newFile, newFolder, rename, trash }
+        var kind: Kind
+        var url: URL
+        var id: String { "\(kind)-\(url.path)" }
+    }
 
     private var editor: EditorWorkspace { app.editor }
     private var builder: BuildRunner { app.builder }
@@ -38,6 +55,14 @@ struct EditorView: View {
         }
         .background(shortcuts)
         .sheet(isPresented: $showQuickOpen) { QuickOpenView(editor: editor, isPresented: $showQuickOpen) }
+        .alert(fileActionTitle, isPresented: Binding(get: { fileAction != nil }, set: { if !$0 { fileAction = nil } })) {
+            if fileAction?.kind != .trash { TextField("Name", text: $fileActionName) }
+            Button(fileAction?.kind == .trash ? "Move to Trash" : "OK", role: fileAction?.kind == .trash ? .destructive : nil) { performFileAction() }
+            Button("Cancel", role: .cancel) { fileAction = nil }
+        } message: { Text(fileAction?.kind == .trash ? "You can restore it from the Trash." : "") }
+        .alert("Couldn't do that", isPresented: Binding(get: { fileError != nil }, set: { if !$0 { fileError = nil } })) {
+            Button("OK") { fileError = nil }
+        } message: { Text(fileError ?? "") }
         .confirmationDialog("Save changes to \(closing?.name ?? "this file")?", isPresented: Binding(
             get: { closing != nil }, set: { if !$0 { closing = nil } })) {
             Button("Save") { if let doc = closing { editor.save(doc); if !doc.isDirty { editor.close(doc) } }; closing = nil }
@@ -71,6 +96,9 @@ struct EditorView: View {
             if builder.isRunning {
                 Button { builder.cancel() } label: { Label("Stop", systemImage: "stop.fill") }
             }
+            TextField("Custom command (optional)", text: Bindable(builder).customCommand)
+                .textFieldStyle(.roundedBorder).frame(maxWidth: 220).font(SSTypography.caption())
+                .help("Runs instead of the detected build command, from the project folder, through a login shell")
             Spacer()
             if builder.isRunning {
                 ProgressView().controlSize(.small)
@@ -135,6 +163,33 @@ struct EditorView: View {
         .padding(SSSpacing.m)
     }
 
+    private func requestFileAction(_ kind: FileAction.Kind, _ url: URL) {
+        fileActionName = kind == .rename ? url.lastPathComponent : ""
+        fileAction = FileAction(kind: kind, url: url)
+    }
+
+    private var projectSearch: some View {
+        VStack(spacing: 0) {
+            TextField("Find in project", text: $searchQuery)
+                .textFieldStyle(.roundedBorder).padding(.horizontal, SSSpacing.xs)
+                .onSubmit { runProjectSearch() }
+            if searching { ProgressView().controlSize(.small).padding(SSSpacing.xs) }
+            List(searchHits) { hit in
+                Button { editor.open(URL(fileURLWithPath: hit.path), line: hit.line, column: hit.column) } label: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(hit.text).font(SSTypography.mono(10)).lineLimit(1)
+                        Text("\(editor.displayPath(URL(fileURLWithPath: hit.path))):\(hit.line)")
+                            .font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            if !searching && searchHits.isEmpty && !searchQuery.isEmpty {
+                Text("No matches. Press ⏎ to search.").font(SSTypography.caption()).foregroundStyle(.secondary).padding(SSSpacing.s)
+            }
+        }
+    }
+
     private func requestClose(_ document: EditorDocument?) {
         guard let document else { return }
         if document.isDirty { closing = document } else { editor.close(document) }
@@ -142,13 +197,63 @@ struct EditorView: View {
 
     // MARK: Navigator
 
+    private var fileActionTitle: String {
+        switch fileAction?.kind {
+        case .newFile: "New File"
+        case .newFolder: "New Folder"
+        case .rename: "Rename"
+        case .trash: "Move \(fileAction?.url.lastPathComponent ?? "item") to the Trash?"
+        case nil: ""
+        }
+    }
+
+    private func performFileAction() {
+        guard let action = fileAction else { return }
+        defer { fileAction = nil }
+        do {
+            switch action.kind {
+            case .newFile: try editor.createFile(named: fileActionName, in: action.url)
+            case .newFolder: try editor.createFolder(named: fileActionName, in: action.url)
+            case .rename: try editor.rename(action.url, to: fileActionName)
+            case .trash: try editor.trash(action.url)
+            }
+            treeVersion += 1
+        } catch {
+            fileError = error.localizedDescription
+        }
+    }
+
+    private func runProjectSearch() {
+        guard let root = editor.root, !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else { searchHits = []; return }
+        let query = searchQuery
+        let hidden = editor.showHidden
+        searching = true
+        Task {
+            let hits = await Task.detached(priority: .userInitiated) {
+                ProjectSearch.search(root: root, query: query, showHidden: hidden)
+            }.value
+            searchHits = hits
+            searching = false
+        }
+    }
+
     private var navigator: some View {
         VStack(spacing: 0) {
-            if let root = editor.root {
+            Picker("", selection: $navigatorMode) {
+                ForEach(NavigatorMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().padding(SSSpacing.xs)
+            if navigatorMode == .search {
+                projectSearch
+            } else if let root = editor.root {
                 HStack {
                     Image(systemName: "folder").foregroundStyle(.secondary)
                     Text(root.lastPathComponent).font(SSTypography.headline()).lineLimit(1)
                     Spacer()
+                    Button { fileActionName = ""; fileAction = FileAction(kind: .newFile, url: root) } label: { Image(systemName: "doc.badge.plus") }
+                        .buttonStyle(.borderless).help("New file in the project root")
+                    Button { fileActionName = ""; fileAction = FileAction(kind: .newFolder, url: root) } label: { Image(systemName: "folder.badge.plus") }
+                        .buttonStyle(.borderless).help("New folder in the project root")
                     Button { treeVersion += 1 } label: { Image(systemName: "arrow.clockwise") }
                         .buttonStyle(.borderless).help("Refresh the file list")
                 }
@@ -157,7 +262,7 @@ struct EditorView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(editor.children(of: root)) { node in
-                            FileTreeRow(editor: editor, node: node, depth: 0)
+                            FileTreeRow(editor: editor, node: node, depth: 0, onAction: requestFileAction)
                         }
                     }
                     .padding(.vertical, 4)
@@ -367,6 +472,7 @@ private struct FileTreeRow: View {
     let editor: EditorWorkspace
     let node: FileNode
     let depth: Int
+    let onAction: (EditorView.FileAction.Kind, URL) -> Void
     @State private var expanded = false
 
     var body: some View {
@@ -385,6 +491,14 @@ private struct FileTreeRow: View {
                 if node.isDirectory { expanded.toggle() } else { editor.open(node.url) }
             }
             .contextMenu {
+                if node.isDirectory {
+                    Button("New File…") { onAction(.newFile, node.url) }
+                    Button("New Folder…") { onAction(.newFolder, node.url) }
+                    Divider()
+                }
+                Button("Rename…") { onAction(.rename, node.url) }
+                Button("Move to Trash…") { onAction(.trash, node.url) }
+                Divider()
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([node.url]) }
                 Button("Copy Path") {
                     NSPasteboard.general.clearContents()
@@ -393,7 +507,7 @@ private struct FileTreeRow: View {
             }
             if node.isDirectory && expanded {
                 ForEach(editor.children(of: node.url)) { child in
-                    FileTreeRow(editor: editor, node: child, depth: depth + 1)
+                    FileTreeRow(editor: editor, node: child, depth: depth + 1, onAction: onAction)
                 }
             }
         }
