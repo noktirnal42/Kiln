@@ -18,10 +18,11 @@ public final class FakeMacServer: @unchecked Sendable {
     private var connections: [ObjectIdentifier: Session] = [:]
     private var listener: NWListener?
     private let advertise: Bool
+    fileprivate let respondToPing: Bool
     private let queue = DispatchQueue(label: "fakemac.listener")
 
-    public init(hostName: String = "Fake Mac", serviceName: String = "Kiln on Fake Mac", key: Data = PairingPayload.makeKey(), advertise: Bool = false) {
-        self.hostName = hostName; self.serviceName = serviceName; self.key = key; self.advertise = advertise
+    public init(hostName: String = "Fake Mac", serviceName: String = "Kiln on Fake Mac", key: Data = PairingPayload.makeKey(), advertise: Bool = false, respondToPing: Bool = true) {
+        self.hostName = hostName; self.serviceName = serviceName; self.key = key; self.advertise = advertise; self.respondToPing = respondToPing
     }
 
     public var pairing: PairingPayload { PairingPayload(hostName: hostName, serviceName: serviceName, key: key) }
@@ -184,7 +185,7 @@ public final class FakeMacServer: @unchecked Sendable {
                 send(.activity(tool: "shell", status: decision == .allowOnce ? "running" : "denied"))
                 reply(to: decision == .allowOnce ? "approved" : "denied", n: counter)
             case .stop: send(.streaming(false))
-            case .ping: send(.pong)
+            case .ping: if server.respondToPing { send(.pong) }
             case .hello: break
             }
         }

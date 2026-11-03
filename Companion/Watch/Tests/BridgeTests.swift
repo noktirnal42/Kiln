@@ -101,6 +101,18 @@ final class BridgeTests: XCTestCase {
         XCTAssertTrue(denied)
     }
 
+    func testPhoneLosingReachabilityDoesNotStayConnected() async throws {
+        let phone = FakePhone(macURL: server.url, key: key)
+        defer { phone.stop() }
+        let session = session(phone: phone)
+        session.connect()
+        let connected = await waitUntil { session.isConnected }
+        XCTAssertTrue(connected)
+        session.phoneBecameUnreachable()
+        guard case .offline(let reason) = session.link else { return XCTFail("expected offline") }
+        XCTAssertTrue(reason.contains("iPhone not reachable"))
+    }
+
     func testUnreachablePhoneFallsBackToDirectAddress() async throws {
         let phone = FakePhone(macURL: server.url, key: key)
         phone.setReachable(false)

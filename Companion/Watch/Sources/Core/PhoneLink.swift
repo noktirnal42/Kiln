@@ -25,10 +25,12 @@ final class PhoneLink: NSObject, WCSessionDelegate, @unchecked Sendable {
     private let onStatus: @Sendable @MainActor (String) -> Void
     private let bridge: PhoneBridge?
     private let onReachable: @Sendable @MainActor () -> Void
+    private let onUnreachable: @Sendable @MainActor () -> Void
 
-    init(onChange: @escaping @Sendable @MainActor (PairingPayload?) -> Void, onStatus: @escaping @Sendable @MainActor (String) -> Void, bridge: PhoneBridge? = nil, onReachable: @escaping @Sendable @MainActor () -> Void = {}) {
+    init(onChange: @escaping @Sendable @MainActor (PairingPayload?) -> Void, onStatus: @escaping @Sendable @MainActor (String) -> Void, bridge: PhoneBridge? = nil, onReachable: @escaping @Sendable @MainActor () -> Void = {}, onUnreachable: @escaping @Sendable @MainActor () -> Void = {}) {
         self.bridge = bridge
         self.onReachable = onReachable
+        self.onUnreachable = onUnreachable
         self.onChange = onChange
         self.onStatus = onStatus
         super.init()
@@ -101,6 +103,9 @@ final class PhoneLink: NSObject, WCSessionDelegate, @unchecked Sendable {
             refresh()
             let onReachable = onReachable
             Task { @MainActor in onReachable() }
+        } else {
+            let onUnreachable = onUnreachable
+            Task { @MainActor in onUnreachable() }
         }
     }
 

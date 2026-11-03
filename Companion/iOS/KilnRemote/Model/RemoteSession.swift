@@ -97,7 +97,10 @@ final class RemoteSession {
     /// The app came to the foreground: if the connection dropped while suspended, don't wait out the backoff.
     func resume() {
         guard mac != nil else { return }
-        if status != .connected, status != .connecting { stop(); start() }
+        if status == .connected, let link {
+            status = .reconnecting("Checking connection to your Mac")
+            link.verifyConnection()
+        } else if status != .connecting { stop(); start() }
     }
 
     /// Saves (or clears) the host:port typed in Settings and reconnects.
@@ -308,7 +311,7 @@ final class RemoteSession {
         case .error(let message):
             lastError = message
         case .pong:
-            break
+            if case .reconnecting = status { status = .connected }
         }
     }
 

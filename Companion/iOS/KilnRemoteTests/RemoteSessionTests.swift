@@ -83,6 +83,25 @@ struct RemoteSessionTests {
         #expect(await wait { session.messages.contains { $0.role == .assistant && $0.text.contains("approved") } })
     }
 
+    @Test func silentMacIsDisconnectedByHeartbeat() async throws {
+        let server = FakeMacServer(respondToPing: false)
+        try await server.start()
+        defer { server.stop() }
+        let link = RemoteLink(pairingKey: server.key, deviceName: "Test Phone", heartbeatInterval: 0.1, heartbeatTimeout: 0.2)
+        try link.connect(host: "127.0.0.1", port: server.port)
+        defer { link.close() }
+        var closedReason: String?
+        let reader = Task { @MainActor in
+            for await event in link.events {
+                if case .closed(let reason, _) = event { closedReason = reason }
+            }
+        }
+        defer { reader.cancel() }
+        #expect(await wait { closedReason != nil })
+        #expect(closedReason == "The Mac stopped responding.")
+        #expect(server.receivedCommands.contains(.ping))
+    }
+
     @Test func reconnectsAfterTheConnectionDrops() async throws {
         let server = FakeMacServer()
         try await server.start()

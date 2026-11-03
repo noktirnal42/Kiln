@@ -98,6 +98,12 @@ final class RemoteSession {
         connect()
     }
 
+    func phoneBecameUnreachable() {
+        guard route == "via iPhone", isConnected else { return }
+        disconnect()
+        link = .offline("iPhone not reachable. Open Kiln Remote on your iPhone.")
+    }
+
     func disconnect() {
         connectionGeneration += 1
         eventsTask?.cancel()

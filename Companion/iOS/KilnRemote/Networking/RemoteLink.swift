@@ -42,8 +42,14 @@ final class RemoteLink: @unchecked Sendable {
     private var clientNonce = Data()
     private var finished = false
     private var sawFrames = false
+    private var awaitingPong = false
+    private var probeGeneration = 0
+    private let heartbeatInterval: TimeInterval
+    private let heartbeatTimeout: TimeInterval
 
-    init(pairingKey: Data, deviceName: String, handshakeTimeout: TimeInterval = 10) {
+    init(pairingKey: Data, deviceName: String, handshakeTimeout: TimeInterval = 10, heartbeatInterval: TimeInterval = 15, heartbeatTimeout: TimeInterval = 8) {
+        self.heartbeatInterval = heartbeatInterval
+        self.heartbeatTimeout = heartbeatTimeout
         self.pairingKey = pairingKey
         self.deviceName = deviceName
         self.handshakeTimeout = handshakeTimeout
@@ -87,6 +93,31 @@ final class RemoteLink: @unchecked Sendable {
 
     func close() { queue.async { [self] in finish("Disconnected.") } }
 
+    /// A resumed app must prove the socket is alive before presenting it as connected.
+    func verifyConnection() { queue.async { [self] in probe() } }
+
+    private func probe() {
+        guard !finished, sawFrames, !awaitingPong, var channel,
+              let plain = try? RemoteCoding.encode(RemoteCommand.ping), let frame = try? channel.seal(plain) else { return }
+        self.channel = channel
+        awaitingPong = true
+        probeGeneration += 1
+        let generation = probeGeneration
+        transmit(frame)
+        queue.asyncAfter(deadline: .now() + heartbeatTimeout) { [weak self] in
+            guard let self, !finished, awaitingPong, probeGeneration == generation else { return }
+            finish("The Mac stopped responding.")
+        }
+    }
+
+    private func scheduleHeartbeat() {
+        queue.asyncAfter(deadline: .now() + heartbeatInterval) { [weak self] in
+            guard let self, !finished else { return }
+            probe()
+            scheduleHeartbeat()
+        }
+    }
+
     // MARK: private (queue-confined)
 
     private func stateChanged(_ state: NWConnection.State) {
@@ -104,7 +135,9 @@ final class RemoteLink: @unchecked Sendable {
 
     private func transmit(_ data: Data) {
         let context = NWConnection.ContentContext(identifier: "kiln-frame", metadata: [NWProtocolWebSocket.Metadata(opcode: .binary)])
-        connection?.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed { _ in })
+        connection?.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed { [weak self] error in
+            if let error { self?.queue.async { self?.finish(error.localizedDescription) } }
+        })
     }
 
     private func receive() {
@@ -135,7 +168,10 @@ final class RemoteLink: @unchecked Sendable {
             return
         }
         self.channel = channel
+        if case .pong = event { awaitingPong = false }
+        let firstFrame = !sawFrames
         sawFrames = true
+        if firstFrame { scheduleHeartbeat() }
         continuation.yield(.event(event))
     }
 
