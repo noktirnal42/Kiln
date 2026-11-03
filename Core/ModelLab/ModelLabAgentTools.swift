@@ -28,6 +28,7 @@ public enum ModelLabAgentTools {
         case exportModel = "export_model"
         case predict = "predict"
         case startSmallLM = "start_small_lm"
+        case startLoRA = "start_lora"
 
         var spec: ToolSpec {
             switch self {
@@ -64,10 +65,10 @@ public enum ModelLabAgentTools {
                 ToolSpec(name: "lab_create_experiment", summary: "Create a draft Create ML classifier experiment over a registered dataset. Start it with lab_start_training.",
                          parameters: [
                             ToolParam(name: "name", description: "Experiment name"),
-                            ToolParam(name: "task", description: "text_classification or tabular_classification (use the exact task identifiers textClassification / tabularClassification)"),
+                            ToolParam(name: "task", description: "text_classification, tabular_classification or image_classification (image: dataset must be an imported folder of images, one subfolder per label; column arguments are ignored)"),
                             ToolParam(name: "dataset_id", description: "ID from lab_list_datasets or lab_import_dataset"),
-                            ToolParam(name: "input_columns", description: "Comma-separated input column names (exactly one for text classification)"),
-                            ToolParam(name: "label_column", description: "Name of the label column"),
+                            ToolParam(name: "input_columns", description: "Comma-separated input column names (exactly one for text classification; not used for images)", required: false),
+                            ToolParam(name: "label_column", description: "Name of the label column (not used for images)", required: false),
                             ToolParam(name: "validation_fraction", type: "number", description: "Share held out for validation, between 0 and 1; default 0.2", required: false),
                          ], permission: .write)
             case .evaluate:
@@ -84,6 +85,16 @@ public enum ModelLabAgentTools {
                             ToolParam(name: "iterations", type: "integer", description: "Training iterations; default 150", required: false),
                             ToolParam(name: "dimensions", type: "integer", description: "Embedding size; default 64", required: false),
                             ToolParam(name: "layers", type: "integer", description: "Transformer layers; default 2", required: false),
+                         ], permission: .execute)
+            case .startLoRA:
+                ToolSpec(name: "lab_start_lora", summary: "Create an MLX LoRA fine-tune experiment over a registered .txt or .jsonl dataset and start it on this Mac's GPU. Uses compute and writes an adapter; requires approval. The base model must already be cached locally: if it is not, nothing is downloaded and the call fails. Only after the user agrees to the download, retry with allow_download=true. Bounded: 10–1000 iterations, rank 1–32, at most 20,000 examples. Poll lab_get_experiment; cancel with lab_cancel_training.",
+                         parameters: [
+                            ToolParam(name: "name", description: "Experiment name"),
+                            ToolParam(name: "dataset_id", description: "ID of a txt or jsonl dataset"),
+                            ToolParam(name: "base_model", description: "Hugging Face repo as org/name, e.g. mlx-community/Qwen2.5-0.5B-Instruct-4bit"),
+                            ToolParam(name: "iterations", type: "integer", description: "Default 100", required: false),
+                            ToolParam(name: "rank", type: "integer", description: "LoRA rank; default 8", required: false),
+                            ToolParam(name: "allow_download", type: "boolean", description: "true only after the user agreed to download the base model from huggingface.co; default false", required: false),
                          ], permission: .execute)
             case .predict:
                 ToolSpec(name: "lab_predict", summary: "Run a trained Create ML text classifier over example inputs and return the predicted label and confidence for each. Pair with lab_evaluate_predictions to score a held-out set.",
@@ -138,13 +149,13 @@ struct ModelLabAgentTool: ToolExecuting {
         case .createExperiment:
             let rawTask = try Self.requiredString(args, "task").lowercased().replacingOccurrences(of: "_", with: "")
             guard let task = TaskType.allCases.first(where: { $0.rawValue.lowercased() == rawTask }) else {
-                throw ModelLabToolError.invalid("task must be text_classification or tabular_classification")
+                throw ModelLabToolError.invalid("task must be text_classification, tabular_classification or image_classification")
             }
-            let inputs = try Self.requiredString(args, "input_columns").split(separator: ",").map(String.init)
+            let inputs = ((args["input_columns"] as? String) ?? "").split(separator: ",").map(String.init)
             let fraction = (args["validation_fraction"] as? Double) ?? 0.2
             let name = try Self.requiredString(args, "name")
             let datasetID = try Self.requiredString(args, "dataset_id")
-            let label = try Self.requiredString(args, "label_column")
+            let label = rawTask == "imageclassification" ? "" : try Self.requiredString(args, "label_column")
             return try await MainActor.run {
                 let record = try module.createClassifierExperiment(name: name, task: task, datasetID: datasetID,
                                                                    inputColumns: inputs, labelColumn: label, validationFraction: fraction)
@@ -171,6 +182,17 @@ struct ModelLabAgentTool: ToolExecuting {
                 try module.startSmallLMExperiment(name: name, datasetID: datasetID, iterations: iterations, dimensions: dimensions, layers: layers)
             }
             return "Training started for experiment \(id). This does not mean it succeeded. Poll lab_get_experiment for status, metrics and the produced artifact."
+        case .startLoRA:
+            let name = try Self.requiredString(args, "name")
+            let datasetID = try Self.requiredString(args, "dataset_id")
+            let base = try Self.requiredString(args, "base_model")
+            let iterations = (args["iterations"] as? Int) ?? 100
+            let rank = (args["rank"] as? Int) ?? 8
+            let allow = (args["allow_download"] as? Bool) ?? false
+            let id = try await MainActor.run {
+                try module.startLoRAExperiment(name: name, datasetID: datasetID, baseModel: base, iterations: iterations, rank: rank, allowDownload: allow)
+            }
+            return "LoRA training started for experiment \(id). This does not mean it succeeded. Poll lab_get_experiment for status, metrics and the adapter artifact."
         case .predict:
             let id = try Self.requiredString(args, "artifact_id")
             let texts = (args["texts"] as? [Any])?.map { "\($0)" } ?? []

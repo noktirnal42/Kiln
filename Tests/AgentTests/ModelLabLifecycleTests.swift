@@ -106,3 +106,38 @@ struct ModelLabLifecycleTests {
         }
     }
 }
+
+@Suite("Model download policy and LoRA tool")
+struct ModelDownloadPolicyTests {
+    @Test func repoIDsMustBeOrgSlashNameWithoutTraversal() {
+        #expect(ModelDownloadPolicy.isValidRepoID("mlx-community/Qwen2.5-0.5B-Instruct-4bit"))
+        for bad in ["", "noslash", "a/b/c", "../x", "a/..", "a b/c", "/abs", "a/"] {
+            #expect(!ModelDownloadPolicy.isValidRepoID(bad), "\(bad)")
+        }
+    }
+
+    @Test func uncachedModelsAreRefusedUnlessDownloadIsAllowed() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-home-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let repo = "org/model"
+        let refusal = ModelDownloadPolicy.refusal(repo: repo, allowDownload: false, home: home)
+        #expect(refusal?.contains("Nothing was downloaded") == true)
+        #expect(ModelDownloadPolicy.refusal(repo: repo, allowDownload: true, home: home) == nil)
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("Documents/huggingface/models/org/model"), withIntermediateDirectories: true)
+        #expect(ModelDownloadPolicy.isCached(repo: repo, home: home))
+        #expect(ModelDownloadPolicy.refusal(repo: repo, allowDownload: false, home: home) == nil)
+        #expect(ModelDownloadPolicy.refusal(repo: "../x", allowDownload: true, home: home) != nil)
+    }
+
+    @Test func loraTextsReadsTxtLinesAndJsonlTextFields() {
+        #expect(ModelLabModule.loraTexts(contents: "a\nb\n", format: .txt) == ["a", "b"])
+        #expect(ModelLabModule.loraTexts(contents: "{\"text\":\"x\"}\n{\"nope\":1}\n{\"text\":\"y\"}", format: .jsonl) == ["x", "y"])
+    }
+
+    @Test func loraToolNeedsApprovalAndDocumentsTheDownloadFlag() {
+        let spec = ModelLabAgentTools.Kind.startLoRA.spec
+        #expect(spec.permission == .execute)
+        #expect(spec.parameters.contains { $0.name == "allow_download" && !$0.required })
+    }
+}
