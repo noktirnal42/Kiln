@@ -41,3 +41,30 @@ Speech framework, so the watch dictates through the system dictation sheet or ha
 
 `Core/Remote` will host the listener, the pairing screen, and the bridge from `ChatSession` and the approval queue to
 `RemoteEvent`s. The companions only need the package and this document.
+
+## Off the home network
+
+A device tries, in this order: (1) the pairing code's `direct` addresses (`host:port`, the Mac's Wi-Fi, Ethernet and VPN
+addresses; the Mac listens on port 47900 when it can), (2) Bonjour, (3) the relay named in the code's `relay` parameter.
+Bonjour is unreliable on watchOS and does not cross a VPN, so direct addresses come first. Tailscale (or any VPN) works with
+no relay: use the Mac's `100.x.y.z:47900`.
+
+### Relay
+
+`Relay/` is a small WebSocket relay (Cloudflare Worker with a Durable Object per room, or the same code on Node:
+`npm run dev`). It needs no account for users and cannot read anything:
+
+- Both sides derive a room name and a password from the pairing key (`RelayAddress`); the relay only learns the room name,
+  checks the password (the first Mac to claim a room sets it) and forwards sealed frames.
+- The Mac keeps one outbound connection to `wss://relay/v1/room/<room>?role=mac` (no port forwarding). Devices connect to
+  `?role=device` with `Authorization: Bearer <password>` and speak the same protocol as on the LAN: 16-byte nonce, then
+  `SecureChannel` frames. The Mac side wraps each device in a 5-byte frame header (`RelayFrame`).
+- Limits: 256 KB per frame, 8 devices per room. If the Mac is offline a device is closed with 4503 and retries.
+- Hosting: `cd Relay && npm install && npx wrangler login && npx wrangler deploy`, then set the relay URL in Kiln's Remote
+  control card. The relay is not deployed by default.
+
+### Away from the Mac
+
+Approvals work from anywhere a device is connected. A phone or watch app that is closed or in the background cannot be woken
+without Apple push notifications, which need an Apple push key; until then open the app to see and answer a pending approval.
+The Mac is kept awake while remote control is on.

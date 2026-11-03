@@ -1,0 +1,14 @@
+{
+  "name": "kiln-relay",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Blind WebSocket relay that lets a paired phone or watch reach Kiln on a Mac over the internet. It only ever sees ciphertext.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "dev": "node src/node-server.mjs",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": { "ws": "^8.18.0" },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}
