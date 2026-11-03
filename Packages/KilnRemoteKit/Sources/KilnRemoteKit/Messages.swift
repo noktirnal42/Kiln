@@ -45,6 +45,9 @@ public enum RemoteCommand: Codable, Equatable, Sendable {
     /// Sends a message into the open conversation, as if typed at the Mac (`spoken` marks it as dictated).
     case send(text: String, spoken: Bool)
     case stop
+    /// A short recording to transcribe on the Mac and send as a spoken message. The watch has no speech recogniser, and
+    /// recording starts the instant the button is tapped instead of opening the system dictation sheet.
+    case sendAudio(data: Data, format: String)
     case decide(approvalID: String, decision: RemoteApprovalDecision)
     case ping
 }
@@ -63,6 +66,8 @@ public enum RemoteEvent: Codable, Equatable, Sendable {
     case approvalRequested(RemoteApproval)
     case approvalResolved(approvalID: String)
     case streaming(Bool)
+    /// What the Mac heard in a `sendAudio` recording; the message itself is then sent as normal.
+    case transcript(String)
     case error(String)
     case pong
 }

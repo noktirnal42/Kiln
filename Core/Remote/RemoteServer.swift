@@ -49,16 +49,30 @@ public final class RemoteServer {
         bridge.emit = { [weak self] event in self?.broadcast(event) }
     }
 
+    @ObservationIgnored private var advertising = true
+    @ObservationIgnored private var triedPreferredPort = false
+
     /// `advertise: false` skips Bonjour (tests connect by port).
     public func start(advertise: Bool = true) {
         guard listener == nil else { return }
+        advertising = advertise
+        launchListener(preferFixedPort: true)
+        guard listener != nil else { return }
+        bridge.start()
+        awakeActivity = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .userInitiated], reason: "Kiln remote control")
+        startRelayClient()
+    }
+
+    private func launchListener(preferFixedPort: Bool) {
+        let advertise = advertising
+        triedPreferredPort = preferFixedPort
         do {
             let parameters = NWParameters.tcp
             parameters.defaultProtocolStack.applicationProtocols.insert(NWProtocolWebSocket.Options(), at: 0)
             // A fixed port makes "address:port" usable from a phone over a VPN (Bonjour does not cross one); fall back to
             // any free port if something else has it.
             let listener: NWListener
-            if let preferred = NWEndpoint.Port(rawValue: Self.preferredPort), let fixed = try? NWListener(using: parameters, on: preferred) {
+            if preferFixedPort, let preferred = NWEndpoint.Port(rawValue: Self.preferredPort), let fixed = try? NWListener(using: parameters, on: preferred) {
                 listener = fixed
             } else {
                 listener = try NWListener(using: parameters)
@@ -72,9 +86,6 @@ public final class RemoteServer {
             }
             listener.start(queue: .global(qos: .userInitiated))
             self.listener = listener
-            bridge.start()
-            awakeActivity = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .userInitiated], reason: "Kiln remote control")
-            startRelayClient()
         } catch {
             lastError = "Could not start remote control: \(error.localizedDescription)"
         }
@@ -138,6 +149,12 @@ public final class RemoteServer {
             lastError = nil
             refreshDirectAddresses()
         case .failed(let error):
+            // The fixed port can be taken (another Kiln, a lingering socket): carry on with any free port.
+            if triedPreferredPort {
+                listener?.cancel(); listener = nil
+                launchListener(preferFixedPort: false)
+                return
+            }
             lastError = "Remote control failed: \(error.localizedDescription)"
             stop()
         default: break

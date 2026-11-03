@@ -29,6 +29,7 @@ public final class ChatRemoteBackend: RemoteBackend {
     }
 
     public func send(_ text: String) { Task { await session.send(text) } }
+    public func transcribe(audio: Data, format: String) async -> String? { await AudioTranscriber.transcribe(audio, format: format) }
     public func stop() { session.stopStreaming() }
 
     public var current: RemoteConversation? {

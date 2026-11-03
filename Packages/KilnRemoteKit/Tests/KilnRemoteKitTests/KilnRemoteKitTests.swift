@@ -16,6 +16,13 @@ struct RemoteProtocolTests {
         #expect(try RemoteCoding.decode(RemoteEvent.self, from: RemoteCoding.encode(opened)) == opened)
     }
 
+    @Test("audio commands and transcripts survive a round trip") func audio() throws {
+        let command = RemoteCommand.sendAudio(data: Data([1, 2, 3, 255]), format: "m4a")
+        #expect(try RemoteCoding.decode(RemoteCommand.self, from: RemoteCoding.encode(command)) == command)
+        let event = RemoteEvent.transcript("run the tests")
+        #expect(try RemoteCoding.decode(RemoteEvent.self, from: RemoteCoding.encode(event)) == event)
+    }
+
     @Test("remote approval cannot grant standing access") func noAlwaysAllow() {
         #expect(RemoteApprovalDecision(rawValue: "alwaysAllow") == nil)
     }

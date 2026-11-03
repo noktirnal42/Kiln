@@ -10,6 +10,8 @@ public protocol RemoteBackend: AnyObject {
     /// Opens a conversation (a new one when `id` is nil) and returns it.
     func open(_ id: String?) async -> RemoteConversation?
     func send(_ text: String)
+    /// Text heard in a short recording, or nil when nothing could be made out (or speech permission is missing).
+    func transcribe(audio: Data, format: String) async -> String?
     func stop()
     var current: RemoteConversation? { get }
     /// Saved messages of the open conversation, oldest first.
@@ -77,6 +79,13 @@ public final class RemoteBridge {
             guard !backend.isStreaming else { return [.error("Kiln is still answering. Stop it first or wait.")] }
             backend.send(trimmed)
             return []
+        case .sendAudio(let data, let format):
+            guard !backend.isStreaming else { return [.error("Kiln is still answering. Stop it first or wait.")] }
+            guard let text = await backend.transcribe(audio: data, format: format), !text.isEmpty else {
+                return [.error("I didn't catch that. Try again, or allow Speech Recognition for Kiln on the Mac.")]
+            }
+            backend.send(text)
+            return [.transcript(text)]
         case .stop:
             backend.stop()
             return []

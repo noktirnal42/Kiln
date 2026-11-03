@@ -24,6 +24,8 @@ final class FakeBackend: RemoteBackend {
         return current
     }
     func send(_ text: String) { sent.append(text) }
+    var heard: String? = "run the tests"
+    func transcribe(audio: Data, format: String) async -> String? { heard }
     func stop() { stopped += 1 }
     func decide(_ approvalID: String, _ decision: RemoteApprovalDecision) {
         decisions.append((approvalID, decision))
@@ -58,6 +60,22 @@ struct RemoteBridgeTests {
         let events = await bridge.handle(.send(text: "again", spoken: false))
         #expect(backend.sent == ["run the tests"])
         #expect(events.count == 1)
+    }
+
+    @Test("a recording is transcribed on the Mac, reported back, and sent as a message") func audio() async {
+        let backend = FakeBackend()
+        let bridge = RemoteBridge(backend: backend)
+        let events = await bridge.handle(.sendAudio(data: Data([1, 2, 3]), format: "m4a"))
+        #expect(events == [.transcript("run the tests")])
+        #expect(backend.sent == ["run the tests"])
+        backend.heard = nil
+        let failed = await bridge.handle(.sendAudio(data: Data([1]), format: "m4a"))
+        if case .error(let text)? = failed.first { #expect(text.contains("didn't catch")) } else { Issue.record("expected an error") }
+        #expect(backend.sent.count == 1)
+        backend.isStreaming = true
+        backend.heard = "again"
+        #expect(await bridge.handle(.sendAudio(data: Data([1]), format: "m4a")).count == 1)
+        #expect(backend.sent.count == 1)
     }
 
     @Test("streamed text is pushed as deltas, then the saved message") func streaming() async {
@@ -204,6 +222,16 @@ struct RemoteServerTests {
         #expect(sawPong)
         #expect(backend.sent == ["hello from the watch"])
         device.close()
+    }
+
+    @Test("a second server falls back to another port when the fixed one is taken") func portFallback() async throws {
+        let first = try makeServer(FakeBackend())
+        let second = try makeServer(FakeBackend())
+        defer { first.stop(); second.stop() }
+        let a = try await waitForPort(first), b = try await waitForPort(second)
+        #expect(a != b)
+        #expect([a, b].contains(RemoteServer.preferredPort) || a != RemoteServer.preferredPort)
+        #expect(second.lastError == nil)
     }
 
     @Test("a device with the wrong key is dropped and never reaches the chat") func wrongKey() async throws {
