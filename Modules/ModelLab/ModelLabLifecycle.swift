@@ -118,4 +118,61 @@ extension ModelLabModule {
         }
         return try Self.predict(modelURL: url, texts: texts)
     }
+
+    // MARK: Small language model from scratch
+
+    /// The job the GUI and the agent tool both build: a character-level transformer over the whole corpus.
+    static func smallLMJob(corpus: String, dimensions: Int, layers: Int, iterations: Int) -> SmallLMPretrainingJob {
+        SmallLMPretrainingJob(corpusText: corpus, contextLength: 128, dimensions: dimensions, numHeads: 4, numLayers: layers,
+                              mlpDimensions: dimensions * 4, iterations: iterations, learningRate: 1e-3, batchSize: 8,
+                              outputName: "run-\(UUID().uuidString)")
+    }
+
+    /// Creates a small-LM experiment over a registered text dataset and starts training. Returns the experiment ID.
+    /// Bounded for agent use: 10–2000 iterations, 32–256 dimensions (multiple of 4), 1–6 layers, corpus at most 5 MB.
+    @MainActor
+    public func startSmallLMExperiment(name: String, datasetID: String, iterations: Int = 150, dimensions: Int = 64, layers: Int = 2) throws -> String {
+        func invalid(_ message: String) -> ModelLabModuleError { .invalidTrainingConfiguration(message) }
+        try requireCapabilities([.fileSystemWrite, .metalCompute])
+        guard let context = mainContext else { throw ModelLabModuleError.storeUnavailable("The Model Lab store is unavailable.") }
+        guard (10...2000).contains(iterations) else { throw invalid("iterations must be between 10 and 2000.") }
+        guard (32...256).contains(dimensions), dimensions % 4 == 0 else { throw invalid("dimensions must be between 32 and 256 and a multiple of 4.") }
+        guard (1...6).contains(layers) else { throw invalid("layers must be between 1 and 6.") }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw invalid("name is required.") }
+        guard ![createMLCoordinator.runningExperimentID, mlxFineTuningCoordinator.runningExperimentID,
+                smallLMCoordinator.runningExperimentID, distillationCoordinator.runningExperimentID].contains(where: { $0 != nil }) else {
+            throw invalid("Another training job is running. Wait or cancel that exact experiment first.")
+        }
+        let datasets = FetchDescriptor<DatasetRecord>(predicate: #Predicate { $0.id == datasetID })
+        guard let dataset = try context.fetch(datasets).first else { throw invalid("No dataset with ID \(datasetID).") }
+        let file = try Self.datasetFile(dataset, in: LibraryPaths.datasets)
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int, size <= 5_000_000 else {
+            throw invalid("The dataset is larger than 5 MB; use the GUI for bigger corpora.")
+        }
+        guard let corpus = try? String(contentsOf: file, encoding: .utf8), !corpus.isEmpty else {
+            throw invalid("The dataset could not be read as a UTF-8 text corpus.")
+        }
+        let job = Self.smallLMJob(corpus: corpus, dimensions: dimensions, layers: layers, iterations: iterations)
+        try SmallLMPretrainingProvider.validate(job: job)
+        let experiment = ExperimentRecord(name: trimmed, task: .smallLMPretraining, datasetID: datasetID)
+        try ExperimentStore(context: context).create(experiment)
+        try startSmallLMPretraining(experiment: experiment, job: job)
+        return experiment.id
+    }
+
+    /// A dataset's file inside the dataset library; rejects traversal and symlinks that leave it.
+    static func datasetFile(_ dataset: DatasetRecord, in datasetsRoot: URL) throws -> URL {
+        func invalid(_ message: String) -> ModelLabModuleError { .invalidTrainingConfiguration(message) }
+        guard let relative = dataset.localRelativePath, !relative.isEmpty, !relative.hasPrefix("/"),
+              !relative.split(separator: "/").contains("..") else {
+            throw invalid("The dataset needs a local file inside the Model Lab dataset library.")
+        }
+        let root = datasetsRoot.resolvingSymlinksInPath().standardizedFileURL
+        let file = root.appendingPathComponent(relative).resolvingSymlinksInPath().standardizedFileURL
+        guard file.path.hasPrefix(root.path + "/"), FileManager.default.fileExists(atPath: file.path) else {
+            throw invalid("The local dataset is missing or outside the dataset library. Import it again before training.")
+        }
+        return file
+    }
 }

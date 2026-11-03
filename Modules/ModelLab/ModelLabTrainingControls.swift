@@ -140,18 +140,7 @@ struct SmallLMControls: View {
             errorText = "The experiment's dataset file could not be read as a text corpus."
             return
         }
-        let job = SmallLMPretrainingJob(
-            corpusText: corpus,
-            contextLength: 128,
-            dimensions: dimensions,
-            numHeads: 4,
-            numLayers: numLayers,
-            mlpDimensions: dimensions * 4,
-            iterations: iterations,
-            learningRate: 1e-3,
-            batchSize: 8,
-            outputName: "run-\(UUID().uuidString)"
-        )
+        let job = ModelLabModule.smallLMJob(corpus: corpus, dimensions: dimensions, layers: numLayers, iterations: iterations)
         do {
             try SmallLMPretrainingProvider.validate(job: job)
             try module.startSmallLMPretraining(experiment: experiment, job: job)

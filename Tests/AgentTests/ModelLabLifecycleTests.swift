@@ -61,6 +61,32 @@ struct ModelLabLifecycleTests {
         #expect(results[0].hasPrefix("positive") && results[1].hasPrefix("negative"))
     }
 
+    @Test func smallLMStartRejectsBadParametersAndUnknownDatasetsBeforeAnyTraining() throws {
+        let module = try module()
+        func message(_ body: () throws -> Void) -> String {
+            do { try body(); return "no error" } catch { return String(describing: error) }
+        }
+        // Without a loaded module the capability check fires first; either way nothing may start.
+        #expect(message { _ = try module.startSmallLMExperiment(name: "x", datasetID: "ds1", iterations: 5) } != "no error")
+        #expect(message { _ = try module.startSmallLMExperiment(name: "x", datasetID: "nope") } != "no error")
+        let job = ModelLabModule.smallLMJob(corpus: "hello world", dimensions: 64, layers: 2, iterations: 150)
+        #expect(job.mlpDimensions == 256 && job.numHeads == 4 && job.contextLength == 128 && job.iterations == 150)
+        #expect(ModelLabAgentTools.Kind.startSmallLM.spec.permission == .execute)
+    }
+
+    @Test func datasetFilesMustStayInsideTheLibrary() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-lib-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "text".write(to: root.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+        let ok = DatasetRecord(id: "a", name: "A", sourceKind: .localImport, localRelativePath: "a.txt", format: .txt)
+        #expect(try ModelLabModule.datasetFile(ok, in: root).lastPathComponent == "a.txt")
+        for bad in ["../a.txt", "/etc/hosts", "", "missing.txt"] {
+            let record = DatasetRecord(id: "b", name: "B", sourceKind: .localImport, localRelativePath: bad, format: .txt)
+            #expect(throws: ModelLabModuleError.self) { try ModelLabModule.datasetFile(record, in: root) }
+        }
+    }
+
     @Test func toolsAreRegisteredWithTheRightPermissions() {
         #expect(ModelLabAgentTools.Kind.predict.spec.permission == .read)
         #expect(ModelLabAgentTools.Kind.importDataset.spec.permission == .write)

@@ -27,6 +27,7 @@ public enum ModelLabAgentTools {
         case evaluate = "evaluate_predictions"
         case exportModel = "export_model"
         case predict = "predict"
+        case startSmallLM = "start_small_lm"
 
         var spec: ToolSpec {
             switch self {
@@ -75,6 +76,15 @@ public enum ModelLabAgentTools {
                             ToolParam(name: "predictions", type: "array", description: "Predicted strings, one per example"),
                             ToolParam(name: "references", type: "array", description: "Reference strings in the same order"),
                          ], permission: .read)
+            case .startSmallLM:
+                ToolSpec(name: "lab_start_small_lm", summary: "Create a small character-level language-model experiment over a registered UTF-8 text dataset and start training it from scratch on this Mac's GPU. Uses compute and writes a new artifact; requires approval. Bounded: 10–2000 iterations, 32–256 dimensions (multiple of 4), 1–6 layers, corpus at most 5 MB. Poll lab_get_experiment; cancel with lab_cancel_training.",
+                         parameters: [
+                            ToolParam(name: "name", description: "Experiment name"),
+                            ToolParam(name: "dataset_id", description: "ID of a text dataset (txt)"),
+                            ToolParam(name: "iterations", type: "integer", description: "Training iterations; default 150", required: false),
+                            ToolParam(name: "dimensions", type: "integer", description: "Embedding size; default 64", required: false),
+                            ToolParam(name: "layers", type: "integer", description: "Transformer layers; default 2", required: false),
+                         ], permission: .execute)
             case .predict:
                 ToolSpec(name: "lab_predict", summary: "Run a trained Create ML text classifier over example inputs and return the predicted label and confidence for each. Pair with lab_evaluate_predictions to score a held-out set.",
                          parameters: [
@@ -151,6 +161,16 @@ struct ModelLabAgentTool: ToolExecuting {
                 metrics: [AccuracyMetric(), F1Metric(), BLEUMetric(), ROUGEMetric(.rouge1), ROUGEMetric(.rouge2), ROUGEMetric(.rougeL)])
             return run.outcomes.map { String(format: "%@ = %.4f%@", $0.metricName, $0.value, $0.lowerIsBetter ? " (lower is better)" : "") }
                 .joined(separator: "\n") + "\n\(predictions.count) examples"
+        case .startSmallLM:
+            let name = try Self.requiredString(args, "name")
+            let datasetID = try Self.requiredString(args, "dataset_id")
+            let iterations = (args["iterations"] as? Int) ?? 150
+            let dimensions = (args["dimensions"] as? Int) ?? 64
+            let layers = (args["layers"] as? Int) ?? 2
+            let id = try await MainActor.run {
+                try module.startSmallLMExperiment(name: name, datasetID: datasetID, iterations: iterations, dimensions: dimensions, layers: layers)
+            }
+            return "Training started for experiment \(id). This does not mean it succeeded. Poll lab_get_experiment for status, metrics and the produced artifact."
         case .predict:
             let id = try Self.requiredString(args, "artifact_id")
             let texts = (args["texts"] as? [Any])?.map { "\($0)" } ?? []
