@@ -64,6 +64,7 @@ struct DevelopView: View {
         case .mcp:
             VStack(spacing: 0) {
                 if let listener = app.mcpListener { MCPServerCard(listener: listener) }
+                if let remote = app.remoteServer { RemoteControlCard(server: remote) }
                 MCPPanelView(service: app.mcpService)
             }
         }
@@ -145,5 +146,46 @@ struct MCPServerCard: View {
         }
         .padding(SSSpacing.m)
         .overlay(alignment: .bottom) { Divider() }
+    }
+}
+
+
+/// Turns on remote control and shows the code a phone or watch scans to pair.
+struct RemoteControlCard: View {
+    let server: RemoteServer
+    @State private var confirmUnpair = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: SSSpacing.m) {
+            SSStatusDot(color: server.isRunning ? SSColor.success : .secondary)
+                .padding(.top, 5)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Remote control").font(SSTypography.headline())
+                if server.isRunning {
+                    Text("\(server.deviceCount) device\(server.deviceCount == 1 ? "" : "s") connected · local network only · encrypted with the key in this code")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    if let image = QRCode.image(for: server.pairing.url.absoluteString) {
+                        Image(nsImage: image).interpolation(.none).resizable().frame(width: 150, height: 150)
+                            .accessibilityLabel("Pairing code for the Kiln Remote app")
+                    }
+                    Text("Scan with Kiln Remote on your iPhone. Anyone who sees this code can pair, so do not share your screen with it open.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    Button("Unpair all devices…") { confirmUnpair = true }
+                } else {
+                    Text("Off. When on, a paired iPhone or Apple Watch can read this conversation, send messages by voice or text, and allow or deny approvals. It cannot grant standing access.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                if let error = server.lastError {
+                    Text(error).font(SSTypography.caption()).foregroundStyle(SSColor.danger)
+                }
+            }
+            Spacer()
+            Button(server.isRunning ? "Stop" : "Start") { server.isRunning ? server.stop() : server.start() }
+        }
+        .padding(SSSpacing.m)
+        .overlay(alignment: .bottom) { Divider() }
+        .confirmationDialog("Unpair every device?", isPresented: $confirmUnpair) {
+            Button("Unpair all", role: .destructive) { server.unpairAll() }
+        } message: { Text("A new code is made. Each phone and watch has to scan it again.") }
     }
 }

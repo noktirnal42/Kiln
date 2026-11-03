@@ -28,6 +28,8 @@ public final class AppModel {
     public let auditHealth = AuditHealth()
     /// Kiln's tools for outside agents over MCP. Created with the orchestrator; off until the user starts it.
     public private(set) var mcpListener: KilnMCPListener?
+    /// Lets paired phones and watches drive this Mac's chat. Created with the chat session; off until the user starts it.
+    public private(set) var remoteServer: RemoteServer?
 
     public private(set) var records: [ModuleRecord] = []
     public private(set) var busEntries: [BusEntry] = []
@@ -232,6 +234,11 @@ public final class AppModel {
             initialModelID: UserDefaults.standard.stringArray(forKey: "chat.recentModels")?.first ?? ""
         )
         chatSession = session
+        remoteServer = RemoteServer(
+            bridge: RemoteBridge(backend: ChatRemoteBackend(session: session)),
+            store: RemotePairingStore(directory: AgentPaths.makeDefault()),
+            hostName: Host.current().localizedName ?? "Mac"
+        )
         if let orchestrator { session.attachOrchestrator(orchestrator) }
         await serviceRegistry.register(session, for: ChatSession.self)
     }
