@@ -1,0 +1,65 @@
+name: KilnWatch
+options:
+  bundleIdPrefix: com.kiln.remote
+  createIntermediateGroups: true
+  deploymentTarget:
+    watchOS: "11.0"
+
+packages:
+  KilnRemoteKit:
+    path: ../../Packages/KilnRemoteKit
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    DEVELOPMENT_TEAM: LH8KLB9N4F
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  KilnWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - Sources
+    dependencies:
+      - package: KilnRemoteKit
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Kiln
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.kiln.remote
+        WKRunsIndependentlyOfCompanionApp: true
+        NSLocalNetworkUsageDescription: Kiln talks to your Mac on the local network.
+        NSBonjourServices:
+          - _kiln-remote._tcp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kiln.remote.watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+
+  KilnWatchTests:
+    type: bundle.unit-test
+    platform: watchOS
+    sources:
+      - Tests
+    dependencies:
+      - target: KilnWatch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kiln.remote.watchkitapp.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  KilnWatch:
+    build:
+      targets:
+        KilnWatch: all
+        KilnWatchTests: [test]
+    test:
+      targets:
+        - KilnWatchTests
