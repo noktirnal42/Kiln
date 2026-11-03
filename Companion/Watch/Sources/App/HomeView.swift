@@ -3,13 +3,15 @@ import SwiftUI
 
 struct HomeView: View {
     let session: RemoteSession
+    var pair: () -> Void = {}
+    @State private var editingAddress = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 8) {
-                StatusRow(link: session.link)
+                StatusRow(link: session.link, stage: session.stage)
                 if session.link == .unpaired {
-                    UnpairedView()
+                    UnpairedView(status: session.phoneStatus, pair: pair)
                 } else {
                     TalkButton(session: session)
                     if !session.pendingApprovals.isEmpty {
@@ -21,13 +23,22 @@ struct HomeView: View {
                         .accessibilityHint("Opens the approval")
                     }
                     ReplyCaption(session: session)
-                    if case .offline = session.link {
+                    if case .offline(let reason) = session.link {
+                        Text(reason).font(.caption2).foregroundStyle(.secondary).lineLimit(6)
+                            .accessibilityLabel("Why it is offline: \(reason)")
+                        Button("Mac address") { editingAddress = true }
+                            .accessibilityLabel("Enter the Mac's address by hand")
                         Button("Retry") { session.connect() }
                             .accessibilityLabel("Retry connecting to your Mac")
+                        Button("Pair again") { pair() }
+                            .accessibilityLabel("Ask the iPhone to send the pairing again")
                     }
                 }
             }
             .padding(.horizontal, 4)
+        }
+        .sheet(isPresented: $editingAddress) {
+            ManualAddressView { session.disconnect(); session.connect() }
         }
         .sheet(item: Binding(get: { session.reviewing }, set: { session.reviewing = $0 })) { approval in
             ApprovalView(approval: approval) { decision in session.decide(approval, decision) }
@@ -37,13 +48,14 @@ struct HomeView: View {
 
 struct StatusRow: View {
     let link: RemoteSession.Link
+    var stage = ""
 
     private var text: String {
         switch link {
         case .unpaired: "Not paired"
-        case .connecting: "Connecting…"
+        case .connecting: stage.isEmpty ? "Connecting…" : stage
         case .connected(let host): host
-        case .offline(let reason): reason
+        case .offline: "Offline"
         }
     }
     private var color: Color {
@@ -57,7 +69,7 @@ struct StatusRow: View {
     var body: some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 8, height: 8)
-            Text(text).font(.caption2).lineLimit(1).foregroundStyle(.secondary)
+            Text(text).font(.caption2).lineLimit(2).foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Connection: \(text)")
@@ -121,12 +133,42 @@ struct ReplyCaption: View {
 }
 
 struct UnpairedView: View {
+    let status: String
+    let pair: () -> Void
+
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: "iphone.and.arrow.forward").font(.title2).foregroundStyle(.orange)
-            Text("Open Kiln on your iPhone and pair this watch with your Mac.")
-                .font(.footnote).multilineTextAlignment(.center)
+            Text("Waiting for iPhone to send pairing").font(.footnote.weight(.semibold)).multilineTextAlignment(.center)
+            Text(status).font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button("Pair", action: pair)
+                .tint(.orange)
+                .accessibilityLabel("Pair")
+                .accessibilityHint("Asks the iPhone to send the pairing to this watch")
         }
-        .accessibilityElement(children: .combine)
+    }
+}
+
+struct ManualAddressView: View {
+    let saved: () -> Void
+    @State private var text = ManualAddress.value ?? ""
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 6) {
+                Text("Mac address").font(.headline)
+                TextField("192.168.1.20:47900", text: $text)
+                    .accessibilityLabel("Mac address, host and port")
+                Button("Save and connect") {
+                    ManualAddress.value = text.isEmpty ? nil : text
+                    saved()
+                    dismiss()
+                }
+                .disabled(!text.isEmpty && !ManualAddress.isHostPort(text))
+                .tint(.orange)
+                .accessibilityLabel("Save the address and connect")
+            }
+        }
     }
 }
