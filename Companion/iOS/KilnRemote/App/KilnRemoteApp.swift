@@ -16,6 +16,9 @@ struct KilnRemoteApp: App {
         _session = State(initialValue: session)
         _voice = State(initialValue: VoiceController(session: session))
         AppDelegate.session = session
+        session.onPairingChanged = { WatchHandoff.shared.publish($0) }
+        WatchHandoff.shared.activate()
+        WatchHandoff.shared.publish(session.mac)
     }
 
     var body: some Scene {
@@ -36,6 +39,7 @@ struct KilnRemoteApp: App {
             case .active:
                 endBackgroundTask()
                 session.resume()
+                WatchHandoff.shared.resend()
             case .background:
                 // Keep the socket for a little while so an approval that arrives right after leaving can still notify.
                 backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "kiln-remote-link") { [self] in endBackgroundTask() }

@@ -30,6 +30,8 @@ final class RemoteSession {
 
     /// A live assistant message arrived (not history loaded by opening a conversation).
     @ObservationIgnored var onAssistantMessage: (@MainActor (RemoteMessage) -> Void)?
+    /// Called when the pairing is saved or removed (the watch hand-off listens).
+    @ObservationIgnored var onPairingChanged: (@MainActor (PairedMac?) -> Void)?
     @ObservationIgnored var onApprovalRequested: (@MainActor (RemoteApproval) -> Void)?
 
     @ObservationIgnored private let store: PairingStoring
@@ -48,6 +50,7 @@ final class RemoteSession {
         self.backoff = backoff
         mac = store.load()
         hostName = mac?.hostName
+        onPairingChanged?(mac)
         status = mac == nil ? .unpaired : .connecting
     }
 
@@ -62,6 +65,7 @@ final class RemoteSession {
         resetConversationState()
         mac = paired
         hostName = paired.hostName
+        onPairingChanged?(paired)
         lastError = nil
         start()
     }
@@ -70,6 +74,7 @@ final class RemoteSession {
         stop()
         store.clear()
         mac = nil; hostName = nil
+        onPairingChanged?(nil)
         resetConversationState()
         status = .unpaired
     }

@@ -1,6 +1,44 @@
 # Kiln Remote (iOS)
 
-Companion for Kiln on the Mac; see `docs/14-REMOTE-CONTROL.md`. Reuses `Packages/KilnRemoteKit` unchanged.
+Companion for Kiln on the Mac. It reads a conversation, sends messages (typed or spoken), shows streamed replies and
+lets you **Allow once / Deny** a tool call the agent asks about. Nothing runs on the phone. Wire contract:
+`Packages/KilnRemoteKit`, protocol notes in `docs/14-REMOTE-CONTROL.md`. iOS 18+, Swift 6, bundle id `com.kiln.remote`.
 
-- `xcodegen generate`, then build/test scheme `KilnRemote` (iOS 18+).
-- `FakeMac/`: a stand-in Mac speaking the protocol. `cd FakeMac && swift run fakemac` prints a pairing link and advertises over Bonjour; open it on the phone/simulator (`xcrun simctl openurl <udid> '<link>'`). Typing "approve" in a message triggers an approval request.
+## Build, test, run
+
+```bash
+cd Companion/iOS
+xcodegen generate            # the .xcodeproj is not committed
+xcodebuild test -project KilnRemote.xcodeproj -scheme KilnRemote -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+Run on a phone with Xcode (team LH8KLB9N4F, automatic signing) or `xcodebuild ... -destination 'id=<udid>' -allowProvisioningUpdates`.
+
+## Pairing
+
+On the Mac: Kiln, Develop, MCP tab, Remote control, Start. Scan the QR with the app, or open / paste the
+`kiln-remote://pair?...` link (`xcrun simctl openurl <udid> '<link>'` in the Simulator). The key is stored in the Keychain
+(this-device-only). The link contains the key: do not commit or share it. Settings, Unpair removes it.
+The pairing is also handed to the Apple Watch app over WatchConnectivity (Settings, Apple Watch row, "Send pairing to watch").
+
+## Trying it without a Mac build
+
+`cd FakeMac && swift run fakemac` starts a scripted stand-in Mac (also used by the unit tests): it prints a pairing link,
+advertises over Bonjour and answers the real protocol. Typing "approve" in a message triggers an approval request.
+
+## What was verified
+
+| Where | What |
+| --- | --- |
+| Unit tests with the fake Mac (10 tests, simulator) | handshake and framing, connect, streamed reply, approval allow, reconnect after a drop, wrong key goes to "pair again", Keychain round trip, spoken-text cleaning, event merging |
+| Simulator against the real, notarized Kiln on this Mac | pairing by link, Bonjour discovery by service name, conversation list, open conversation with history and markdown, send a message and get the reply, approval card with the exact command, Allow once (command ran), Deny (recorded as `deny` in the Mac's approvals log) |
+| Physical iPhone 16 Pro Max | installs and signs; paired to the real Mac, connects (after a first cold Bonjour miss, a retry succeeds), lists real conversations and shows history. Driven through iPhone Mirroring, which cannot type |
+| Not verified | QR scanning with the camera; dictation, spoken replies, hands-free conversation and voice approvals (need a real microphone); local notification for an approval while backgrounded; typing and Allow/Deny tapped on the physical phone; the watch hand-off end to end; token-by-token streaming against the real Mac (replies arrived as whole messages) |
+
+## Known gaps
+
+- Local network only. Off the home network needs Tailscale (a "Mac address" field is planned; the Mac must offer a fixed
+  port) or a relay with push (planned). Until then approvals only reach the phone while the app is open or briefly
+  backgrounded: iOS suspends the app, and the local notification needs the socket alive.
+- Bonjour is looked up per connect (10 s); the first lookup after a cold launch can miss and the app retries by itself.
+- Hands-free declares the `audio` background mode so a conversation can continue with the screen off.

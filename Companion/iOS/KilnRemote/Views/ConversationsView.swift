@@ -74,6 +74,7 @@ struct SettingsView: View {
                     Button("Unpair this Mac", role: .destructive) { session.unpair(); dismiss() }
                         .accessibilityHint("Deletes the saved key; scan the code on your Mac to pair again")
                 }
+                WatchSection()
                 Section("Voice") {
                     Toggle("Read replies aloud", isOn: $voice.readRepliesAloud)
                 }
@@ -91,6 +92,30 @@ struct SettingsView: View {
         case .reconnecting: "Reconnecting"
         case .needsRepairing: "Needs pairing again"
         case .unpaired: "Not paired"
+        }
+    }
+}
+
+struct WatchSection: View {
+    private var watch: WatchHandoff { .shared }
+
+    var body: some View {
+        Section("Apple Watch") {
+            row("Watch paired with this iPhone", watch.watchPaired)
+            row("Kiln Remote installed on watch", watch.watchAppInstalled)
+            row("Watch reachable now", watch.reachable)
+            LabeledContent("Pairing sent", value: watch.lastSent.map { $0.formatted(date: .omitted, time: .standard) } ?? "Not yet")
+            if let blocked = watch.blocked { Text(blocked).font(.footnote).foregroundStyle(.orange) }
+            Button("Send pairing to watch") { watch.resend() }
+                .accessibilityHint("Sends the Mac pairing to the Kiln Remote app on your Apple Watch")
+        }
+    }
+
+    private func row(_ title: String, _ on: Bool) -> some View {
+        LabeledContent(title) {
+            Image(systemName: on ? "checkmark.circle.fill" : "xmark.circle")
+                .foregroundStyle(on ? .green : .secondary)
+                .accessibilityLabel(on ? "Yes" : "No")
         }
     }
 }
