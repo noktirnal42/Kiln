@@ -64,6 +64,14 @@ One window, one sidebar, one conversation.
 - **Kiln as an MCP server:** Develop → MCP → Start. Loopback only, bearer token in
   `Application Support/Kiln/mcp-server.json` (0600). 34 tools incl. `re_*`, `lab_*`. External calls run as
   "External: <client>" and are audited; reads are free, anything else waits for approval in Kiln.
+- **Shared tool configuration (no duplicates).** Kiln reads, never copies, what Claude Code, Codex and OpenCode already
+  have: MCP servers from `~/.claude.json`, `~/.codex/config.toml` and `~/.config/opencode/opencode.json`
+  (`Core/Integrations/ToolSourceImporter.swift`) and skills (`SKILL.md` folders) from `~/.claude/skills`, `~/.codex/skills`,
+  `~/.config/opencode/skills`, OpenCode's `skills.paths` and installed Claude plugins (`SkillCatalog`). A server
+  that launches the same command (or URL) is one server however each tool names it; same name with a different command is
+  kept as `name-<tool>`. Environment values (API keys) stay in memory; every imported server still needs
+  "Approve & Connect" in Develop → MCP. Agents get `list_skills` / `read_skill`. **Not imported:** OpenCode's JS plugins
+  (`plugins`), Claude Code hooks and slash commands, and MCP servers bundled inside Claude plugins.
 - **Reverse engineering:** import via `re_import_binary` (returns `project_id`; every other `re_*` tool takes it;
   the analysis id is accepted too). Native `otool` engine; Ghidra optional.
 - **Model Lab:** `lab_hardware`, `lab_list_experiments`, `lab_list_datasets`, Hugging Face search tools.

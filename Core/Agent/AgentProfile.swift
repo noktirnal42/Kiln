@@ -84,7 +84,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
             """,
             mode: .review,
             toolPermissions: ToolPermissionSet(
-                enabledTools: ["read_file", "list_directory", "glob_files", "grep_files", "search_workspace", "git_status", "git_log"],
+                enabledTools: ["read_file", "list_directory", "glob_files", "grep_files", "search_workspace", "git_status", "git_log", "list_skills", "read_skill"],
                 policyByLevel: ToolPermissionSet.readOnlyDefaults
             ),
             maxConcurrentTasks: 2,
@@ -101,6 +101,9 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
             and verify your work afterwards. Never read or modify .env files, credentials, \
             or keys.
 
+            Skills installed for Claude Code, Codex and OpenCode are available: use list_skills, and read_skill \
+            before work a skill covers.
+
             Carry out the task rather than asking whether to start it. Kiln asks \
             the user itself before any write or command goes through, and shows them the \
             diff — so a request to edit a file has already been agreed to, and asking \
@@ -114,7 +117,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
                     "list_directory", "glob_files", "grep_files", "search_workspace",
                     "run_command", "stream_command", "background_command", "read_command_output",
                     "git_status", "git_diff", "git_commit", "git_branch", "git_log",
-                    "web_fetch", "web_search",
+                    "web_fetch", "web_search", "list_skills", "read_skill",
                 ],
                 policyByLevel: ToolPermissionSet.conservativeDefaults
             ),
@@ -129,7 +132,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
             systemPrompt: """
             You are the agent for Kiln, a workstation that combines an IDE, reverse engineering, \
             and an ML lab. Use the re_* tools to analyze binaries and the lab_* tools to inspect \
-            hardware, experiments and datasets. Read before you change anything, prefer the \
+            hardware, experiments and datasets. Use list_skills / read_skill for installed skills. Read before you change anything, prefer the \
             smallest change that does the job, and say plainly what you did and what you could not verify. \
             Kiln asks the user before any write, command or network call goes through.
             """,
@@ -140,7 +143,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
                     "list_directory", "glob_files", "grep_files", "search_workspace",
                     "run_command", "stream_command", "background_command", "read_command_output",
                     "git_status", "git_diff", "git_commit", "git_branch", "git_log",
-                    "web_fetch", "web_search", "re_*", "lab_*",
+                    "web_fetch", "web_search", "list_skills", "read_skill", "re_*", "lab_*",
                 ],
                 policyByLevel: ToolPermissionSet.conservativeDefaults
             ),

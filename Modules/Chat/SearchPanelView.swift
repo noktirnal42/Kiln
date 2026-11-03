@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SearchPanelView: View {
     let service: FileIndexService
+    /// The current project folder; indexed automatically when nothing else has been opened.
+    var projectRoot: String?
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var hits: [SearchHit] = []
@@ -72,8 +74,12 @@ struct SearchPanelView: View {
             }
         }
         .frame(minWidth: 680, minHeight: 480)
-        .task {
+        .task(id: projectRoot) {
             indexedRoot = await service.indexedRootPath()
+            if let projectRoot, indexedRoot != projectRoot {
+                try? await service.index(root: projectRoot)
+                indexedRoot = await service.indexedRootPath()
+            }
         }
     }
 

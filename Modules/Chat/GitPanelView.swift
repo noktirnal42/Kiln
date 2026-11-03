@@ -18,9 +18,10 @@ public final class GitPanelModel {
         self.service = service
     }
 
-    public func openRepository(at path: String) async {
+    /// `quiet` is for opening the project folder automatically: a project that is not a repository is not an error.
+    public func openRepository(at path: String, quiet: Bool = false) async {
         guard await service.isRepository(path) else {
-            errorText = "'\(path)' is not a Git repository."
+            if !quiet { errorText = "'\(path)' is not a Git repository." }
             return
         }
         repositoryPath = path

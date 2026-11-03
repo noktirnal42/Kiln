@@ -224,7 +224,9 @@ public final class AppModel {
         let session = ChatSession(
             registry: modelRegistry, conversations: conversations, artifacts: artifacts,
             ptyManager: ptyManager, mcpService: mcpService, gitService: gitService,
-            fileIndexService: fileIndexService
+            fileIndexService: fileIndexService,
+            // Start on the model used last time instead of asking again on every launch.
+            initialModelID: UserDefaults.standard.stringArray(forKey: "chat.recentModels")?.first ?? ""
         )
         chatSession = session
         if let orchestrator { session.attachOrchestrator(orchestrator) }

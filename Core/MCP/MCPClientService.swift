@@ -103,8 +103,19 @@ public actor MCPClientService {
         for directory in directories {
             loadServerFile(directory.appendingPathComponent("servers.json"))
         }
+        // Servers already configured for Claude Code, Codex and OpenCode, merged so each appears once.
+        // Anything with the same command line as a server loaded above is skipped, not duplicated.
+        let known = Set(configs.values.map { ToolSourceImporter.identity(of: $0) })
+        for imported in ToolSourceImporter.importServers(home: home) where !known.contains(ToolSourceImporter.identity(of: imported.config)) {
+            guard configs[imported.config.id] == nil else { continue }
+            configs[imported.config.id] = imported.config
+            importedFrom[imported.config.id] = imported.sources
+        }
         return Array(configs.values).sorted { $0.id < $1.id }
     }
+
+    /// Which tools (Claude Code, Codex, OpenCode) define each imported server.
+    public private(set) var importedFrom: [String: [String]] = [:]
 
     public func loadProjectFile(at url: URL) -> [MCPServerConfig] {
         loadServerFile(url)

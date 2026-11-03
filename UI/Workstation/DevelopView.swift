@@ -48,9 +48,16 @@ struct DevelopView: View {
         case .terminal:
             if let terminalModel { TerminalDockView(model: terminalModel) }
         case .git:
-            if let gitModel { GitPanelView(model: gitModel) }
+            if let gitModel {
+                GitPanelView(model: gitModel)
+                    .task(id: app.chatSession?.workspaceRoot) {
+                        if let root = app.chatSession?.workspaceRoot, gitModel.repositoryPath != root {
+                            await gitModel.openRepository(at: root, quiet: true)
+                        }
+                    }
+            }
         case .search:
-            SearchPanelView(service: app.fileIndexService)
+            SearchPanelView(service: app.fileIndexService, projectRoot: app.chatSession?.workspaceRoot)
         case .mcp:
             VStack(spacing: 0) {
                 if let listener = app.mcpListener { MCPServerCard(listener: listener) }

@@ -196,6 +196,7 @@ public enum BuiltInTools {
             GitStatusTool(), GitDiffTool(), GitCommitTool(), GitBranchTool(), GitLogTool(),
             WebFetchTool(), WebSearchTool(),
             SearchWorkspaceTool(),
+            ListSkillsTool(), ReadSkillTool(),
         ]
         for tool in tools { registry.register(tool) }
     }
