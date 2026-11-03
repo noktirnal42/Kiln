@@ -532,6 +532,12 @@ struct EditorView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .contentShape(Rectangle())
                     .onTapGesture { editor.activeID = document.id }
+                    .draggable(document.id.uuidString)
+                    .dropDestination(for: String.self) { items, _ in
+                        guard let id = items.first.flatMap(UUID.init(uuidString:)) else { return false }
+                        editor.moveDocument(id, before: document.id)
+                        return true
+                    }
                     .contextMenu {
                         Button("Open in Split") { editor.openInSplit(document) }
                         Button("Close") { requestClose(document) }

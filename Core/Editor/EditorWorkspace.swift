@@ -247,6 +247,17 @@ public final class EditorWorkspace {
         for document in dirtyDocuments { save(document) }
     }
 
+    /// Moves a tab to sit before another (or to the end when `target` is nil). No-op for unknown or identical IDs.
+    public func moveDocument(_ id: UUID, before target: UUID?) {
+        guard id != target, let from = documents.firstIndex(where: { $0.id == id }) else { return }
+        let moving = documents.remove(at: from)
+        if let target, let to = documents.firstIndex(where: { $0.id == target }) {
+            documents.insert(moving, at: to)
+        } else {
+            documents.append(moving)
+        }
+    }
+
     /// Removes the tab. The caller decides what to do about unsaved edits first (`document.isDirty`).
     public func close(_ document: EditorDocument) {
         guard let index = documents.firstIndex(where: { $0.id == document.id }) else { return }

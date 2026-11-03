@@ -410,6 +410,35 @@ final class LineNumberRuler: NSRulerView {
     }
 }
 
+/// Multi-cursor helpers (⌘D): pure, so they are tested without a view.
+enum MultiCursor {
+    /// The next occurrence of the last selection's text after it, wrapping once; nil when nothing new can be added.
+    /// With an empty caret the word under it is selected first.
+    static func nextSelection(in text: NSString, selected: [NSRange]) -> NSRange? {
+        guard let last = selected.last else { return nil }
+        if last.length == 0 {
+            return wordRange(in: text, at: last.location)
+        }
+        let needle = text.substring(with: last)
+        guard !needle.isEmpty else { return nil }
+        let after = NSRange(location: NSMaxRange(last), length: text.length - NSMaxRange(last))
+        var found = text.range(of: needle, options: .literal, range: after)
+        if found.location == NSNotFound {
+            found = text.range(of: needle, options: .literal, range: NSRange(location: 0, length: last.location))
+        }
+        guard found.location != NSNotFound, !selected.contains(found) else { return nil }
+        return found
+    }
+
+    static func wordRange(in text: NSString, at index: Int) -> NSRange? {
+        func isWord(_ c: unichar) -> Bool { (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 }
+        var start = min(index, text.length), end = start
+        while start > 0, isWord(text.character(at: start - 1)) { start -= 1 }
+        while end < text.length, isWord(text.character(at: end)) { end += 1 }
+        return end > start ? NSRange(location: start, length: end - start) : nil
+    }
+}
+
 /// NSTextView with ⌘-click (go to definition) and server-backed completion.
 final class CodeNSTextView: NSTextView {
     var onCommandClick: ((Int) -> Void)?
@@ -422,6 +451,21 @@ final class CodeNSTextView: NSTextView {
             return
         }
         super.mouseDown(with: event)
+    }
+
+    /// ⌘D adds the next occurrence of the selection as another cursor; typing then edits all of them.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.charactersIgnoringModifiers == "d",
+           window?.firstResponder === self {
+            let ranges = selectedRanges.map(\.rangeValue)
+            if let next = MultiCursor.nextSelection(in: string as NSString, selected: ranges) {
+                let all = ranges.last?.length == 0 ? [next] : ranges + [next]
+                setSelectedRanges(all.map { NSValue(range: $0) }, affinity: .downstream, stillSelecting: false)
+                scrollRangeToVisible(next)
+            }
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
     }
 
     private func showCompletionPopup(_ sender: Any?) { super.complete(sender) }

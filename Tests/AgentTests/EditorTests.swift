@@ -429,3 +429,38 @@ struct LanguageServerTests {
         #expect(LanguageServerClient.location(from: link) == LSPLocation(path: "/tmp/x.swift", line: 3, column: 4))
     }
 }
+
+@MainActor
+struct TabOrderAndMultiCursorTests {
+    @Test func tabsReorderBeforeATargetOrToTheEnd() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-tabs-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let workspace = EditorWorkspace(recovery: EditorRecoveryStore(directory: dir.appendingPathComponent("r")))
+        let docs = try ["a", "b", "c"].map { name -> EditorDocument in
+            let url = dir.appendingPathComponent("\(name).txt")
+            try name.write(to: url, atomically: true, encoding: .utf8)
+            return workspace.open(url)
+        }
+        workspace.moveDocument(docs[2].id, before: docs[0].id)
+        #expect(workspace.documents.map(\.name) == ["c.txt", "a.txt", "b.txt"])
+        workspace.moveDocument(docs[2].id, before: nil)
+        #expect(workspace.documents.map(\.name) == ["a.txt", "b.txt", "c.txt"])
+        workspace.moveDocument(docs[1].id, before: docs[1].id)
+        workspace.moveDocument(UUID(), before: docs[0].id)
+        #expect(workspace.documents.count == 3)
+    }
+
+    @Test func commandDSelectsTheWordThenEachNextOccurrenceWithWrap() {
+        let text = "foo bar foo baz foo" as NSString
+        let word = MultiCursor.nextSelection(in: text, selected: [NSRange(location: 1, length: 0)])
+        #expect(word == NSRange(location: 0, length: 3))
+        let second = MultiCursor.nextSelection(in: text, selected: [word!])
+        #expect(second == NSRange(location: 8, length: 3))
+        let third = MultiCursor.nextSelection(in: text, selected: [word!, second!])
+        #expect(third == NSRange(location: 16, length: 3))
+        // Everything already selected: nothing more to add.
+        #expect(MultiCursor.nextSelection(in: "foo foo" as NSString, selected: [NSRange(location: 0, length: 3), NSRange(location: 4, length: 3)]) == nil)
+        #expect(MultiCursor.nextSelection(in: " " as NSString, selected: [NSRange(location: 0, length: 0)]) == nil)
+    }
+}
