@@ -42,8 +42,7 @@ gh release create v<version> dist/Kiln-<version>.zip dist/Kiln-<version>.dmg dis
   --title "Kiln <version>" --notes-file release-notes.md
 ```
 
-State in the notes what was and was not verified (see "Not verified" in `docs/11-CURRENT-STATE.md`). `site/support.html` says a stable download is not
-advertised until a release exists; update it in the same change.
+State in the notes what was and was not verified (see "Not verified" in `docs/11-CURRENT-STATE.md`). `site/support.html` and the README point at the Releases page; v0.1.0 (preview) was published on 2026-11-03 from `c41409f` with release notes in `docs/releases/v0.1.0.md`. Tag the commit the artifact was built from.
 
 ## Updates
 
