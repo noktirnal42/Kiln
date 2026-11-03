@@ -147,8 +147,7 @@ in Settings; none are read or printed by the tests.
   Not yet: speaking while the reply is still streaming, an MLX neural voice (Kokoro is cached on the dev Mac), wake word.
 - **Remote control.** Develop → MCP has a Remote control card: Start shows a QR pairing code. A paired iPhone or Apple Watch
   on the same network can list and open conversations, send text or dictated messages, stop a reply, and allow once or deny
-  an approval. It cannot grant standing access or change settings. Frames are ChaCha20-Poly1305 encrypted with a key that is
-  only ever on the Mac's screen; replay, reordering and tampering are rejected. Protocol and threat model:
+  an approval. It cannot grant standing access or change settings. Frames are ChaCha20-Poly1305 encrypted with a pairing key shared with paired companions; replay, reordering and tampering are rejected. Protocol and threat model:
   `docs/14-REMOTE-CONTROL.md`; shared code: `Packages/KilnRemoteKit`; Mac side: `Core/Remote`.
 - **Companion apps** live in `Companion/iOS` and `Companion/Watch` (own XcodeGen projects, see their READMEs).
 - **Verified:** the wire contract and Mac bridge by unit tests, the Mac server over a real local socket (right key works,
@@ -156,7 +155,7 @@ in Settings; none are read or printed by the tests.
   (conversations listed, message sent, a real approval allowed from the app and the command ran).
   **Not verified:** a physical iPhone and Apple Watch end to end, voice with a real microphone, pairing through the camera.
 - **Known limits:** one pairing key is shared by all devices, so unpairing is all-or-nothing; the link is local network
-  only (no relay); each remote message goes into the one open conversation on the Mac.
+  across devices; relay software exists but is not deployed by default or verified end to end with a real Mac. Each remote message goes into the one open conversation on the Mac. Unexpected standing approval decisions observed in testing remain under investigation.
 - **Model Lab tools added:** `lab_start_lora` (verified end to end: SmolLM-135M, 20 iterations, completed) and
   `lab_start_distillation` (verified: Qwen2.5-3B teacher into SmolLM-135M, loss 0.83 training / 1.88 validation), both
   approval-gated with a download policy. Agents polling `lab_get_experiment` can exhaust their tool rounds on a slow job.

@@ -11,8 +11,8 @@ tested with `swift test` inside the package.
 
 ## Pairing
 
-1. On the Mac, Settings → Remote control shows a QR code (and a `kiln-remote://pair?...` link) with a fresh 256-bit key,
-   the Mac's name and its Bonjour service name. The key is only ever on that screen; it is not sent over any network.
+1. On the Mac, Develop → MCP → Remote control shows a QR code (and a `kiln-remote://pair?...` link) with a fresh 256-bit key,
+   the Mac's name and its Bonjour service name. The QR code contains a secret pairing key; scanning transfers it to the companion, and the iPhone can hand it to the watch through WatchConnectivity. Treat the code and link as credentials.
 2. The device scans it and stores the key in its Keychain. A paired device can be revoked at the Mac, which deletes the key.
 3. The watch pairs through its iPhone (the key is handed over WatchConnectivity); it may also reach the Mac directly.
 
@@ -39,7 +39,7 @@ Speech framework, so the watch dictates through the system dictation sheet or ha
 
 ## Mac side (in this repo, not in the package)
 
-`Core/Remote` will host the listener, the pairing screen, and the bridge from `ChatSession` and the approval queue to
+`Core/Remote` hosts the listener, the pairing screen, and the bridge from `ChatSession` and the approval queue to
 `RemoteEvent`s. The companions only need the package and this document.
 
 ## Off the home network
@@ -65,6 +65,10 @@ no relay: use the Mac's `100.x.y.z:47900`.
 
 ### Away from the Mac
 
-Approvals work from anywhere a device is connected. A phone or watch app that is closed or in the background cannot be woken
+Approvals are designed to work while a device is connected. Real-device and real-Mac relay approval flows still require end-to-end validation. Unexpected standing approval decisions were observed during testing and remain under investigation. A phone or watch app that is closed or in the background cannot be woken
 without Apple push notifications, which need an Apple push key; until then open the app to see and answer a pending approval.
 The Mac is kept awake while remote control is on.
+
+## Verification status (2026-11-03)
+
+The iOS simulator connected directly to a real Mac, listed and opened a conversation, sent a message and received a reply. A separate test used a local Node relay and a fake Mac to exercise chat and an approval. These do not establish real-Mac internet relay operation. A physical watch attempted direct and Bonjour connections without reaching the Mac; phone-to-watch pairing and physical three-device voice and approval flows remain unverified. The relay is not deployed by default. Do not treat simulator or fake-server results as physical-device certification.
