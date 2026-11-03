@@ -21,7 +21,7 @@ struct GhidraInstallationTests {
         _ = try fixture(root, "ghidra_12.2_DEV", version: "12.2", release: "DEV")
         _ = try fixture(root, "ghidra_12.1.9_PUBLIC", version: "12.1.9")
         let expected = try fixture(root, "ghidra_12.1.10_PUBLIC", version: "12.1.10")
-        #expect(GhidraInstallation.discover(environment: [:], applicationDirectories: [root]) == expected)
+        #expect(GhidraInstallation.discover(environment: [:], applicationDirectories: [root])?.path == expected.path)
     }
 
     @Test func validEnvironmentHomeWinsAndInvalidHomeFallsBack() throws {
@@ -29,8 +29,8 @@ struct GhidraInstallationTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let release = try fixture(root, "ghidra_12.1.4_PUBLIC", version: "12.1.4")
         let explicit = try fixture(root, "ghidra_custom", version: "11.3.2")
-        #expect(GhidraInstallation.discover(environment: ["GHIDRA_HOME": explicit.path], applicationDirectories: [root]) == explicit)
-        #expect(GhidraInstallation.discover(environment: ["GHIDRA_HOME": root.appendingPathComponent("missing").path], applicationDirectories: [root]) == release)
+        #expect(GhidraInstallation.discover(environment: ["GHIDRA_HOME": explicit.path], applicationDirectories: [root])?.path == explicit.path)
+        #expect(GhidraInstallation.discover(environment: ["GHIDRA_HOME": root.appendingPathComponent("missing").path], applicationDirectories: [root])?.path == release.path)
     }
 
     @Test func ignoresNonExecutableAndUnsupportedInstallations() throws {
@@ -59,7 +59,7 @@ struct LiveGhidraTests {
         defer { try? FileManager.default.removeItem(at: project.folder) }
         let initial = try await module.analysis(projectID: project.id)
         let annotated = try await module.editProject(projectID: project.id, expectedRevision: initial.revision,
-            operations: [.addressNote(address: "100000000", comment: "Keep this analyst note", label: "QA binary")])
+            operations: [.addressNote(address: "100000000", comment: "Keep this analyst note", label: "qa_binary")])
         let tool = REAgentTool(definition: try #require(REMCPTools.definitions.first { $0.name == "analyze_binary" }), module: module)
         #expect(tool.spec.permission == .execute)
         let context = ToolExecutionContext(workspaceRoot: nil, conversationID: UUID(), redactSecrets: true, services: ToolServices())

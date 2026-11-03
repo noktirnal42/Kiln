@@ -157,7 +157,7 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
         let analysis = try await Task.detached(priority: .userInitiated) {
             let existing = try ProjectStore.load(project.folder.path)
             let result = try Analyzer.ghidra(project.binaryURL.path, home: home.path, scriptPath: script.path,
-                                            workspace: Analyzer.engineWorkspace(projectPath: project.folder.path, projectID: existing.id))
+                                            arch: existing.slice, workspace: Analyzer.engineWorkspace(projectPath: project.folder.path, projectID: existing.id))
             return try ProjectStore.replace(result, to: project.folder.path, expectedID: existing.id,
                                             expectedRevision: existing.revision, preserveAnnotations: true)
         }.value
