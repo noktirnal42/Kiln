@@ -39,6 +39,7 @@ struct KilnRemoteApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
+                Task { await Notifier.shared.refreshAuthorization() }
                 endBackgroundTask()
                 session.resume()
                 WatchHandoff.shared.resend()
@@ -72,6 +73,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         NSLog("KilnRemote: push registration failed: %@", error.localizedDescription)
+        Task { @MainActor in Notifier.shared.registrationError = error.localizedDescription }
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {

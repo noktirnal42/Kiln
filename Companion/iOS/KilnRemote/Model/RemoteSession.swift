@@ -126,7 +126,9 @@ final class RemoteSession {
     // MARK: Apple push
 
     /// This phone's push token, once Apple has issued it.
-    @ObservationIgnored var pushToken: String? { didSet { sendPushRegistration() } }
+    var pushToken: String? { didSet { sendPushRegistration() } }
+    /// When this phone last told the Mac its push token.
+    private(set) var pushRegisteredAt: Date?
     /// Allow/Deny answers from a notification that arrived before the connection was up; sent as soon as it is.
     @ObservationIgnored private(set) var pendingDecisions: [(approvalID: String, decision: RemoteApprovalDecision)] = []
 
@@ -139,6 +141,7 @@ final class RemoteSession {
         let environment = "production"
         #endif
         link?.send(.registerPush(token: pushToken, environment: environment, topic: Bundle.main.bundleIdentifier ?? "com.kiln.remote"))
+        pushRegisteredAt = Date()
     }
 
     /// An Allow/Deny tapped on a notification. Works with the connection down: it reconnects, then answers.

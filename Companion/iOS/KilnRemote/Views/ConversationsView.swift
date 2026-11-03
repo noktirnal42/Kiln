@@ -1,5 +1,6 @@
 import KilnRemoteKit
 import SwiftUI
+import UIKit
 
 struct ConversationsView: View {
     @Environment(RemoteSession.self) private var session
@@ -81,6 +82,7 @@ struct SettingsView: View {
                     Button("Unpair this Mac", role: .destructive) { session.unpair(); dismiss() }
                         .accessibilityHint("Deletes the saved key; scan the code on your Mac to pair again")
                 }
+                AlertsSection()
                 KeepAliveSection()
                 WatchSection()
                 Section("Voice") {
@@ -101,6 +103,33 @@ struct SettingsView: View {
         case .reconnecting: "Reconnecting"
         case .needsRepairing: "Needs pairing again"
         case .unpaired: "Not paired"
+        }
+    }
+}
+
+/// Whether an approval can alert this phone while the app is closed: notifications allowed, an Apple push token, and the Mac told.
+struct AlertsSection: View {
+    @Environment(RemoteSession.self) private var session
+
+    var body: some View {
+        let notifier = Notifier.shared
+        Section("Approval alerts") {
+            LabeledContent("Notifications") { Text(notifier.authorization).foregroundStyle(notifier.isAllowed ? .green : .orange) }
+            LabeledContent("Apple push token") {
+                if let error = notifier.registrationError { Text("Failed").foregroundStyle(.red).accessibilityHint(error) }
+                else if session.pushToken != nil { Text("Issued").foregroundStyle(.green) }
+                else { Text("Waiting").foregroundStyle(.secondary) }
+            }
+            LabeledContent("Mac knows this phone") {
+                if let at = session.pushRegisteredAt { Text(at.formatted(date: .omitted, time: .standard)).foregroundStyle(.green) }
+                else { Text(session.isConnected ? "Not yet" : "Not connected").foregroundStyle(.secondary) }
+            }
+            if let error = notifier.registrationError { Text(error).font(.footnote).foregroundStyle(.red) }
+            if !notifier.isAllowed {
+                Text("Alerts stay silent until notifications are turned on for Kiln Remote.").font(.footnote).foregroundStyle(.orange)
+                Button("Open notification settings") { notifier.openSettings() }
+            }
+            Button("Register for alerts again") { UIApplication.shared.registerForRemoteNotifications(); session.sendPushRegistration() }
         }
     }
 }

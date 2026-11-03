@@ -23,9 +23,11 @@ final class SpeechListener {
 
     var usesOnDeviceRecognition: Bool { recognizer?.supportsOnDeviceRecognition ?? false }
 
-    static func authorize() async throws {
+    /// `nonisolated` on purpose: iOS answers the permission request on a background queue, and a closure created inside this
+    /// main-actor type is asserted to run on the main thread, which kills the app the first time speech asks.
+    nonisolated static func authorize() async throws {
         let speech = await withCheckedContinuation { (c: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
-            SFSpeechRecognizer.requestAuthorization { c.resume(returning: $0) }
+            SFSpeechRecognizer.requestAuthorization { @Sendable status in c.resume(returning: status) }
         }
         guard speech == .authorized else { throw Failure.speechDenied }
         guard await AVAudioApplication.requestRecordPermission() else { throw Failure.microphoneDenied }

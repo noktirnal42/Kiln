@@ -188,9 +188,11 @@ public final class VoiceController: NSObject, AVSpeechSynthesizerDelegate {
             ?? AVSpeechSynthesisVoice(language: Locale.current.identifier)
     }
 
-    private static func authorised() async -> Bool {
-        let speech: Bool = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
+    /// `nonisolated` on purpose: macOS answers the permission request on a background queue, and a closure created inside this
+    /// main-actor type would be asserted to run on the main thread, which crashed the app the first time voice asked.
+    nonisolated private static func authorised() async -> Bool {
+        let speech: Bool = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            SFSpeechRecognizer.requestAuthorization { @Sendable status in continuation.resume(returning: status == .authorized) }
         }
         guard speech else { return false }
         return await AVAudioApplication.requestRecordPermission()

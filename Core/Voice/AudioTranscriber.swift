@@ -8,7 +8,7 @@ public enum AudioTranscriber {
     public static func transcribe(_ audio: Data, format: String) async -> String? {
         guard audio.count > 0, audio.count <= maxBytes else { return nil }
         let allowed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
+            SFSpeechRecognizer.requestAuthorization { @Sendable status in continuation.resume(returning: status == .authorized) }
         }
         guard allowed, let recognizer = SFSpeechRecognizer(locale: Locale.current) ?? SFSpeechRecognizer(), recognizer.isAvailable else { return nil }
         let ext = format.filter { $0.isLetter || $0.isNumber }.prefix(5)
