@@ -57,6 +57,8 @@ final class MicrophoneRecorder: VoiceRecording_ {
     static let speechDecibels: Float = -42
 
     func record() async -> VoiceRecording? {
+        // Asking for the microphone without a usage description in Info.plist kills the app; refuse instead.
+        guard Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") != nil else { return nil }
         guard await AVAudioApplication.requestRecordPermission() else { return nil }
         let session = AVAudioSession.sharedInstance()
         do {

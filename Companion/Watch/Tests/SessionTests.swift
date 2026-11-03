@@ -51,6 +51,12 @@ final class SessionTests: XCTestCase {
         XCTAssertTrue(connected)
     }
 
+    /// Regression: the microphone string was lost once when project.yml regenerated Info.plist, and the app crashed on Talk.
+    func testBuiltAppDeclaresWhyItUsesTheMicrophone() {
+        let text = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
+        XCTAssertFalse((text ?? "").isEmpty)
+    }
+
     func testTalkRecordsStraightAwayAndTheMacTranscribesIt() async throws {
         let store = InMemoryPairingStore(PairingPayload(hostName: "Fake Mac", serviceName: "Fake", key: key))
         let url = server.url

@@ -26,6 +26,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Kiln talks to your Mac on the local network.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Kiln listens while you talk to it, then sends the recording to your Mac to turn into text.</string>
 	<key>WKApplication</key>
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>

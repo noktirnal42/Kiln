@@ -32,6 +32,7 @@ targets:
         WKCompanionAppBundleIdentifier: com.kiln.remote
         WKRunsIndependentlyOfCompanionApp: true
         NSLocalNetworkUsageDescription: Kiln talks to your Mac on the local network.
+        NSMicrophoneUsageDescription: Kiln listens while you talk to it, then sends the recording to your Mac to turn into text.
         NSBonjourServices:
           - _kiln-remote._tcp
     settings:
