@@ -155,7 +155,7 @@ in Settings; none are read or printed by the tests.
   (conversations listed, message sent, a real approval allowed from the app and the command ran).
   **Not verified:** a physical iPhone and Apple Watch end to end, voice with a real microphone, pairing through the camera.
 - **Known limits:** one pairing key is shared by all devices, so unpairing is all-or-nothing; the link is local network
-  across devices. An operator-deployed relay completed an encrypted handshake with the running Mac, but phone relay reconnect timed out and remains unverified. Physical iPhone and watch tests each produced remote Deny and Allow once decisions; broader coverage remains open. Each remote message goes into the one open conversation on the Mac. Earlier unexpected standing approval decisions remain under investigation.
+  across devices. An operator-deployed relay completed an encrypted handshake with the running Mac, and a relay-only physical iPhone carried a watch message through it; an earlier reconnect timed out. Physical iPhone and watch tests each produced remote Deny and Allow once decisions; broader coverage remains open. Each remote message goes into the one open conversation on the Mac. Earlier unexpected standing approval decisions remain under investigation.
 - **Model Lab tools added:** `lab_start_lora` (verified end to end: SmolLM-135M, 20 iterations, completed) and
   `lab_start_distillation` (verified: Qwen2.5-3B teacher into SmolLM-135M, loss 0.83 training / 1.88 validation), both
   approval-gated with a download policy. Agents polling `lab_get_experiment` can exhaust their tool rounds on a slow job.
