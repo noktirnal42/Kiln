@@ -447,6 +447,54 @@ final class LineNumberRuler: NSRulerView {
 
     @objc private func refresh() { needsDisplay = true }
 
+    // MARK: Accessibility
+    // The gutter is drawn by hand, so VoiceOver sees nothing unless each marked line is exposed as an element.
+
+    override func isAccessibilityElement() -> Bool { false }
+    override func accessibilityRole() -> NSAccessibility.Role? { .group }
+    override func accessibilityLabel() -> String? { "Gutter" }
+    /// The built-in ruler press opens a marker-type sheet; nothing in this gutter should do that.
+    override func accessibilityPerformPress() -> Bool { false }
+
+    override func accessibilityChildren() -> [Any]? {
+        guard let textView, let layout = textView.layoutManager, let container = textView.textContainer, layout.numberOfGlyphs > 0 else { return [] }
+        let visible = textView.visibleRect
+        let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
+        let text = textView.string as NSString
+        var elements: [Any] = []
+        var line = 1, counted = 0
+        var glyphIndex = glyphs.location
+        while glyphIndex < NSMaxRange(glyphs) {
+            var lineGlyphs = NSRange()
+            let fragment = layout.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: &lineGlyphs)
+            let charIndex = layout.characterIndexForGlyph(at: glyphIndex)
+            if text.lineRange(for: NSRange(location: charIndex, length: 0)).location == charIndex {
+                while counted < charIndex { if text.character(at: counted) == 10 { line += 1 }; counted += 1 }
+                let number = line
+                let foldable = foldableLines.contains(number)
+                let hunk = LineDiff.hunk(at: number - 1, in: hunks)
+                let label = GutterAccessibility.label(line: number, foldable: foldable, folded: foldedLines.contains(number),
+                                                      breakpoint: breakpointLines.contains(number), executing: executionLine == number,
+                                                      change: hunk.map { GutterAccessibility.changeName($0.kind) })
+                if let label {
+                    let element = GutterAccessibilityElement()
+                    element.setAccessibilityRole(.button)
+                    element.setAccessibilityLabel(label)
+                    element.setAccessibilityParent(self)
+                    let y = fragment.minY + textView.textContainerInset.height - visible.minY
+                    element.setAccessibilityFrameInParentSpace(NSRect(x: 0, y: y, width: ruleThickness, height: fragment.height))
+                    element.onPress = { [weak self] in
+                        guard let self else { return }
+                        if foldable { self.onToggleFold(number) } else { self.onToggleBreakpoint(number) }
+                    }
+                    elements.append(element)
+                }
+            }
+            glyphIndex = NSMaxRange(lineGlyphs)
+        }
+        return elements
+    }
+
     override func drawHashMarksAndLabels(in rect: NSRect) {
         guard let textView, let layout = textView.layoutManager, let container = textView.textContainer else { return }
         NSColor.windowBackgroundColor.withAlphaComponent(0.6).setFill()
@@ -502,6 +550,33 @@ final class LineNumberRuler: NSRulerView {
                 }
             }
             glyphIndex = NSMaxRange(lineGlyphs)
+        }
+    }
+}
+
+/// One marked gutter line as seen by VoiceOver; pressing it folds or toggles the breakpoint.
+final class GutterAccessibilityElement: NSAccessibilityElement {
+    var onPress: () -> Void = {}
+    override func accessibilityPerformPress() -> Bool { onPress(); return true }
+}
+
+/// Spoken description of a gutter line; nil when the line carries no marker, so only marked lines become elements.
+enum GutterAccessibility {
+    static func label(line: Int, foldable: Bool, folded: Bool, breakpoint: Bool, executing: Bool, change: String?) -> String? {
+        var parts: [String] = []
+        if breakpoint { parts.append("breakpoint") }
+        if executing { parts.append("execution stopped here") }
+        if let change { parts.append(change) }
+        if foldable { parts.append(folded ? "folded block, press to expand" : "foldable block, press to fold") }
+        guard !parts.isEmpty else { return nil }
+        return "Line \(line), " + parts.joined(separator: ", ")
+    }
+
+    static func changeName(_ kind: LineDiff.Hunk.Kind) -> String {
+        switch kind {
+        case .added: "added since commit"
+        case .modified: "modified since commit"
+        case .removed: "lines removed after this point"
         }
     }
 }

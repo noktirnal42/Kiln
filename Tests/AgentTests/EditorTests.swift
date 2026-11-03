@@ -502,3 +502,17 @@ struct CodeFoldingTests {
         #expect(CodeFolding.hiddenRanges(in: text, folded: regions).count == 1)
     }
 }
+
+@Suite("Gutter accessibility")
+struct GutterAccessibilityTests {
+    @Test("unmarked lines have no element") func unmarked() {
+        #expect(GutterAccessibility.label(line: 3, foldable: false, folded: false, breakpoint: false, executing: false, change: nil) == nil)
+    }
+
+    @Test("markers are spoken together") func markers() {
+        let label = GutterAccessibility.label(line: 7, foldable: true, folded: true, breakpoint: true, executing: false, change: "modified since commit")
+        #expect(label == "Line 7, breakpoint, modified since commit, folded block, press to expand")
+        #expect(GutterAccessibility.label(line: 1, foldable: true, folded: false, breakpoint: false, executing: false, change: nil)
+                == "Line 1, foldable block, press to fold")
+    }
+}
