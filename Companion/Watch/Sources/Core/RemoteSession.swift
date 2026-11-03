@@ -60,6 +60,7 @@ final class RemoteSession {
     /// New payload from the iPhone (or nil when it revoked the pairing).
     func pairingChanged(_ payload: PairingPayload?) {
         if let payload {
+            if store.load() == payload { return }
             store.save(payload)
             pairingLog.notice("pairing stored")
             disconnect()
