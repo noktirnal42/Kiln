@@ -4,6 +4,8 @@ import Network
 
 enum RemoteError: Error, Equatable {
     case timeout, closed, badHandshake, notReady, notFound
+    /// Every way of reaching the Mac failed; one line per attempt ("192.168.1.20:47900: timed out").
+    case attemptsFailed([String])
 }
 
 /// Carries opaque binary frames to the Mac. `send` is synchronous and ordered so the encrypted frame counter
@@ -34,9 +36,10 @@ final class NWTransport: RemoteTransport, @unchecked Sendable {
     private let states: AsyncStream<NWConnection.State>
     private let stateContinuation: AsyncStream<NWConnection.State>.Continuation
 
-    init(url: URL) {
+    init(url: URL, headers: [String: String] = [:]) {
         let websocket = NWProtocolWebSocket.Options()
-        let parameters = NWParameters.tcp
+        if !headers.isEmpty { websocket.setAdditionalHeaders(headers.map { ($0.key, $0.value) }) }
+        let parameters: NWParameters = url.scheme == "wss" ? .tls : .tcp
         parameters.defaultProtocolStack.applicationProtocols.insert(websocket, at: 0)
         connection = NWConnection(to: .url(url), using: parameters)
         (incoming, continuation) = AsyncThrowingStream.makeStream(of: Data.self)

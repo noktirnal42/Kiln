@@ -10,15 +10,7 @@ struct KilnWatchApp: App {
     init() {
         let session = RemoteSession(
             store: KeychainPairingStore(),
-            connector: { pairing, progress in
-                await progress("Paired. Looking for your Mac…")
-                let url = try await BonjourResolver.resolve(serviceName: pairing.serviceName)
-                await progress("Found your Mac. Connecting…")
-                let transport = NWTransport(url: url)
-                try await transport.start()
-                await progress("Securing connection…")
-                return transport
-            },
+            connector: { pairing, progress in try await MacConnector.connect(pairing, progress: progress) },
             transcriber: DictationTranscriber(),
             speaker: SystemSpeaker(),
             haptics: WatchHaptics()

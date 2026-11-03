@@ -119,6 +119,7 @@ final class RemoteSession {
 
     private static func describe(_ error: Error) -> String {
         switch error {
+        case RemoteError.attemptsFailed(let tried): tried.isEmpty ? "Can't find your Mac" : "Tried " + tried.joined(separator: "; ")
         case RemoteError.timeout, RemoteError.notFound: "Can't find your Mac"
         case SecureChannelError.authenticationFailed, SecureChannelError.outOfOrder: "Pairing key rejected"
         default: "Can't reach your Mac"
