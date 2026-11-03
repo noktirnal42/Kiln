@@ -35,9 +35,9 @@ struct StatusBanner: View {
         case .connected, .unpaired:
             EmptyView()
         case .connecting:
-            banner("Connecting to \(session.hostName ?? "your Mac")…", systemImage: "antenna.radiowaves.left.and.right", tint: .secondary)
+            banner(session.attemptStatus ?? "Connecting to \(session.hostName ?? "your Mac")…", systemImage: "antenna.radiowaves.left.and.right", tint: .secondary)
         case .reconnecting(let reason):
-            banner("Reconnecting… \(reason)", systemImage: "arrow.triangle.2.circlepath", tint: .orange)
+            banner(session.attemptStatus.map { "Reconnecting. \($0)" } ?? "Reconnecting… \(reason)", systemImage: "arrow.triangle.2.circlepath", tint: .orange)
         case .needsRepairing:
             VStack(alignment: .leading, spacing: 6) {
                 banner("Your Mac no longer accepts this phone. Scan its pairing code again.", systemImage: "exclamationmark.triangle.fill", tint: .red)

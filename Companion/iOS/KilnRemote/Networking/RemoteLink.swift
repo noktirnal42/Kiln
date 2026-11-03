@@ -36,15 +36,17 @@ final class RemoteLink: @unchecked Sendable {
     private let queue = DispatchQueue(label: "kiln.remote.link")
     private let pairingKey: Data
     private let deviceName: String
+    private let handshakeTimeout: TimeInterval
     private var connection: NWConnection?
     private var channel: SecureChannel?
     private var clientNonce = Data()
     private var finished = false
     private var sawFrames = false
 
-    init(pairingKey: Data, deviceName: String) {
+    init(pairingKey: Data, deviceName: String, handshakeTimeout: TimeInterval = 10) {
         self.pairingKey = pairingKey
         self.deviceName = deviceName
+        self.handshakeTimeout = handshakeTimeout
         (events, continuation) = AsyncStream.makeStream(of: LinkEvent.self)
     }
 
@@ -68,7 +70,7 @@ final class RemoteLink: @unchecked Sendable {
             connection.stateUpdateHandler = { [weak self] state in self?.stateChanged(state) }
             connection.start(queue: queue)
             // Handshake, then the first frame, has to finish promptly or the Mac drops us anyway.
-            queue.asyncAfter(deadline: .now() + 10) { [weak self] in
+            queue.asyncAfter(deadline: .now() + handshakeTimeout) { [weak self] in
                 guard let self, !finished, !(channel != nil && sawFrames) else { return }
                 finish("The Mac did not answer in time.")
             }

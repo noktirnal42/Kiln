@@ -25,6 +25,8 @@ targets:
     sources: [KilnRemote]
     dependencies:
       - package: KilnRemoteKit
+      - target: KilnWatch
+        embed: true
     info:
       path: KilnRemote/Info.plist
       properties:
@@ -50,6 +52,34 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+
+  # The watch app lives in Companion/Watch; it is built here too and embedded so watchOS links it to this iPhone app
+  # (WatchConnectivity only works between a watch app and an iOS app installed as a pair).
+  KilnWatch:
+    type: application
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: ../Watch/Sources
+        excludes: [Info.plist]
+    dependencies:
+      - package: KilnRemoteKit
+    info:
+      path: KilnWatch/Info.plist
+      properties:
+        CFBundleDisplayName: Kiln
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.kiln.remote
+        WKRunsIndependentlyOfCompanionApp: true
+        NSLocalNetworkUsageDescription: Kiln talks to your Mac on the local network.
+        NSBonjourServices: [_kiln-remote._tcp]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kiln.remote.watchkitapp
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
 
