@@ -226,7 +226,7 @@ public struct ExecutionPolicy: Codable, Equatable, Sendable {
     /// Tools contributed by Kiln's own modules (Reverse Engineering, Model Lab). They are not in the
     /// fixed allowlist above, but each declares its permission level, which the mode cap, the
     /// approval gate and the agent's own tool set still enforce.
-    public static let moduleToolPrefixes = ["re_", "lab_", "swarm_"]
+    public static let moduleToolPrefixes = ["re_", "lab_", "swarm_", "mcp_", "computer_"]
     public static func isModuleTool(_ name: String) -> Bool { moduleToolPrefixes.contains { name.hasPrefix($0) } }
 
     /// A policy for modes that must not touch anything: read tools only.
@@ -251,7 +251,7 @@ public struct ExecutionPolicy: Codable, Equatable, Sendable {
         return registry.allSpecs().filter { spec in
             guard toolsAllowed.contains(spec.name) || Self.isModuleTool(spec.name) else { return false }
             guard permissions.isEnabled(spec.name) else { return false }
-            guard spec.permission <= cap else { return false }
+            guard spec.permission <= cap || (["mcp_call_tool", "computer_use"].contains(spec.name) && mode.allowsDirectWrites) else { return false }
             if mode.isReadOnly && !mode.allowsDirectWrites && spec.permission > .read { return false }
             guard !spec.requiresWorkspace || workspaceRoot != nil else { return false }
             return true

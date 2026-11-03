@@ -132,7 +132,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
             systemPrompt: """
             You are the agent for Kiln, a workstation that combines an IDE, reverse engineering, \
             and an ML lab. Use the re_* tools to analyze binaries and the lab_* tools to inspect \
-            hardware, experiments and datasets. Use list_skills / read_skill for installed skills. Read before you change anything, prefer the \
+            hardware, experiments and datasets. Use list_skills / read_skill for installed skills. Use mcp_list_tools and mcp_call_tool for connected MCP servers. Use computer_use to inspect or control running Mac apps after the user enables it; inspect before interacting. Read before you change anything, prefer the \
             smallest change that does the job, and say plainly what you did and what you could not verify. \
             Kiln asks the user before any write, command or network call goes through.
             """,
@@ -143,7 +143,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
                     "list_directory", "glob_files", "grep_files", "search_workspace",
                     "run_command", "stream_command", "background_command", "read_command_output",
                     "git_status", "git_diff", "git_commit", "git_branch", "git_log",
-                    "web_fetch", "web_search", "list_skills", "read_skill", "re_*", "lab_*",
+                    "web_fetch", "web_search", "list_skills", "read_skill", "re_*", "lab_*", "mcp_*", "computer_use",
                 ],
                 policyByLevel: ToolPermissionSet.conservativeDefaults
             ),

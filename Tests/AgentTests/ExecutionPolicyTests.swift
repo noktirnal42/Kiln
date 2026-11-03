@@ -76,6 +76,17 @@ struct ExecutionPolicyTests {
         #expect(offered.isEmpty)
     }
 
+    @Test func privilegedIntegrationsRequireAnActingProfileAndExplicitToolEnablement() {
+        let registry = ToolRegistry(tools: [MCPListTools(), MCPCallTool(), ComputerUseTool()])
+        let enabled = ToolPermissionSet(enabledTools: ["mcp_*", "computer_use"])
+        let acting = ExecutionPolicy(mode: .act).offeredTools(from: registry, permissions: enabled, workspaceRoot: nil)
+        #expect(Set(acting.map(\.name)) == Set(["mcp_list_tools", "mcp_call_tool", "computer_use"]))
+        let reviewing = ExecutionPolicy(mode: .review).offeredTools(from: registry, permissions: enabled, workspaceRoot: nil)
+        #expect(reviewing.map(\.name) == ["mcp_list_tools"])
+        let none = ExecutionPolicy(mode: .act).offeredTools(from: registry, permissions: ToolPermissionSet(enabledTools: []), workspaceRoot: nil)
+        #expect(none.isEmpty)
+    }
+
     // MARK: checkTool
 
     @Test func checkToolAllowsListedAndDeniesTheRest() {
