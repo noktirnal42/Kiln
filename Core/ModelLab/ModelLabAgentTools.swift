@@ -22,6 +22,10 @@ public enum ModelLabAgentTools {
         case cancelTraining = "cancel_training"
         case searchModels = "search_models"
         case searchDatasets = "search_datasets"
+        case importDataset = "import_dataset"
+        case createExperiment = "create_experiment"
+        case evaluate = "evaluate_predictions"
+        case exportModel = "export_model"
 
         var spec: ToolSpec {
             switch self {
@@ -51,6 +55,32 @@ public enum ModelLabAgentTools {
             case .searchDatasets:
                 ToolSpec(name: "lab_search_datasets", summary: "Search Hugging Face for datasets.",
                          parameters: [ToolParam(name: "query", description: "Search text")], permission: .execute)
+            case .importDataset:
+                ToolSpec(name: "lab_import_dataset", summary: "Copy a local CSV, TSV, JSON, JSONL, TXT file (or a folder of images) into the Model Lab dataset library and register it. Returns the dataset ID and its columns.",
+                         parameters: [ToolParam(name: "path", description: "Absolute path of the local file or folder")], permission: .write)
+            case .createExperiment:
+                ToolSpec(name: "lab_create_experiment", summary: "Create a draft Create ML classifier experiment over a registered dataset. Start it with lab_start_training.",
+                         parameters: [
+                            ToolParam(name: "name", description: "Experiment name"),
+                            ToolParam(name: "task", description: "text_classification or tabular_classification (use the exact task identifiers textClassification / tabularClassification)"),
+                            ToolParam(name: "dataset_id", description: "ID from lab_list_datasets or lab_import_dataset"),
+                            ToolParam(name: "input_columns", description: "Comma-separated input column names (exactly one for text classification)"),
+                            ToolParam(name: "label_column", description: "Name of the label column"),
+                            ToolParam(name: "validation_fraction", type: "number", description: "Share held out for validation, between 0 and 1; default 0.2", required: false),
+                         ], permission: .write)
+            case .evaluate:
+                ToolSpec(name: "lab_evaluate_predictions", summary: "Score predictions against references with accuracy, F1, BLEU and ROUGE (the same runner as the Evaluation tab). Pure computation; nothing is written.",
+                         parameters: [
+                            ToolParam(name: "predictions", type: "array", description: "Predicted strings, one per example"),
+                            ToolParam(name: "references", type: "array", description: "Reference strings in the same order"),
+                         ], permission: .read)
+            case .exportModel:
+                ToolSpec(name: "lab_export_model", summary: "Export a produced model artifact (Create ML .mlmodel/.mlpackage as core_ml, or MLX artifacts as mlx_package) to a new path. The destination must not exist; GGUF is not available.",
+                         parameters: [
+                            ToolParam(name: "artifact_id", description: "Artifact ID from lab_get_experiment"),
+                            ToolParam(name: "format", description: "core_ml or mlx_package"),
+                            ToolParam(name: "destination", description: "Absolute path for the exported file or folder (must not exist; its parent must)"),
+                         ], permission: .write)
             }
         }
     }
@@ -82,6 +112,54 @@ struct ModelLabAgentTool: ToolExecuting {
             return try await MainActor.run { try Self.cancelTraining(module, id: id) }
         case .datasets:
             return try await MainActor.run { try Self.datasets(module, limit: limit) }
+        case .importDataset:
+            let path = try Self.requiredString(args, "path")
+            return try await MainActor.run {
+                let record = try module.importLocalDataset(at: URL(fileURLWithPath: path))
+                return "Imported dataset \(record.id) · \(record.name) · \(record.formatRaw) · \(record.rowCount.map(String.init) ?? "?") rows · columns: \(record.columns.joined(separator: ", "))"
+            }
+        case .createExperiment:
+            let rawTask = try Self.requiredString(args, "task").lowercased().replacingOccurrences(of: "_", with: "")
+            guard let task = TaskType.allCases.first(where: { $0.rawValue.lowercased() == rawTask }) else {
+                throw ModelLabToolError.invalid("task must be text_classification or tabular_classification")
+            }
+            let inputs = try Self.requiredString(args, "input_columns").split(separator: ",").map(String.init)
+            let fraction = (args["validation_fraction"] as? Double) ?? 0.2
+            let name = try Self.requiredString(args, "name")
+            let datasetID = try Self.requiredString(args, "dataset_id")
+            let label = try Self.requiredString(args, "label_column")
+            return try await MainActor.run {
+                let record = try module.createClassifierExperiment(name: name, task: task, datasetID: datasetID,
+                                                                   inputColumns: inputs, labelColumn: label, validationFraction: fraction)
+                return "Created draft experiment \(record.id) · \(record.name). Start it with lab_start_training, then poll lab_get_experiment."
+            }
+        case .evaluate:
+            let predictions = (args["predictions"] as? [Any])?.map { "\($0)" } ?? []
+            let references = (args["references"] as? [Any])?.map { "\($0)" } ?? []
+            guard !predictions.isEmpty, predictions.count == references.count else {
+                throw ModelLabToolError.invalid("predictions and references must be non-empty arrays of the same length")
+            }
+            let run = try EvaluationRunner().evaluate(
+                modelName: "agent", predictions: predictions, references: references,
+                metrics: [AccuracyMetric(), F1Metric(), BLEUMetric(), ROUGEMetric(.rouge1), ROUGEMetric(.rouge2), ROUGEMetric(.rougeL)])
+            return run.outcomes.map { String(format: "%@ = %.4f%@", $0.metricName, $0.value, $0.lowerIsBetter ? " (lower is better)" : "") }
+                .joined(separator: "\n") + "\n\(predictions.count) examples"
+        case .exportModel:
+            let id = try Self.requiredString(args, "artifact_id")
+            let formatName = try Self.requiredString(args, "format").lowercased()
+            let format: ModelExporters.ExportFormat
+            switch formatName {
+            case "core_ml", "coreml": format = .coreML
+            case "mlx_package", "mlx": format = .mlxPackage
+            default: throw ModelLabToolError.invalid("format must be core_ml or mlx_package (GGUF is unavailable)")
+            }
+            let destination = URL(fileURLWithPath: try Self.requiredString(args, "destination"))
+            guard destination.path.hasPrefix("/") else { throw ModelLabToolError.invalid("destination must be an absolute path") }
+            guard !FileManager.default.fileExists(atPath: destination.path) else {
+                throw ModelLabToolError.invalid("\(destination.path) already exists; choose a new path so nothing is overwritten")
+            }
+            let exported = try await MainActor.run { try module.exportArtifact(id: id, format: format, destination: destination) }
+            return "Exported to \(exported.path)"
         case .searchModels:
             let query = try Self.query(args)
             let results = try await module.searchHuggingFaceModels(query: query)
@@ -114,6 +192,12 @@ struct ModelLabAgentTool: ToolExecuting {
         return "\(chip), \(hardware.memoryGB) GB unified memory, \(hardware.coreCount) cores"
             + (hardware.metalDeviceName.map { ", GPU \($0)" } ?? "")
             + String(format: ". Working limit about %.1f GB for model weights plus overhead.", limitGB)
+    }
+
+    static func requiredString(_ args: [String: Any], _ key: String) throws -> String {
+        let value = ((args[key] as? String) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { throw ModelLabToolError.invalid("\(key) is required") }
+        return value
     }
 
     static func experimentID(_ args: [String: Any]) throws -> String {
@@ -177,9 +261,11 @@ struct ModelLabAgentTool: ToolExecuting {
 
 enum ModelLabToolError: Error, CustomStringConvertible {
     case missingQuery, missingExperimentID, storeUnavailable
+    case invalid(String)
     case experimentNotFound(String), experimentNotRunning(String)
     var description: String {
         switch self {
+        case .invalid(let message): message
         case .missingQuery: "query is required"
         case .missingExperimentID: "experiment_id is required"
         case .storeUnavailable: "Model Lab store is unavailable"

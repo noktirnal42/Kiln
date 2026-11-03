@@ -23,7 +23,7 @@ public final class ModelLabModule: @preconcurrency Module, ModuleDefinition, Mod
 
     // MARK: State
 
-    public private(set) var container: ModelContainer? = nil
+    public internal(set) var container: ModelContainer? = nil
     public private(set) var bootstrapError: String? = nil
     public private(set) var hardware = HardwareProfile.current()
     public private(set) var capabilityReports: [CapabilityReport] = []
