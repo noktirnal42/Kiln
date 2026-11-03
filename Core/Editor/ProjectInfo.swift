@@ -184,3 +184,68 @@ public enum TestOutputParser {
         return order.compactMap { results[$0] }
     }
 }
+
+
+/// Finds the executable a build produced, so the debugger can launch it.
+public enum ProgramResolver {
+    /// Supports both xcodebuild's structured settings and its human-readable output.
+    public static func parseBuildSettings(_ text: String, preferredTarget: String? = nil) -> String? {
+        func executable(_ settings: [String: String]) -> String? {
+            guard let directory = settings["TARGET_BUILD_DIR"], !directory.isEmpty,
+                  let path = settings["EXECUTABLE_PATH"], !path.isEmpty else { return nil }
+            return URL(fileURLWithPath: directory).appendingPathComponent(path).path
+        }
+        if let rows = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [[String: Any]] {
+            let runnable = rows.filter { row in
+                guard let settings = row["buildSettings"] as? [String: String] else { return false }
+                return settings["MACH_O_TYPE"] == "mh_execute"
+                    || settings["PRODUCT_TYPE"] == "com.apple.product-type.application"
+            }
+            let row = runnable.first { $0["target"] as? String == preferredTarget } ?? runnable.first
+            return (row?["buildSettings"] as? [String: String]).flatMap(executable)
+        }
+        var values: [String: String] = [:]
+        for line in text.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard let separator = trimmed.range(of: " = ") else { continue }
+            values[String(trimmed[..<separator.lowerBound])] = String(trimmed[separator.upperBound...])
+        }
+        return executable(values)
+    }
+
+    public static func resolve(info: ProjectInfo, selection: BuildSelection, root: URL) async -> String? {
+        await Task.detached(priority: .userInitiated) { () -> String? in
+            func run(_ arguments: [String]) -> String {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+                process.arguments = arguments
+                process.currentDirectoryURL = root
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = FileHandle.nullDevice
+                do { try process.run() } catch { return "" }
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                guard process.terminationStatus == 0 else { return "" }
+                return String(decoding: data, as: UTF8.self)
+            }
+            switch info.kind {
+            case .swiftPackage:
+                let arguments = ["swift", "build"] + (selection.configuration == "release" ? ["-c", "release"] : []) + ["--show-bin-path"]
+                let binPath = run(arguments).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let product = info.executables.first, !binPath.isEmpty else { return nil }
+                return URL(fileURLWithPath: binPath).appendingPathComponent(product).path
+            case .xcodeProject, .xcodeWorkspace:
+                guard let container = info.container else { return nil }
+                let scheme = selection.scheme ?? info.schemes.first ?? (container as NSString).deletingPathExtension
+                let flag = info.kind == .xcodeWorkspace ? "-workspace" : "-project"
+                var arguments = ["xcodebuild", flag, container, "-scheme", scheme, "-destination", "platform=macOS"]
+                if let configuration = selection.configuration { arguments += ["-configuration", configuration] }
+                arguments += ["-showBuildSettings", "-json"]
+                return parseBuildSettings(run(arguments), preferredTarget: scheme)
+            case .other:
+                return nil
+            }
+        }.value
+    }
+}

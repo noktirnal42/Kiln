@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         guard let appModel else { return }
         let model = appModel
+        MainActor.assumeIsolated { model.editor.debug.reset() }
         Task { @MainActor in
             await model.shutdown()
         }

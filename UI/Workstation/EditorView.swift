@@ -2,8 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Develop → Editor: a file navigator, tabs, and a native code editor over the open project, with build output and
-/// clickable problems. It is a text editor with a build button, not Xcode: there is no language server, debugger or
-/// previews yet (see docs/KNOWN-ISSUES.md).
+/// clickable problems, SourceKit language services and an LLDB debugger. See docs/KNOWN-ISSUES.md for limits.
 struct EditorView: View {
     @Environment(AppModel.self) private var app
     @State private var caret = (line: 1, column: 1)
@@ -21,6 +20,13 @@ struct EditorView: View {
     @State private var fileActionName = ""
     @State private var fileError: String?
     @State private var showSettings = false
+    @State private var showBuildOptions = false
+    @State private var debugPane = DebugPane.variables
+    enum DebugPane: String, CaseIterable { case stack = "Stack", variables = "Variables", console = "Console" }
+    @State private var preparingDebugger = false
+    @State private var bottomMode = BottomMode.problems
+    enum BottomMode: String, CaseIterable { case problems = "Problems", debug = "Debug" }
+    private var debug: DebugSession { editor.debug }
     private var settings: EditorSettings { EditorSettings.shared }
 
     enum NavigatorMode: String, CaseIterable { case files = "Files", search = "Find", changes = "Changes" }
@@ -44,7 +50,7 @@ struct EditorView: View {
             Divider()
             HSplitView {
                 navigator
-                    .frame(minWidth: 160, idealWidth: 220, maxWidth: 380)
+                    .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
                 VStack(spacing: 0) {
                     tabBar
                     Divider()
@@ -83,6 +89,14 @@ struct EditorView: View {
             editor.setRoot(root)
             if let url = editor.root { Task { await builder.loadProject(at: url) } }
         }
+        .onChange(of: debug.isPaused) { _, paused in
+            if paused { bottomMode = .debug; showProblems = true }
+        }
+        .onChange(of: debug.currentLocation.map { "\($0.path):\($0.line)" }) { _, _ in
+            if debug.isPaused, let location = debug.currentLocation {
+                editor.open(URL(fileURLWithPath: location.path), line: location.line)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in editor.writeRecovery() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in editor.tick() }
     }
@@ -90,31 +104,55 @@ struct EditorView: View {
     // MARK: Toolbar
 
     private var toolbar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: SSSpacing.s) {
             Button { showQuickOpen = true } label: { Label("Open Quickly", systemImage: "magnifyingglass") }
                 .disabled(editor.root == nil)
+                .help("Open Quickly (⌘P)")
             Button { editor.active.map { editor.save($0) } } label: { Label("Save", systemImage: "square.and.arrow.down") }
                 .disabled(!(editor.active?.isDirty ?? false))
+                .help("Save (⌘S)")
             Button { editor.saveAll() } label: { Label("Save All", systemImage: "square.and.arrow.down.on.square") }
                 .disabled(!editor.hasUnsavedChanges)
+                .help("Save all open files (⇧⌘S)")
             Divider().frame(height: 16)
             Button { runBuild() } label: {
                 Label(builder.isRunning ? "Building…" : buildTitle, systemImage: "hammer")
             }
-            .disabled(builder.isRunning || editor.root == nil || buildCommand == nil)
+            .disabled(builder.isRunning || debug.isActive || preparingDebugger || editor.root == nil || buildCommand == nil)
+            .help("Build the current project (⌘B)")
             targetPickers
             Button { runTests() } label: { Label("Test", systemImage: "checkmark.diamond") }
-                .disabled(builder.isRunning || ProjectCommands.test(info: builder.info, selection: builder.selection) == nil)
+                .disabled(builder.isRunning || debug.isActive || preparingDebugger || ProjectCommands.test(info: builder.info, selection: builder.selection) == nil)
                 .help("Run the project's tests (⌘U)")
+            Button { toggleBreakpointAtCaret() } label: { Label("Toggle Breakpoint", systemImage: "record.circle") }
+                .disabled(editor.active == nil)
+                .help("Toggle breakpoint at the caret (⌘\\)")
+            if debug.isActive {
+                debugControls
+            } else {
+                Button { startDebugging() } label: { Label(preparingDebugger ? "Preparing…" : "Debug", systemImage: "ant") }
+                    .disabled(builder.isRunning || preparingDebugger || ProjectCommands.run(info: builder.info, selection: builder.selection) == nil || !DebugSession.isAvailable)
+                    .help("Build, then run under the debugger. Click the gutter to set breakpoints (⌥⌘R)")
+            }
             Button { runApp() } label: { Label("Run", systemImage: "play.fill") }
-                .disabled(builder.isRunning || ProjectCommands.run(info: builder.info, selection: builder.selection) == nil)
+                .disabled(builder.isRunning || debug.isActive || preparingDebugger || ProjectCommands.run(info: builder.info, selection: builder.selection) == nil)
                 .help("Build and run (⌘R)")
             if builder.isRunning {
                 Button { builder.cancel() } label: { Label("Stop", systemImage: "stop.fill") }
             }
-            TextField("Custom command (optional)", text: Bindable(builder).customCommand)
-                .textFieldStyle(.roundedBorder).frame(maxWidth: 220).font(SSTypography.caption())
-                .help("Runs instead of the detected build command, from the project folder, through a login shell")
+            Button { showBuildOptions.toggle() } label: { Label("Build options", systemImage: "terminal") }
+                .help("Custom build command")
+                .popover(isPresented: $showBuildOptions) {
+                    VStack(alignment: .leading, spacing: SSSpacing.s) {
+                        Text("Custom build command").font(SSTypography.headline())
+                        TextField("Use the detected build command", text: Bindable(builder).customCommand)
+                            .textFieldStyle(.roundedBorder)
+                        Text("Leave empty to use the project's normal build. A custom command runs in the current project folder.")
+                            .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    }
+                    .padding(SSSpacing.m).frame(width: 300)
+                }
             Spacer()
             if builder.isRunning {
                 ProgressView().controlSize(.small)
@@ -138,9 +176,14 @@ struct EditorView: View {
             Toggle("Hidden files", isOn: Binding(get: { editor.showHidden }, set: { editor.showHidden = $0; treeVersion += 1 }))
                 .toggleStyle(.checkbox).font(SSTypography.caption())
         }
+        .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
         .padding(.horizontal, SSSpacing.m)
         .padding(.vertical, SSSpacing.xs)
+        }
+        .frame(height: 38)
     }
 
     private var settingsPanel: some View {
@@ -165,28 +208,79 @@ struct EditorView: View {
 
     private var buildCommand: String? { buildPlan?.command }
 
+    @ViewBuilder
+    private var debugControls: some View {
+        Group {
+            if debug.isPaused {
+                Button { Task { await debug.resume() } } label: { Label("Continue", systemImage: "play.fill") }.keyboardShortcut("y", modifiers: [.command, .control])
+                Button { Task { await debug.stepOver() } } label: { Label("Over", systemImage: "arrow.right.to.line") }.keyboardShortcut("'", modifiers: .command)
+                Button { Task { await debug.stepInto() } } label: { Label("Into", systemImage: "arrow.down.to.line") }.keyboardShortcut(";", modifiers: .command)
+                Button { Task { await debug.stepOut() } } label: { Label("Out", systemImage: "arrow.up.to.line") }.keyboardShortcut(";", modifiers: [.command, .shift])
+            } else {
+                Button { Task { await debug.pause() } } label: { Label("Pause", systemImage: "pause.fill") }
+            }
+            Button { Task { await debug.stop() } } label: { Label("Stop", systemImage: "stop.fill") }.foregroundStyle(SSColor.danger)
+        }
+    }
+
+    /// Builds with the selected scheme, resolves the executable, then runs it under lldb.
+    private func startDebugging() {
+        guard !preparingDebugger, !builder.isRunning, !debug.isActive,
+              let root = editor.root, let plan = buildPlan else { return }
+        guard editor.saveProjectDocuments() else {
+            fileError = "Save all changes before starting the debugger."
+            return
+        }
+        let info = builder.info
+        let selection = builder.selection
+        preparingDebugger = true
+        bottomMode = .debug
+        showProblems = true
+        Task {
+            defer { preparingDebugger = false }
+            builder.run(command: plan.command, in: root, kind: .build)
+            while builder.isRunning { try? await Task.sleep(nanoseconds: 100_000_000) }
+            guard editor.root == root else { return }
+            guard builder.lastExitStatus == 0 else { bottomMode = .problems; return }
+            guard let program = await ProgramResolver.resolve(info: info, selection: selection, root: root) else {
+                fileError = "Kiln could not find the built executable to debug."
+                return
+            }
+            guard editor.root == root else { return }
+            await debug.start(program: program, workingDirectory: root)
+        }
+    }
+
     private var buildTitle: String {
         if !builder.customCommand.trimmingCharacters(in: .whitespaces).isEmpty { return "Run custom" }
         return buildPlan.map { "Build (\($0.title))" } ?? "Build"
     }
 
+    private func toggleBreakpointAtCaret() {
+        guard let document = editor.active else { return }
+        editor.toggleBreakpoint(document.url, line: caret.line)
+    }
+
     private func runBuild() {
+        guard !debug.isActive, !preparingDebugger else { return }
         guard let root = editor.root, let command = buildCommand else { return }
-        editor.saveAll()
+        guard editor.saveProjectDocuments() else { return }
         builder.run(command: command, in: root, kind: .build)
         showProblems = true
     }
 
     private func runTests(filter: String? = nil) {
+        guard !debug.isActive, !preparingDebugger else { return }
         guard let root = editor.root, let plan = ProjectCommands.test(info: builder.info, selection: builder.selection, filter: filter) else { return }
-        editor.saveAll()
+        guard editor.saveProjectDocuments() else { return }
         builder.run(command: plan.command, in: root, kind: .test)
         showProblems = true
     }
 
     private func runApp() {
+        guard !debug.isActive, !preparingDebugger else { return }
         guard let root = editor.root, let plan = ProjectCommands.run(info: builder.info, selection: builder.selection) else { return }
-        editor.saveAll()
+        guard editor.saveProjectDocuments() else { return }
         builder.run(command: plan.command, in: root, kind: .run)
         showProblems = true
     }
@@ -221,6 +315,8 @@ struct EditorView: View {
             Button("") { editor.saveAll() }.keyboardShortcut("s", modifiers: [.command, .shift])
             Button("") { showQuickOpen = true }.keyboardShortcut("p", modifiers: .command)
             Button("") { runBuild() }.keyboardShortcut("b", modifiers: .command)
+            Button("") { toggleBreakpointAtCaret() }.keyboardShortcut("\\", modifiers: .command)
+            Button("") { if !debug.isActive { startDebugging() } }.keyboardShortcut("r", modifiers: [.command, .option])
             Button("") { runTests() }.keyboardShortcut("u", modifiers: .command)
             Button("") { runApp() }.keyboardShortcut("r", modifiers: .command)
             Button("") { requestClose(editor.active) }.keyboardShortcut("w", modifiers: .command)
@@ -520,6 +616,9 @@ struct EditorView: View {
                 onCaretMove: { if tracksCaret { caret = ($0, $1) } },
                 diagnostics: editor.languageServer.diagnostics[document.url.path] ?? [],
                 onEdited: { editor.noteEdited(document) },
+                breakpointLines: editor.breakpointLines(for: document.url),
+                executionLine: debug.currentLocation.flatMap { DebugSession.canonicalSourcePath($0.path) == DebugSession.canonicalSourcePath(document.url.path) ? $0.line : nil },
+                onToggleBreakpoint: { editor.toggleBreakpoint(document.url, line: $0) },
                 onDefinition: { line, column in
                     Task {
                         if let target = await editor.languageServer.definition(url: document.url, line: line, column: column) {
@@ -575,13 +674,89 @@ struct EditorView: View {
         }
         .font(SSTypography.caption())
         .foregroundStyle(.secondary)
+        .lineLimit(1)
         .padding(.horizontal, SSSpacing.m).padding(.vertical, 3)
+    }
+
+    private var debugPanel: some View {
+        GeometryReader { geometry in
+            if geometry.size.width >= 620 {
+                HSplitView {
+                    debugFrames.frame(minWidth: 180)
+                    debugVariables.frame(minWidth: 200)
+                    debugConsole.frame(minWidth: 180)
+                }
+            } else {
+                VStack(spacing: 0) {
+                    Picker("Debugger pane", selection: $debugPane) {
+                        ForEach(DebugPane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().padding(.horizontal, SSSpacing.xs)
+                    switch debugPane {
+                    case .stack: debugFrames
+                    case .variables: debugVariables
+                    case .console: debugConsole
+                    }
+                }
+            }
+        }
+    }
+
+    private var debugFrames: some View {
+            List(debug.frames) { frame in
+                Button { Task { await debug.selectFrame(frame.id) } } label: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(frame.name).font(SSTypography.caption()).lineLimit(1)
+                        Text(frame.path.map { "\(editor.displayPath(URL(fileURLWithPath: $0))):\(frame.line)" } ?? "no source")
+                            .font(SSTypography.mono(10)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
+                    }
+                    .padding(.vertical, 1)
+                    .background(frame.id == debug.selectedFrameID ? Color.accentColor.opacity(0.18) : Color.clear)
+                }
+                .buttonStyle(.plain)
+            }
+            .overlay { if debug.frames.isEmpty { Text(debugStatus).font(SSTypography.caption()).foregroundStyle(.secondary) } }
+    }
+
+    private var debugVariables: some View {
+            List(debug.variables) { variable in
+                HStack(alignment: .top, spacing: 6) {
+                    Text(variable.name).font(SSTypography.mono(11)).foregroundStyle(SSColor.accent)
+                    Text(variable.value).font(SSTypography.mono(11)).lineLimit(4).textSelection(.enabled)
+                    Spacer(minLength: 0)
+                    if let type = variable.type { Text(type).font(SSTypography.mono(9)).foregroundStyle(.tertiary).lineLimit(1) }
+                }
+            }
+    }
+
+    private var debugConsole: some View {
+            ScrollView {
+                Text(debug.console.isEmpty ? " " : debug.console).font(SSTypography.mono(10)).textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(SSSpacing.xs)
+            }
+    }
+
+    private var debugStatus: String {
+        switch debug.state {
+        case .idle: "Press Debug (⌥⌘R) to build and run under the debugger. Click the gutter to set breakpoints."
+        case .starting: "Starting…"
+        case .running: "Running. Hit a breakpoint or press Pause."
+        case .paused(let reason): "Paused (\(reason))"
+        case .finished(let code): "Finished" + (code.map { " with exit code \($0)" } ?? "")
+        case .failed(let message): message
+        }
     }
 
     private var problemsPanel: some View {
         VStack(spacing: 0) {
             Divider()
-            if allDiagnostics.isEmpty && builder.output.isEmpty {
+            Picker("", selection: $bottomMode) {
+                ForEach(BottomMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 220).padding(SSSpacing.xs)
+            if bottomMode == .debug {
+                debugPanel
+            } else if allDiagnostics.isEmpty && builder.output.isEmpty {
                 Text(editor.root == nil ? "" : "Build output and problems appear here. ⌘B builds the project.")
                     .font(SSTypography.caption()).foregroundStyle(.secondary).padding(SSSpacing.s)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -631,7 +806,7 @@ struct EditorView: View {
                 }
             }
         }
-        .frame(height: 170)
+        .frame(height: 190)
         .clipped()
     }
 

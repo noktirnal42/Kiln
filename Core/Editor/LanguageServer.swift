@@ -96,6 +96,7 @@ public final class LanguageServerClient {
     public func start(root: URL) async {
         guard state == .stopped || { if case .failed = state { return true } else { return false } }() else { return }
         self.root = root
+        signal(SIGPIPE, SIG_IGN)
         state = .starting
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")

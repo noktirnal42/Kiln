@@ -14,6 +14,10 @@ struct CodeTextView: NSViewRepresentable {
     /// Live diagnostics for this file, drawn as underlines.
     var diagnostics: [LSPDiagnostic] = []
     var onEdited: () -> Void = {}
+    /// Breakpoint lines (1-based) and the line execution is paused on, drawn in the gutter; clicking the gutter toggles a breakpoint.
+    var breakpointLines: Set<Int> = []
+    var executionLine: Int?
+    var onToggleBreakpoint: (_ line: Int) -> Void = { _ in }
     /// ⌘-click: 0-based line and UTF-16 column.
     var onDefinition: (_ line: Int, _ column: Int) -> Void = { _, _ in }
     /// ⌥Esc / F5: asks the server, then shows the system completion popup.
@@ -82,6 +86,11 @@ struct CodeTextView: NSViewRepresentable {
         }
         coordinator.applySettings(settings, to: textView, scroll: scroll)
         coordinator.applyDiagnostics(diagnostics, to: textView)
+        if let ruler = scroll.verticalRulerView as? LineNumberRuler {
+            ruler.breakpointLines = breakpointLines
+            ruler.executionLine = executionLine
+            ruler.onToggleBreakpoint = onToggleBreakpoint
+        }
         if coordinator.lastGitBase != document.gitBase {
             coordinator.lastGitBase = document.gitBase
             coordinator.refreshGutter()
@@ -311,6 +320,24 @@ final class LineNumberRuler: NSRulerView {
     private weak var textView: NSTextView?
     /// Committed-vs-current differences, drawn as coloured bars beside the numbers.
     var hunks: [LineDiff.Hunk] = [] { didSet { needsDisplay = true } }
+    var breakpointLines: Set<Int> = [] { didSet { if oldValue != breakpointLines { needsDisplay = true } } }
+    var executionLine: Int? { didSet { if oldValue != executionLine { needsDisplay = true } } }
+    var onToggleBreakpoint: (Int) -> Void = { _ in }
+
+    /// A click in the gutter toggles a breakpoint on that line.
+    override func mouseDown(with event: NSEvent) {
+        guard let textView, let layout = textView.layoutManager, let container = textView.textContainer else { return }
+        guard layout.numberOfGlyphs > 0 else { return }
+        let point = textView.convert(event.locationInWindow, from: nil)
+        let glyph = layout.glyphIndex(for: NSPoint(x: 1, y: point.y - textView.textContainerInset.height), in: container)
+        guard glyph < layout.numberOfGlyphs else { return }
+        let char = layout.characterIndexForGlyph(at: glyph)
+        let text = textView.string as NSString
+        var line = 1
+        var cursor = 0
+        while cursor < min(char, text.length) { if text.character(at: cursor) == 10 { line += 1 }; cursor += 1 }
+        onToggleBreakpoint(line)
+    }
 
     init(scrollView: NSScrollView, textView: NSTextView) {
         self.textView = textView
@@ -359,6 +386,14 @@ final class LineNumberRuler: NSRulerView {
                 let size = label.size(withAttributes: attributes)
                 let y = fragment.minY + textView.textContainerInset.height - visible.minY
                 label.draw(at: NSPoint(x: ruleThickness - size.width - 8, y: y + (fragment.height - size.height) / 2), withAttributes: attributes)
+                if executionLine == line {
+                    NSColor.systemYellow.withAlphaComponent(0.25).setFill()
+                    NSRect(x: 0, y: y, width: ruleThickness, height: fragment.height).fill()
+                }
+                if breakpointLines.contains(line) {
+                    NSColor.systemRed.setFill()
+                    NSBezierPath(ovalIn: NSRect(x: 4, y: y + (fragment.height - 9) / 2, width: 9, height: 9)).fill()
+                }
                 if let hunk = LineDiff.hunk(at: line - 1, in: hunks) {
                     let color: NSColor = hunk.kind == .added ? .systemGreen : hunk.kind == .modified ? .systemBlue : .systemRed
                     color.setFill()

@@ -16,6 +16,8 @@ public final class EditorWorkspace {
     public var git = GitService()
     /// Live diagnostics, go to definition and completion for Swift / C-family files (sourcekit-lsp).
     public let languageServer = LanguageServerClient()
+    /// The debugger; breakpoints are kept per project and survive relaunch.
+    public let debug = DebugSession()
     public var languageServerEnabled = true
     public private(set) var documents: [EditorDocument] = []
     public var activeID: UUID?
@@ -74,11 +76,17 @@ public final class EditorWorkspace {
 
     /// Points the editor at a project folder. Open files outside it stay open (they are still the user's work).
     public func setRoot(_ path: String?) {
-        guard let path, !path.isEmpty else { root = nil; return }
+        guard let path, !path.isEmpty else {
+            if root != nil { languageServer.stop(); debug.reset() }
+            root = nil
+            debug.breakpoints = [:]
+            return
+        }
         let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
         guard url != root else { return }
-        if root != nil { languageServer.stop() }
+        if root != nil { languageServer.stop(); debug.reset() }
         root = url
+        loadBreakpoints()
     }
 
     public nonisolated static let ignoredNames: Set<String> = [
@@ -121,7 +129,9 @@ public final class EditorWorkspace {
     @discardableResult
     public func open(_ url: URL, line: Int? = nil, column: Int = 1) -> EditorDocument {
         let url = url.standardizedFileURL
-        if let existing = documents.first(where: { $0.url == url }) {
+        if let existing = documents.first(where: {
+            DebugSession.canonicalSourcePath($0.url.path) == DebugSession.canonicalSourcePath(url.path)
+        }) {
             activeID = existing.id
             existing.checkForExternalChange()
             if let line { pendingLine = (existing.id, line, column) }
@@ -165,6 +175,22 @@ public final class EditorWorkspace {
         languageServer.didChange(url: document.url, text: document.text)
     }
 
+    // MARK: Breakpoints
+
+    private var breakpointsKey: String { "debug.breakpoints." + (root?.path ?? "") }
+
+    private func loadBreakpoints() {
+        let stored = UserDefaults.standard.dictionary(forKey: breakpointsKey) as? [String: [Int]] ?? [:]
+        debug.breakpoints = stored.mapValues(Set.init)
+    }
+
+    public func toggleBreakpoint(_ url: URL, line: Int) {
+        debug.toggleBreakpoint(path: url.path, line: line)
+        UserDefaults.standard.set(debug.breakpoints.mapValues { $0.sorted() }, forKey: breakpointsKey)
+    }
+
+    public func breakpointLines(for url: URL) -> Set<Int> { debug.breakpoints[url.path] ?? [] }
+
     /// Reads the committed version off the main thread; the gutter markers appear once it arrives.
     public func loadGitBase(for document: EditorDocument) {
         let url = document.url
@@ -202,6 +228,19 @@ public final class EditorWorkspace {
         } catch {
             message = error.localizedDescription
         }
+    }
+
+    /// Build actions save only the current project; unrelated open drafts remain untouched.
+    @discardableResult
+    public func saveProjectDocuments() -> Bool {
+        guard let root else { return false }
+        let directory = DebugSession.canonicalSourcePath(root.path)
+        func belongs(_ document: EditorDocument) -> Bool {
+            let path = DebugSession.canonicalSourcePath(document.url.path)
+            return path.hasPrefix(directory == "/" ? "/" : directory + "/")
+        }
+        for document in dirtyDocuments where belongs(document) { save(document) }
+        return !dirtyDocuments.contains(where: belongs)
     }
 
     public func saveAll() {

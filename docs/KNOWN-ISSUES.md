@@ -6,9 +6,9 @@ This is the contributor-facing gap list for Kiln's current development state. Th
 
 ## Develop is a capable editor, not Xcode
 
-**Observed:** Develop → Editor has a language server (Swift and C-family only), build/test/run with schemes, git gutter markers and a split pane (see `docs/11-CURRENT-STATE.md`). It has **no debugger**, no SwiftUI previews, no code folding or multi-cursor, no language server for other languages, and no stage-hunk or blame UI in the editor.
+**Observed:** Develop → Editor has a language server (Swift and C-family only), build/test/run with schemes, git gutter markers and a split pane (see `docs/11-CURRENT-STATE.md`). It now has a launch debugger backed by LLDB: file/line breakpoints, stepping, stack, locals and console. It has no debugger attach, conditional breakpoints or watches, no SwiftUI previews, no code folding or multi-cursor, no language server for other languages, and no stage-hunk or blame UI in the editor.
 
-**Needed:** a debugger (LLDB) is tracked in #16; remaining editor features in #20. Do not describe Kiln as having Xcode parity.
+**Verified (2026-11-02):** real Swift programs exercised breakpoints, locals, stepping, restart, launch failure, project switching, and same-named files in separate targets. Build actions preserve unrelated projects' unsaved drafts. Broader debugger workflows remain tracked in #16; remaining editor features in #20. Do not describe Kiln as having Xcode parity.
 
 ## Small local model tool use is unreliable
 
@@ -42,9 +42,9 @@ This is the contributor-facing gap list for Kiln's current development state. Th
 
 ## Reverse-engineering depth depends on external tooling
 
-**Observed:** native Mach-O import and inspection work, including a labeled linear disassembly fallback for stripped binaries. Linear listings do not recover function boundaries or establish decompiler parity. Ghidra is optional and was not configured during this QA pass. The bundled cipher-classifier data is a placeholder, not a trained classifier.
+**Observed:** native Mach-O import and inspection work, including a labeled linear disassembly fallback for stripped binaries. Linear listings do not recover function boundaries or establish decompiler parity. Ghidra is optional. Kiln now discovers existing stable installations in user/system Applications (or valid `GHIDRA_HOME`), bundles the export script, and exposes GUI and execution-gated agent analysis through the same service. A real installed Ghidra 12.1.4 / Java 21 run imported and decompiled `/usr/bin/true`, persisted pseudocode, preserved annotations and rejected concurrent analysis. The bundled cipher-classifier data is a placeholder, not a trained classifier.
 
-**Needed:** supported Ghidra installation/configuration and real decompilation fixtures; honest capability states; a licensed, evaluated model and dataset if cipher classification is pursued. Do not label placeholder classification as working.
+**Needed:** broader Ghidra version/architecture and complex-binary fixtures; cancellation UI and explicit installation chooser; honest capability states; a licensed, evaluated model and dataset if cipher classification is pursued. Do not label placeholder classification as working.
 
 ## Export and model compatibility need broader coverage
 
@@ -89,3 +89,7 @@ A full regression run exercised 456 tests and found one nested-path indexing fai
 Live tests require compatible providers, credentials, model availability, and sometimes API credits. A listed model may return a payment error even when another model on the same provider works. A command reporting success with zero selected tests is not verification.
 
 The suite was 520 tests and passing on 2026-11-02.
+
+## Latest debugger and Ghidra verification
+
+The 2026-11-02 continuation passed **538 tests in 100 suites**, including one opt-in installed-Ghidra integration test (537 regular tests). See [the QA record](14-DEBUGGER-AND-GHIDRA-QA.md) for scope and remaining limits. A passing app suite does not certify every provider/model, every model-training lifecycle or full Xcode/Ghidra parity.

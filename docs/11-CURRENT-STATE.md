@@ -12,7 +12,7 @@ Older docs describe the plan; this describes the app.
 - Signing: automatic, team `LH8KLB9N4F`, Apple Development identity; Release archives are re-signed with
   Developer ID at export. `xcodeVersion: 2710` plus the recommended build settings keep Xcode's
   "Update to recommended settings" prompt away. Bump it when moving to a newer Xcode.
-- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (520 tests, no
+- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (537 regular tests; 538 including the opt-in live Ghidra test, no
   warnings except four from mlx-swift's Metal kernels, which cannot be silenced from this project; mlx-swift 0.32
   is worse, 76 warnings).
 - **Notarize from Xcode:** Product → Archive, Organizer → Distribute App → Direct Distribution → Export
@@ -43,8 +43,11 @@ One window, one sidebar, one conversation.
   ⌘-click go to definition and ⌥Esc completion; it degrades to nothing when `xcrun sourcekit-lsp` is unavailable. **Git:** gutter markers against HEAD, "Revert
   Change" at the caret. **Build / Test / Run** (⌘B, ⌘U, ⌘R): scheme and configuration pickers from `xcodebuild -list` / `swift package describe` (remembered per
   project), streamed output, `file:line:col: error:` and Swift Testing issues as clickable problems, a test list with per-test results and "Run only this test", and
-  Run for packages and Xcode apps; "Ask the agent to fix the errors" drafts a prompt. **Not in Kiln:** a debugger (breakpoints, stepping, variables), SwiftUI
-  previews, code folding, multi-cursor, completion/diagnostics for languages other than Swift/C-family, and stage-hunk / blame UI in the editor.
+  Run for packages and Xcode apps; "Ask the agent to fix the errors" drafts a prompt. **Debugger:** Debug (⌥⌘R) builds the selected target and launches it under LLDB.
+  Toggle file/line breakpoints from the gutter or at the caret (⌘\); continue, pause, step over/into/out, inspect the stack and locals, and read program output.
+  Breakpoints persist per project. Switching projects and quitting end the previous debugger; build actions save only current-project documents.
+  The debugger panel switches to Stack / Variables / Console tabs in narrow editor panes. **Not in Kiln:** debugger attach, conditional breakpoints, watches,
+  SwiftUI previews, code folding, multi-cursor, completion/diagnostics for languages other than Swift/C-family, and stage-hunk / blame UI in the editor.
 - **Project** = the folder the agent works in. `WorkspaceStore` keeps a security-scoped bookmark per recent folder;
   without it the sandbox forgets the folder on every relaunch.
 - **Composer** (model, Agent toggle, agent profile) is shared by the Agent view and the panel beside every tool.
@@ -83,6 +86,9 @@ One window, one sidebar, one conversation.
   kept as `name-<tool>`. Environment values (API keys) stay in memory; every imported server still needs
   "Approve & Connect" in Develop → MCP. Agents get `list_skills` / `read_skill`. **Not imported:** OpenCode's JS plugins
   (`plugins`), Claude Code hooks and slash commands, and MCP servers bundled inside Claude plugins.
+- **Ghidra:** Kiln discovers existing stable releases in `~/Applications` and `/Applications`, or a valid `GHIDRA_HOME`, and bundles its export script.
+  Analyze → Analyze with Ghidra and `re_analyze_binary` call the same bounded service; the agent action requires execution approval. Reanalysis preserves annotations
+  and analyst signatures, checks project revision and binary hash, and rejects concurrent runs. Ghidra 12.1.4 + Java 21 produced real persisted pseudocode here.
 - **Reverse engineering:** import via `re_import_binary` (returns `project_id`; every other `re_*` tool takes it;
   the analysis id is accepted too). Native `otool` engine; Ghidra optional.
 - **Model Lab:** `lab_hardware`, `lab_list_experiments`, `lab_list_datasets`, Hugging Face search tools.
