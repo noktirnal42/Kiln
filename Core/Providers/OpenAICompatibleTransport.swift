@@ -118,6 +118,13 @@ public enum OpenAICompatibleTransport {
         )
     }
 
+    /// Seconds to wait for the first byte of a reply before reporting a stalled provider (default 90; 10–600).
+    /// Set `defaults write com.kiln.app provider.firstChunkTimeout -int 180` for slow hosted models.
+    public static var configuredFirstChunkTimeout: TimeInterval {
+        let value = UserDefaults.standard.double(forKey: "provider.firstChunkTimeout")
+        return value == 0 ? 90 : min(max(value, 10), 600)
+    }
+
     public static func stream(
         url: URL,
         apiKey: String,
@@ -127,7 +134,7 @@ public enum OpenAICompatibleTransport {
         headers: [String: String] = [:],
         extraFields: [String: ProviderJSON] = [:],
         useCompletionTokens: Bool = false,
-        firstChunkTimeout: TimeInterval = 90
+        firstChunkTimeout: TimeInterval = Self.configuredFirstChunkTimeout
     ) -> AsyncThrowingStream<ChatChunk, Error> {
         AsyncThrowingStream { continuation in
             let gotFirstChunk = FirstChunkFlag()

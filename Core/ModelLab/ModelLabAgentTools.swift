@@ -26,6 +26,7 @@ public enum ModelLabAgentTools {
         case createExperiment = "create_experiment"
         case evaluate = "evaluate_predictions"
         case exportModel = "export_model"
+        case predict = "predict"
 
         var spec: ToolSpec {
             switch self {
@@ -73,6 +74,12 @@ public enum ModelLabAgentTools {
                          parameters: [
                             ToolParam(name: "predictions", type: "array", description: "Predicted strings, one per example"),
                             ToolParam(name: "references", type: "array", description: "Reference strings in the same order"),
+                         ], permission: .read)
+            case .predict:
+                ToolSpec(name: "lab_predict", summary: "Run a trained Create ML text classifier over example inputs and return the predicted label and confidence for each. Pair with lab_evaluate_predictions to score a held-out set.",
+                         parameters: [
+                            ToolParam(name: "artifact_id", description: "Artifact ID from lab_get_experiment (a .mlmodel / .mlpackage)"),
+                            ToolParam(name: "texts", type: "array", description: "Input strings, at most 200"),
                          ], permission: .read)
             case .exportModel:
                 ToolSpec(name: "lab_export_model", summary: "Export a produced model artifact (Create ML .mlmodel/.mlpackage as core_ml, or MLX artifacts as mlx_package) into an existing folder, keeping its file name (a numbered suffix is added rather than overwriting). GGUF is not available.",
@@ -144,6 +151,12 @@ struct ModelLabAgentTool: ToolExecuting {
                 metrics: [AccuracyMetric(), F1Metric(), BLEUMetric(), ROUGEMetric(.rouge1), ROUGEMetric(.rouge2), ROUGEMetric(.rougeL)])
             return run.outcomes.map { String(format: "%@ = %.4f%@", $0.metricName, $0.value, $0.lowerIsBetter ? " (lower is better)" : "") }
                 .joined(separator: "\n") + "\n\(predictions.count) examples"
+        case .predict:
+            let id = try Self.requiredString(args, "artifact_id")
+            let texts = (args["texts"] as? [Any])?.map { "\($0)" } ?? []
+            guard !texts.isEmpty, texts.count <= 200 else { throw ModelLabToolError.invalid("texts must be a non-empty array of at most 200 strings") }
+            let predictions = try await MainActor.run { try module.predict(artifactID: id, texts: texts) }
+            return zip(texts, predictions).map { "\($0) → \($1)" }.joined(separator: "\n")
         case .exportModel:
             let id = try Self.requiredString(args, "artifact_id")
             let formatName = try Self.requiredString(args, "format").lowercased()

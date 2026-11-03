@@ -1,6 +1,6 @@
 # Getting started: from a clean clone to your first contribution
 
-This walkthrough was followed on a clean checkout of `https://github.com/noktirnal42/Kiln.git` (commit `0635855`, 2026-11-02) in a fresh directory with
+This walkthrough was followed on a clean checkout of `https://github.com/noktirnal42/Kiln.git` (commit `cb0db16`, 2026-11-02) in a fresh directory with
 no signing team configured. Nothing below depends on the maintainer's machine, paths or signing identity.
 
 ## 1. What was used
@@ -37,7 +37,7 @@ xcodebuild test -project Kiln.xcodeproj -scheme Kiln \
   -destination 'platform=macOS,arch=arm64' -jobs 2 CODE_SIGNING_ALLOWED=NO
 ```
 
-Observed on the clean checkout: `** TEST SUCCEEDED **`. Live-provider suites (`TEST_RUNNER_KILN_LIVE=1`) stay off unless you ask for them. A green command is not enough on its own:
+Observed on the clean checkout: `** TEST SUCCEEDED **` (503 tests at that commit). Live-provider suites (`TEST_RUNNER_KILN_LIVE=1`) stay off unless you ask for them. A green command is not enough on its own:
 confirm the suite you care about ran (search the log for its name).
 
 ## 4. Optional: providers, without a paid account

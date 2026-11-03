@@ -94,4 +94,28 @@ extension ModelLabModule {
         }
         return try ModelExporters().export(record: record, absoluteURL: absolute, format: format, to: destination)
     }
+
+    /// Runs a trained Create ML text classifier over some inputs. Returns "label (confidence)" per input, in order.
+    public static func predict(modelURL: URL, texts: [String]) throws -> [String] {
+        let provider = CoreMLClassificationProvider()
+        return try texts.map { text in
+            let scores = try provider.classify(modelURL: modelURL, text: text)
+            guard let top = scores.max(by: { $0.confidence < $1.confidence }) else { return "no prediction" }
+            return String(format: "%@ (%.2f)", top.label, top.confidence)
+        }
+    }
+
+    @MainActor
+    public func predict(artifactID id: String, texts: [String]) throws -> [String] {
+        guard let context = mainContext else { throw ModelLabModuleError.storeUnavailable("The Model Lab store is unavailable.") }
+        let descriptor = FetchDescriptor<ModelArtifactRecord>(predicate: #Predicate { $0.id == id })
+        guard let record = try context.fetch(descriptor).first else {
+            throw ModelLabModuleError.invalidTrainingConfiguration("No model artifact with ID \(id).")
+        }
+        let url = ModelLabCore.ArtifactStore().absoluteURL(for: record.localRelativePath, in: .models)
+        guard record.format == .mlmodel || record.format == .mlpackage, FileManager.default.fileExists(atPath: url.path) else {
+            throw ModelLabModuleError.invalidTrainingConfiguration("lab_predict runs Core ML classifiers (.mlmodel / .mlpackage) that exist in the model library.")
+        }
+        return try Self.predict(modelURL: url, texts: texts)
+    }
 }

@@ -53,7 +53,16 @@ struct ModelLabLifecycleTests {
         #expect(throws: (any Error).self) { try module.exportArtifact(id: "missing", format: .coreML, destinationFolder: URL(fileURLWithPath: "/tmp")) }
     }
 
+    /// A real classifier trained by Kiln on a 120-row synthetic sentiment CSV (see docs/13-AGENT-CAPABILITY-MATRIX.md).
+    @Test func aTrainedClassifierFixtureClassifiesHeldOutText() throws {
+        let model = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/review-sentiment.mlmodel")
+        let results = try ModelLabModule.predict(modelURL: model, texts: ["Absolutely wonderful, I love it", "Terrible, a total waste of money"])
+        #expect(results[0].hasPrefix("positive") && results[1].hasPrefix("negative"))
+    }
+
     @Test func toolsAreRegisteredWithTheRightPermissions() {
+        #expect(ModelLabAgentTools.Kind.predict.spec.permission == .read)
         #expect(ModelLabAgentTools.Kind.importDataset.spec.permission == .write)
         #expect(ModelLabAgentTools.Kind.createExperiment.spec.permission == .write)
         #expect(ModelLabAgentTools.Kind.exportModel.spec.permission == .write)
