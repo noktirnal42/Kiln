@@ -19,6 +19,7 @@ tested with `swift test` inside the package.
 ## Connection
 
 - Transport: WebSocket over TCP on the local network. The Mac advertises `_kiln-remote._tcp`. Off unless switched on.
+- Client note: Network.framework only runs the WebSocket client protocol when the connection is made to a URL endpoint (`NWConnection(to: .url(ws://host:port), using: parameters)` with `NWProtocolWebSocket.Options` inserted first in `defaultProtocolStack.applicationProtocols`). With a Bonjour result, resolve it to host and port first.
 - Handshake: the device sends 16 random bytes (client nonce); the Mac answers with 16 (server nonce). Both derive the session
   keys with `SecureChannel` (HKDF over the pairing key and both nonces, one key per direction).
 - Every later frame is `SecureChannel.seal`ed (ChaCha20-Poly1305, strictly increasing counter). The first frame from the device

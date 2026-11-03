@@ -19,6 +19,8 @@ packages:
     from: 0.31.6
   AxiomCore:
     path: Packages/AxiomCore
+  KilnRemoteKit:
+    path: Packages/KilnRemoteKit
 
 settings:
   base:
@@ -117,6 +119,8 @@ targets:
         product: MLX
       - package: AxiomCore
         product: AxiomCore
+      - package: KilnRemoteKit
+        product: KilnRemoteKit
 
   KilnTests:
     type: bundle.unit-test
