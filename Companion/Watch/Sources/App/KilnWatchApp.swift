@@ -10,10 +10,13 @@ struct KilnWatchApp: App {
     init() {
         let session = RemoteSession(
             store: KeychainPairingStore(),
-            connector: { pairing in
+            connector: { pairing, progress in
+                await progress("Paired. Looking for your Mac…")
                 let url = try await BonjourResolver.resolve(serviceName: pairing.serviceName)
+                await progress("Found your Mac. Connecting…")
                 let transport = NWTransport(url: url)
                 try await transport.start()
+                await progress("Securing connection…")
                 return transport
             },
             transcriber: DictationTranscriber(),
@@ -31,13 +34,13 @@ struct KilnWatchApp: App {
         }
         #endif
         _session = State(initialValue: session)
-        phoneLink = PhoneLink { [session] payload in session.pairingChanged(payload) }
+        phoneLink = PhoneLink(onChange: { [session] payload in session.pairingChanged(payload) }, onStatus: { [session] text in session.phoneStatus = text })
         phoneLink.activate()
     }
 
     var body: some Scene {
         WindowGroup {
-            HomeView(session: session)
+            HomeView(session: session, pair: { phoneLink.refresh() })
                 .task { if !Demo.isActive { session.connect() } }
                 .onChange(of: scenePhase) { _, phase in
                     guard !Demo.isActive else { return }

@@ -13,9 +13,14 @@ final class RemoteSession {
         case idle, listening, thinking, speaking
     }
 
-    typealias Connector = @Sendable (PairingPayload) async throws -> RemoteTransport
+    /// The second argument reports which step is running ("Looking for Mac…").
+    typealias Connector = @Sendable (PairingPayload, @Sendable @MainActor (String) -> Void) async throws -> RemoteTransport
 
     private(set) var link = Link.unpaired
+    /// What the watch is doing or waiting for, in words.
+    private(set) var stage = ""
+    /// State of the link to the iPhone, shown while unpaired.
+    var phoneStatus = "Starting phone link"
     private(set) var talk = Talk.idle
     private(set) var latestReply = ""
     private(set) var lastHeard = ""
@@ -54,6 +59,8 @@ final class RemoteSession {
     func pairingChanged(_ payload: PairingPayload?) {
         if let payload {
             store.save(payload)
+            pairingLog.notice("pairing stored")
+            disconnect()
             connect()
         } else {
             store.clear()
@@ -69,6 +76,8 @@ final class RemoteSession {
         guard let pairing = store.load() else { link = .unpaired; return }
         guard eventsTask == nil else { return }
         link = .connecting
+        stage = "Paired. Looking for your Mac…"
+        pairingLog.notice("connect: paired, looking for Mac")
         eventsTask = Task { [weak self] in
             guard let self else { return }
             await self.run(pairing)
@@ -88,14 +97,20 @@ final class RemoteSession {
 
     private func run(_ pairing: PairingPayload) async {
         do {
-            let transport = try await connector(pairing)
+            let transport = try await connector(pairing) { [weak self] text in
+                self?.stage = text
+                pairingLog.notice("stage: \(text, privacy: .public)")
+            }
             let client = RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: deviceName)
             self.client = client
             let events = await client.connect()
             for try await event in events { handle(event) }
             if !Task.isCancelled { link = .offline("Mac disconnected") }
         } catch {
-            if !Task.isCancelled { link = .offline(Self.describe(error)) }
+            if !Task.isCancelled {
+                pairingLog.error("connect failed: \(String(describing: error), privacy: .public)")
+                link = .offline(Self.describe(error))
+            }
         }
         client = nil
         conversationOpen = false
@@ -116,6 +131,8 @@ final class RemoteSession {
         switch event {
         case .welcome(let host, _):
             link = .connected(host: host)
+            stage = "Connected to \(host)"
+            pairingLog.notice("connected")
             send(.listConversations)
         case .conversations(let list):
             guard !conversationOpen else { break }
