@@ -29,6 +29,7 @@ public enum ModelLabAgentTools {
         case predict = "predict"
         case startSmallLM = "start_small_lm"
         case startLoRA = "start_lora"
+        case startDistillation = "start_distillation"
 
         var spec: ToolSpec {
             switch self {
@@ -95,6 +96,17 @@ public enum ModelLabAgentTools {
                             ToolParam(name: "iterations", type: "integer", description: "Default 100", required: false),
                             ToolParam(name: "rank", type: "integer", description: "LoRA rank; default 8", required: false),
                             ToolParam(name: "allow_download", type: "boolean", description: "true only after the user agreed to download the base model from huggingface.co; default false", required: false),
+                         ], permission: .execute)
+            case .startDistillation:
+                ToolSpec(name: "lab_start_distillation", summary: "Distill a teacher into a small student: the teacher answers your seed prompts, then a LoRA student trains on those answers (synthetic-data distillation, not logit matching). Uses compute and writes a dataset and adapter; requires approval. teacher is \"apple\" (Apple Intelligence, if available) or an MLX repo; MLX repos must already be cached locally, otherwise nothing is downloaded and the call fails. Only after the user agrees to the download, retry with allow_download=true. Bounded: 1–200 seed prompts, 10–1000 iterations, rank 1–32. Poll lab_get_experiment; cancel with lab_cancel_training.",
+                         parameters: [
+                            ToolParam(name: "name", description: "Experiment name"),
+                            ToolParam(name: "seed_prompts", type: "array", description: "Prompts the teacher answers; the answers become the training data"),
+                            ToolParam(name: "teacher", description: "\"apple\" or an MLX Hugging Face repo as org/name"),
+                            ToolParam(name: "student_model", description: "Student base model, Hugging Face repo as org/name, e.g. mlx-community/Llama-3.2-1B-Instruct-4bit"),
+                            ToolParam(name: "iterations", type: "integer", description: "Default 100", required: false),
+                            ToolParam(name: "rank", type: "integer", description: "LoRA rank; default 8", required: false),
+                            ToolParam(name: "allow_download", type: "boolean", description: "true only after the user agreed to download uncached models from huggingface.co; default false", required: false),
                          ], permission: .execute)
             case .predict:
                 ToolSpec(name: "lab_predict", summary: "Run a trained Create ML text classifier over example inputs and return the predicted label and confidence for each. Pair with lab_evaluate_predictions to score a held-out set.",
@@ -193,6 +205,19 @@ struct ModelLabAgentTool: ToolExecuting {
                 try module.startLoRAExperiment(name: name, datasetID: datasetID, baseModel: base, iterations: iterations, rank: rank, allowDownload: allow)
             }
             return "LoRA training started for experiment \(id). This does not mean it succeeded. Poll lab_get_experiment for status, metrics and the adapter artifact."
+        case .startDistillation:
+            let name = try Self.requiredString(args, "name")
+            let teacher = try Self.requiredString(args, "teacher")
+            let student = try Self.requiredString(args, "student_model")
+            let seeds = (args["seed_prompts"] as? [Any])?.map { "\($0)" } ?? []
+            let iterations = (args["iterations"] as? Int) ?? 100
+            let rank = (args["rank"] as? Int) ?? 8
+            let allow = (args["allow_download"] as? Bool) ?? false
+            let id = try await MainActor.run {
+                try module.startDistillationExperiment(name: name, seedPrompts: seeds, teacher: teacher, studentModel: student,
+                                                       iterations: iterations, rank: rank, allowDownload: allow)
+            }
+            return "Distillation started for experiment \(id). This does not mean it succeeded. Poll lab_get_experiment for status, metrics and the adapter artifact."
         case .predict:
             let id = try Self.requiredString(args, "artifact_id")
             let texts = (args["texts"] as? [Any])?.map { "\($0)" } ?? []

@@ -141,3 +141,14 @@ struct ModelDownloadPolicyTests {
         #expect(spec.parameters.contains { $0.name == "allow_download" && !$0.required })
     }
 }
+
+@Suite("Distillation tool")
+struct DistillationToolSpecTests {
+    @Test("is an approval-gated execute tool with bounded, explicit parameters") func spec() {
+        let spec = ModelLabAgentTools.Kind.startDistillation.spec
+        #expect(spec.name == "lab_start_distillation")
+        #expect(spec.permission == .execute)
+        let names = spec.parameters.map(\.name)
+        #expect(names.contains("seed_prompts") && names.contains("teacher") && names.contains("student_model") && names.contains("allow_download"))
+    }
+}

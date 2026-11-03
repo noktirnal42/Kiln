@@ -259,6 +259,43 @@ extension ModelLabModule {
         return experiment.id
     }
 
+    /// Creates a distillation experiment (teacher answers the seed prompts, a student LoRA trains on the answers) and starts it.
+    /// `teacher` is "apple" (Apple Intelligence) or an MLX repo that must already be cached; the student follows the same download rule.
+    /// Bounded: 1–200 seed prompts, 10–1000 iterations, rank 1–32.
+    @MainActor
+    public func startDistillationExperiment(name: String, seedPrompts: [String], teacher: String, studentModel: String,
+                                            iterations: Int = 100, rank: Int = 8, allowDownload: Bool = false) throws -> String {
+        func invalid(_ message: String) -> ModelLabModuleError { .invalidTrainingConfiguration(message) }
+        try requireCapabilities(allowDownload ? [.fileSystemWrite, .metalCompute, .networkClient] : [.fileSystemWrite, .metalCompute])
+        guard let context = mainContext else { throw ModelLabModuleError.storeUnavailable("The Model Lab store is unavailable.") }
+        guard (10...1000).contains(iterations) else { throw invalid("iterations must be between 10 and 1000.") }
+        guard (1...32).contains(rank) else { throw invalid("rank must be between 1 and 32.") }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw invalid("name is required.") }
+        let seeds = seedPrompts.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard (1...200).contains(seeds.count) else { throw invalid("Provide between 1 and 200 non-empty seed prompts.") }
+        let teacherProvider: any InferenceProvider
+        if teacher.lowercased() == "apple" {
+            teacherProvider = FoundationModelsInferenceProvider()
+        } else {
+            if let reason = ModelDownloadPolicy.refusal(repo: teacher, allowDownload: allowDownload) { throw invalid("Teacher: " + reason) }
+            teacherProvider = MLXInferenceProvider(repoID: teacher)
+        }
+        if let reason = ModelDownloadPolicy.refusal(repo: studentModel, allowDownload: allowDownload) { throw invalid("Student: " + reason) }
+        guard ![createMLCoordinator.runningExperimentID, mlxFineTuningCoordinator.runningExperimentID,
+                smallLMCoordinator.runningExperimentID, distillationCoordinator.runningExperimentID].contains(where: { $0 != nil }) else {
+            throw invalid("Another training job is running. Wait or cancel that exact experiment first.")
+        }
+        let job = DistillationJob(seedPrompts: seeds, teacherProvider: teacherProvider, studentBaseModelRepoID: studentModel,
+                                  rank: rank, numLayers: 8, iterations: iterations, learningRate: 1e-4, batchSize: 1,
+                                  datasetOutputName: "distill-\(UUID().uuidString)", adapterOutputName: "student-\(UUID().uuidString)")
+        let experiment = ExperimentRecord(name: trimmed, task: .distillation, datasetID: "")
+        experiment.baseModelID = studentModel
+        try ExperimentStore(context: context).create(experiment)
+        try startDistillation(experiment: experiment, job: job)
+        return experiment.id
+    }
+
     nonisolated static func loraTexts(contents: String, format: DatasetFileFormat) -> [String] {
         let lines = contents.split { $0.isNewline }.map(String.init)
         guard format == .jsonl else { return lines }
