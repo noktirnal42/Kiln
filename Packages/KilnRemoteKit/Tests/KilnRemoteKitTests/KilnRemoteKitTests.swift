@@ -7,17 +7,17 @@ struct RemoteProtocolTests {
     @Test("commands and events survive a round trip") func roundTrip() throws {
         let command = RemoteCommand.send(text: "run the tests", spoken: true)
         #expect(try RemoteCoding.decode(RemoteCommand.self, from: RemoteCoding.encode(command)) == command)
-        let request = ApprovalRequest(id: "a1", tool: "run_command", permission: "execute", preview: "swift test")
+        let request = RemoteApproval(id: "a1", tool: "run_command", permission: "execute", preview: "swift test")
         let event = RemoteEvent.approvalRequested(request)
         #expect(try RemoteCoding.decode(RemoteEvent.self, from: RemoteCoding.encode(event)) == event)
-        let opened = RemoteEvent.opened(conversation: ConversationSummary(id: "c", title: "T", updatedAt: Date(timeIntervalSince1970: 1_700_000_000)),
+        let opened = RemoteEvent.opened(conversation: RemoteConversation(id: "c", title: "T", updatedAt: Date(timeIntervalSince1970: 1_700_000_000)),
                                         messages: [RemoteMessage(id: "m", role: .assistant, text: "Hi", createdAt: Date(timeIntervalSince1970: 1_700_000_001))],
                                         isStreaming: false)
         #expect(try RemoteCoding.decode(RemoteEvent.self, from: RemoteCoding.encode(opened)) == opened)
     }
 
     @Test("remote approval cannot grant standing access") func noAlwaysAllow() {
-        #expect(ApprovalDecision(rawValue: "alwaysAllow") == nil)
+        #expect(RemoteApprovalDecision(rawValue: "alwaysAllow") == nil)
     }
 }
 
