@@ -72,3 +72,52 @@ struct SecureChannelTests {
         _ = device
     }
 }
+
+@Suite("Relay addressing")
+struct RelayTests {
+    @Test("room and password are stable for a key, differ between keys and from each other") func derivation() {
+        let key = Data(repeating: 7, count: 32), other = Data(repeating: 8, count: 32)
+        #expect(RelayAddress.roomID(pairingKey: key) == RelayAddress.roomID(pairingKey: key))
+        #expect(RelayAddress.roomID(pairingKey: key) != RelayAddress.roomID(pairingKey: other))
+        #expect(RelayAddress.roomID(pairingKey: key) != RelayAddress.authToken(pairingKey: key))
+        #expect(RelayAddress.roomID(pairingKey: key).count == 22)
+        // Fixed vectors: every platform must derive the same names, or devices and Mac never meet.
+        #expect(RelayAddress.roomID(pairingKey: key) == "56FXSQJdVgihvTxVnz72qA")
+        #expect(RelayAddress.authToken(pairingKey: key) == "kYG1U503LPYRFtSrmuAwkX2jkjN5DTmDBuoI7g9lNbE")
+    }
+
+    @Test("the relay URL carries the room and role, not the key or the password") func url() throws {
+        let key = PairingPayload.makeKey()
+        let url = try #require(RelayAddress.url(relay: URL(string: "wss://relay.example.dev/")!, pairingKey: key, role: .device))
+        #expect(url.absoluteString == "wss://relay.example.dev/v1/room/\(RelayAddress.roomID(pairingKey: key))?role=device")
+        #expect(!url.absoluteString.contains(RelayAddress.authToken(pairingKey: key)))
+    }
+
+    @Test("the pairing link can carry a relay, and refuses a non-websocket one") func link() throws {
+        var payload = PairingPayload(hostName: "Mac", serviceName: "Kiln-1", key: PairingPayload.makeKey(), relay: URL(string: "wss://relay.example.dev"))
+        #expect(PairingPayload(url: payload.url) == payload)
+        payload.relay = nil
+        #expect(PairingPayload(url: payload.url)?.relay == nil)
+        let bad = payload.url.absoluteString + "&relay=https://evil.example"
+        #expect(PairingPayload(url: URL(string: bad)!)?.relay == nil)
+    }
+
+    @Test("relay frames round trip and reject garbage") func frames() {
+        let frame = RelayFrame.encode(.data, device: 0x01020304, payload: Data("hi".utf8))
+        let decoded = RelayFrame.decode(frame)
+        #expect(decoded?.kind == .data && decoded?.device == 0x01020304 && decoded?.payload == Data("hi".utf8))
+        #expect(RelayFrame.decode(Data([9, 0, 0, 0, 1])) == nil)
+        #expect(RelayFrame.decode(Data([1, 0])) == nil)
+    }
+}
+
+@Suite("Direct addresses")
+struct DirectAddressTests {
+    @Test("direct addresses travel in the pairing link; anything that is not host:port is dropped") func direct() throws {
+        let payload = PairingPayload(hostName: "Mac", serviceName: "Kiln-1", key: PairingPayload.makeKey(), direct: ["192.168.1.20:47900", "100.101.1.2:47900"])
+        #expect(PairingPayload(url: payload.url)?.direct == ["192.168.1.20:47900", "100.101.1.2:47900"])
+        let link = payload.url.absoluteString.replacingOccurrences(of: "direct=", with: "direct=evil.example/x:1,http://a:2,ok.local:99999,fine.local:1234,")
+        #expect(PairingPayload(url: URL(string: link)!)?.direct.contains("fine.local:1234") == true)
+        #expect(PairingPayload(url: URL(string: link)!)?.direct.contains { $0.contains("/") || $0.contains("http") || $0.hasSuffix(":99999") } == false)
+    }
+}

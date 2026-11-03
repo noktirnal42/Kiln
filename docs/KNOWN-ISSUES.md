@@ -6,7 +6,7 @@ This is the contributor-facing gap list for Kiln's current development state. Th
 
 ## Develop is a capable editor, not Xcode
 
-**Observed:** Develop → Editor has a language server (Swift and C-family only), build/test/run with schemes, git gutter markers and a split pane (see `docs/11-CURRENT-STATE.md`). It now has a launch debugger backed by LLDB: file/line breakpoints, stepping, stack, locals and console. It has no debugger attach, conditional breakpoints or watches, no SwiftUI previews, no code folding or multi-cursor, no language server for other languages, and no stage-hunk or blame UI in the editor.
+**Observed:** Develop → Editor has a language server (Swift and C-family only), build/test/run with schemes, git gutter markers and a split pane (see `docs/11-CURRENT-STATE.md`). It now has a launch debugger backed by LLDB: file/line breakpoints, stepping, stack, locals and console. It now has code folding, ⌘D multi-cursor (add-cursor Return/Tab behaviour is untested) and VoiceOver access to the gutter. It has no debugger attach, conditional breakpoints or watches, no SwiftUI previews, no language server for other languages, and no stage-hunk or blame UI in the editor.
 
 **Verified (2026-11-02):** real Swift programs exercised breakpoints, locals, stepping, restart, launch failure, project switching, and same-named files in separate targets. Build actions preserve unrelated projects' unsaved drafts. Broader debugger workflows remain tracked in #16; remaining editor features in #20. Do not describe Kiln as having Xcode parity.
 
@@ -93,3 +93,7 @@ The suite was 520 tests and passing on 2026-11-02.
 ## Latest debugger and Ghidra verification
 
 The 2026-11-02 continuation passed **538 tests in 100 suites**, including one opt-in installed-Ghidra integration test (537 regular tests). See [the QA record](14-DEBUGGER-AND-GHIDRA-QA.md) for scope and remaining limits. A passing app suite does not certify every provider/model, every model-training lifecycle or full Xcode/Ghidra parity.
+
+## Voice and remote control (new, 2026-11-03)
+
+**Voice:** dictation, spoken replies and a hands-free conversation mode are in the Mac composer, but were not tried with a real microphone in QA, replies are spoken only after they finish, and speech output uses system voices. **Remote control:** the Mac server and both companion apps work against fakes and the iOS simulator; a physical iPhone and Apple Watch have not completed an end-to-end run. All paired devices share one key, and there is no relay, so the devices must be on the same network. See `docs/14-REMOTE-CONTROL.md`.

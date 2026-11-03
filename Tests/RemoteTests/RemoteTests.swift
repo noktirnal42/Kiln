@@ -107,11 +107,15 @@ final class LoopbackDevice {
     private var waiter: CheckedContinuation<Data, Never>?
     private let clientNonce = SecureChannel.makeNonce()
 
-    init(port: UInt16, key: Data) {
+    convenience init(port: UInt16, key: Data) { self.init(url: URL(string: "ws://127.0.0.1:\(port)")!, key: key, headers: []) }
+
+    init(url: URL, key: Data, headers: [(String, String)]) {
         self.key = key
         let parameters = NWParameters.tcp
-        parameters.defaultProtocolStack.applicationProtocols.insert(NWProtocolWebSocket.Options(), at: 0)
-        connection = NWConnection(to: .url(URL(string: "ws://127.0.0.1:\(port)")!), using: parameters)
+        let options = NWProtocolWebSocket.Options()
+        if !headers.isEmpty { options.setAdditionalHeaders(headers) }
+        parameters.defaultProtocolStack.applicationProtocols.insert(options, at: 0)
+        connection = NWConnection(to: .url(url), using: parameters)
     }
 
     func connect() async {
@@ -156,8 +160,13 @@ final class LoopbackDevice {
         if let waiter { self.waiter = nil; waiter.resume(returning: data) } else { inbox.append(data) }
     }
 
+    /// Empty data when nothing arrives in time, so a broken path fails the test instead of hanging it.
     private func next() async -> Data {
         if !inbox.isEmpty { return inbox.removeFirst() }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            if let waiter = self?.waiter { self?.waiter = nil; waiter.resume(returning: Data()) }
+        }
         return await withCheckedContinuation { waiter = $0 }
     }
 }
@@ -208,5 +217,81 @@ struct RemoteServerTests {
         #expect(backend.sent.isEmpty)
         #expect(server.deviceCount == 0)
         device.close()
+    }
+}
+
+/// The same Mac server, reached through a real relay process: this is the path a phone on mobile data takes.
+@MainActor
+@Suite("Remote control through the relay", .serialized, .timeLimit(.minutes(2)))
+struct RemoteRelayTests {
+    /// Xcode's test environment does not inherit the shell's PATH, so look where Node usually lives.
+    nonisolated static var nodeAvailable: Bool { nodePath() != nil }
+
+    nonisolated private static func nodePath() -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        var candidates = ["/opt/homebrew/bin/node", "/usr/local/bin/node"]
+        let nvm = home + "/.nvm/versions/node"
+        candidates += ((try? FileManager.default.contentsOfDirectory(atPath: nvm)) ?? []).sorted().reversed().map { "\(nvm)/\($0)/bin/node" }
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    private func startRelay(port: Int) throws -> Process {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let script = root.appendingPathComponent("Relay/src/node-server.mjs").path
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: try #require(Self.nodePath()))
+        process.arguments = [script]
+        process.environment = ProcessInfo.processInfo.environment.merging(["PORT": "\(port)", "HOST": "127.0.0.1"]) { $1 }
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        return process
+    }
+
+    @Test("a device reaches the Mac only through the relay, with no direct connection", .enabled(if: RemoteRelayTests.nodeAvailable)) func throughRelay() async throws {
+        let relayPort = Int.random(in: 20_000...40_000)
+        let relay = try startRelay(port: relayPort)
+        defer { relay.terminate() }
+        try await Task.sleep(for: .milliseconds(800))
+        let backend = FakeBackend()
+        _ = await backend.open("c1")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-relay-\(UUID().uuidString)")
+        let defaults = UserDefaults(suiteName: "kiln.remote.test.\(UUID().uuidString)")!
+        let server = RemoteServer(bridge: RemoteBridge(backend: backend), store: RemotePairingStore(directory: dir), hostName: "Test Mac", defaults: defaults)
+        let relayURL = URL(string: "ws://127.0.0.1:\(relayPort)")!
+        server.setRelay(relayURL)
+        server.start(advertise: false)
+        defer { server.stop() }
+        for _ in 0..<100 where !server.relayConnected { try await Task.sleep(for: .milliseconds(100)) }
+        #expect(server.relayConnected)
+        #expect(server.pairing.relay == relayURL)
+
+        let key = server.pairing.key
+        let url = try #require(RelayAddress.url(relay: relayURL, pairingKey: key, role: .device))
+        let device = LoopbackDevice(url: url, key: key, headers: [("Authorization", RelayAddress.authorizationHeader(pairingKey: key))])
+        await device.connect()
+        device.send(.hello(deviceName: "Phone on mobile data", protocolVersion: kilnRemoteProtocolVersion))
+        #expect(await device.nextEvent() == .welcome(hostName: "Test Mac", protocolVersion: kilnRemoteProtocolVersion))
+
+        // An approval raised at the Mac reaches the remote device, which answers it from afar.
+        backend.pendingApprovals = [RemoteApproval(id: "a1", tool: "run_command", permission: "execute", preview: "echo from afar")]
+        var sawApproval = false
+        for _ in 0..<12 { if case .approvalRequested(let request)? = await device.nextEvent(), request.id == "a1" { sawApproval = true; break } }
+        #expect(sawApproval)
+        device.send(.decide(approvalID: "a1", decision: .allowOnce))
+        for _ in 0..<50 where backend.decisions.isEmpty { try await Task.sleep(for: .milliseconds(100)) }
+        #expect(backend.decisions.first?.0 == "a1")
+        #expect(backend.decisions.first?.1 == .allowOnce)
+        device.close()
+    }
+}
+
+@Suite("Network addresses")
+struct NetworkAddressTests {
+    @Test("Tailscale's 100.64.0.0/10 range is recognised and ordinary private ranges are not") func tailscale() {
+        #expect(NetworkAddresses.isTailscale("100.101.102.103"))
+        #expect(NetworkAddresses.isTailscale("100.64.0.1") && NetworkAddresses.isTailscale("100.127.255.254"))
+        #expect(!NetworkAddresses.isTailscale("100.63.0.1") && !NetworkAddresses.isTailscale("100.128.0.1"))
+        #expect(!NetworkAddresses.isTailscale("192.168.1.20") && !NetworkAddresses.isTailscale("10.0.0.5"))
     }
 }

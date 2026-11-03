@@ -1,4 +1,4 @@
-# Kiln — current state (2026-11-01)
+# Kiln — current state (2026-11-03)
 
 Read this first. It says what exists, how it was checked, how to build and ship it, and what is still open.
 Older docs describe the plan; this describes the app.
@@ -137,6 +137,31 @@ Opt-in, they spend network calls: `TEST_RUNNER_KILN_LIVE=1 xcodebuild test … -
 (also `LiveChatTests`, `LiveHostedModelTests`). `LiveMLXStoreTests` must run unsandboxed
 (`CODE_SIGN_ENTITLEMENTS=` empty) because the sandboxed host cannot read an external drive. They use the keys saved
 in Settings; none are read or printed by the tests.
+
+## Voice and remote control (2026-11-03)
+
+- **Voice in the Mac app.** The composer has a mic (dictate into the message), a speaker (read finished replies aloud) and a
+  conversation button (listen, send when you pause, speak the reply, listen again). Speech recognition is Apple's, on this
+  Mac when the model is installed; speech output is the best installed system voice. Code and markdown are not read out
+  (`Core/Voice/SpokenText.swift`, tested). The first use asks macOS for Microphone and Speech Recognition permission.
+  Not yet: speaking while the reply is still streaming, an MLX neural voice (Kokoro is cached on the dev Mac), wake word.
+- **Remote control.** Develop → MCP has a Remote control card: Start shows a QR pairing code. A paired iPhone or Apple Watch
+  on the same network can list and open conversations, send text or dictated messages, stop a reply, and allow once or deny
+  an approval. It cannot grant standing access or change settings. Frames are ChaCha20-Poly1305 encrypted with a key that is
+  only ever on the Mac's screen; replay, reordering and tampering are rejected. Protocol and threat model:
+  `docs/14-REMOTE-CONTROL.md`; shared code: `Packages/KilnRemoteKit`; Mac side: `Core/Remote`.
+- **Companion apps** live in `Companion/iOS` and `Companion/Watch` (own XcodeGen projects, see their READMEs).
+- **Verified:** the wire contract and Mac bridge by unit tests, the Mac server over a real local socket (right key works,
+  wrong key is dropped before reaching the chat), and the iOS app in the simulator against the real notarized Kiln
+  (conversations listed, message sent, a real approval allowed from the app and the command ran).
+  **Not verified:** a physical iPhone and Apple Watch end to end, voice with a real microphone, pairing through the camera.
+- **Known limits:** one pairing key is shared by all devices, so unpairing is all-or-nothing; the link is local network
+  only (no relay); each remote message goes into the one open conversation on the Mac.
+- **Model Lab tools added:** `lab_start_lora` (verified end to end: SmolLM-135M, 20 iterations, completed) and
+  `lab_start_distillation` (verified: Qwen2.5-3B teacher into SmolLM-135M, loss 0.83 training / 1.88 validation), both
+  approval-gated with a download policy. Agents polling `lab_get_experiment` can exhaust their tool rounds on a slow job.
+- **Editor:** code folding (gutter chevrons, ⌘⌥[ and ⌘⌥], checked in the running app), ⌘D multi-cursor, drag-reorder tabs,
+  and VoiceOver access to the gutter (breakpoints, folds, diff and execution markers).
 
 ## Known limits and ideas
 

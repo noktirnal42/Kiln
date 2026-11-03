@@ -8,8 +8,15 @@ public struct PairingPayload: Equatable, Sendable {
     /// Bonjour service name to look up; the device connects to whatever address that resolves to.
     public var serviceName: String
     public var key: Data
+    /// Where devices reach this Mac over the internet (wss URL of a Kiln relay); nil means local network only.
+    public var relay: URL?
+    /// "host:port" addresses the Mac listens on right now (Wi-Fi, Ethernet, VPN). Devices try these first, because
+    /// Bonjour discovery is unreliable on watchOS and does not cross a VPN.
+    public var direct: [String]
 
-    public init(hostName: String, serviceName: String, key: Data) { self.hostName = hostName; self.serviceName = serviceName; self.key = key }
+    public init(hostName: String, serviceName: String, key: Data, relay: URL? = nil, direct: [String] = []) {
+        self.hostName = hostName; self.serviceName = serviceName; self.key = key; self.relay = relay; self.direct = direct
+    }
 
     public static func makeKey() -> Data { SymmetricKey(size: .bits256).withUnsafeBytes { Data($0) } }
 
@@ -23,6 +30,8 @@ public struct PairingPayload: Equatable, Sendable {
             URLQueryItem(name: "key", value: Self.base64URL(key)),
             URLQueryItem(name: "v", value: String(kilnRemoteProtocolVersion)),
         ]
+        if let relay { components.queryItems?.append(URLQueryItem(name: "relay", value: relay.absoluteString)) }
+        if !direct.isEmpty { components.queryItems?.append(URLQueryItem(name: "direct", value: direct.joined(separator: ","))) }
         return components.url!
     }
 
@@ -32,7 +41,16 @@ public struct PairingPayload: Equatable, Sendable {
         func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
         guard let host = value("host"), let service = value("service"), let keyText = value("key"),
               let key = Self.fromBase64URL(keyText), key.count == 32, value("v") == String(kilnRemoteProtocolVersion) else { return nil }
-        self.init(hostName: host, serviceName: service, key: key)
+        let relay = value("relay").flatMap(URL.init(string:)).flatMap { $0.scheme == "wss" || $0.scheme == "ws" ? $0 : nil }
+        let direct = (value("direct") ?? "").split(separator: ",").map(String.init).filter(Self.isHostPort)
+        self.init(hostName: host, serviceName: service, key: key, relay: relay, direct: direct)
+    }
+
+    /// "1.2.3.4:5678" or "name.local:5678": something a socket can be opened to, nothing that smuggles in a path or scheme.
+    static func isHostPort(_ text: String) -> Bool {
+        let parts = text.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2, let port = Int(parts[1]), (1...65535).contains(port), !parts[0].isEmpty else { return false }
+        return parts[0].allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" }
     }
 
     static func base64URL(_ data: Data) -> String {
