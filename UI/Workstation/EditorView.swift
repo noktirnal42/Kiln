@@ -517,7 +517,19 @@ struct EditorView: View {
                 language: SyntaxHighlighter.language(for: document.url),
                 jump: editor.pendingLine.flatMap { $0.id == document.id ? ($0.line, $0.column) : nil },
                 onJumpDone: { editor.pendingLine = nil },
-                onCaretMove: { if tracksCaret { caret = ($0, $1) } }
+                onCaretMove: { if tracksCaret { caret = ($0, $1) } },
+                diagnostics: editor.languageServer.diagnostics[document.url.path] ?? [],
+                onEdited: { editor.noteEdited(document) },
+                onDefinition: { line, column in
+                    Task {
+                        if let target = await editor.languageServer.definition(url: document.url, line: line, column: column) {
+                            editor.open(URL(fileURLWithPath: target.path), line: target.line + 1, column: target.column + 1)
+                        }
+                    }
+                },
+                onComplete: { line, column in
+                    await editor.languageServer.completions(url: document.url, line: line, column: column).map(\.insertText)
+                }
             )
             .id(document.id)
         case .binary:
@@ -556,7 +568,8 @@ struct EditorView: View {
                 Spacer()
             }
             Button { showProblems.toggle() } label: {
-                Label("\(builder.errorCount) errors, \(builder.warningCount) warnings", systemImage: "exclamationmark.triangle")
+                Label("\(allDiagnostics.filter { $0.severity == .error }.count) errors, \(allDiagnostics.filter { $0.severity == .warning }.count) warnings",
+                      systemImage: "exclamationmark.triangle")
             }
             .buttonStyle(.plain)
         }
@@ -568,7 +581,7 @@ struct EditorView: View {
     private var problemsPanel: some View {
         VStack(spacing: 0) {
             Divider()
-            if builder.diagnostics.isEmpty && builder.output.isEmpty {
+            if allDiagnostics.isEmpty && builder.output.isEmpty {
                 Text(editor.root == nil ? "" : "Build output and problems appear here. ⌘B builds the project.")
                     .font(SSTypography.caption()).foregroundStyle(.secondary).padding(SSSpacing.s)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -580,7 +593,7 @@ struct EditorView: View {
                             .buttonStyle(.borderless).font(SSTypography.caption()).padding(SSSpacing.xs)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    List(builder.diagnostics) { diagnostic in
+                    List(allDiagnostics) { diagnostic in
                         Button { open(diagnostic) } label: {
                             HStack(alignment: .top, spacing: 6) {
                                 Image(systemName: diagnostic.severity == .error ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
@@ -628,6 +641,17 @@ struct EditorView: View {
             .map { "\(editor.displayPath(URL(fileURLWithPath: $0.path))):\($0.line): \($0.message)" }
             .joined(separator: "\n")
         app.chatSession?.draft = "The build failed. Fix these errors in \(editor.root?.path ?? "the project"), then rebuild to confirm:\n\n\(errors)"
+    }
+
+    /// Build problems plus the language server's live ones for the file in front.
+    private var allDiagnostics: [Diagnostic] {
+        var list = builder.diagnostics
+        if let document = editor.active {
+            for live in editor.languageServer.diagnostics[document.url.path] ?? [] {
+                list.append(Diagnostic(path: document.url.path, line: live.line + 1, column: live.column + 1, severity: live.severity, message: live.message))
+            }
+        }
+        return list
     }
 
     private func open(_ diagnostic: Diagnostic) {

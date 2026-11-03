@@ -380,3 +380,52 @@ struct ProjectCommandTests {
         #expect(BuildSelection.load(for: URL(fileURLWithPath: "/tmp/proj-b"), defaults: defaults) == BuildSelection())
     }
 }
+
+@MainActor
+struct LanguageServerTests {
+    @Test func framerSplitsMessagesAcrossArbitraryChunks() {
+        var framer = LSPFramer()
+        let a = LSPFramer.encode(["jsonrpc": "2.0", "id": 1, "result": "x"])
+        let b = LSPFramer.encode(["jsonrpc": "2.0", "method": "m"])
+        let all = a + b
+        var out: [[String: Any]] = []
+        for start in stride(from: 0, to: all.count, by: 7) { out += framer.feed(all[start..<min(start + 7, all.count)]) }
+        #expect(out.count == 2 && out[0]["id"] as? Int == 1 && out[1]["method"] as? String == "m")
+    }
+
+    @Test func talksToAStubServerForDiagnosticsDefinitionAndCompletion() async throws {
+        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/stub_lsp.py").path
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-lsp-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("a.swift")
+        let client = LanguageServerClient(command: "python3 '\(script)'")
+        await client.start(root: dir)
+        #expect(client.state == .running)
+        client.didOpen(url: file, text: "let a = 1\n")
+        for _ in 0..<100 where client.diagnostics[file.path] == nil { try await Task.sleep(nanoseconds: 50_000_000) }
+        let diagnostic = try #require(client.diagnostics[file.path]?.first)
+        #expect(diagnostic.line == 2 && diagnostic.column == 4 && diagnostic.severity == .error && diagnostic.message == "stub error")
+        let definition = try #require(await client.definition(url: file, line: 0, column: 4))
+        #expect(definition == LSPLocation(path: file.path, line: 7, column: 1))
+        let items = await client.completions(url: file, line: 0, column: 1)
+        #expect(items.map(\.label) == ["alpha", "beta"] && items[1].insertText == "beta()")
+        client.stop()
+        #expect(client.state == .stopped)
+    }
+
+    @Test func aMissingServerFailsCleanlyInsteadOfHanging() async {
+        let client = LanguageServerClient(command: "definitely-not-a-real-server-binary")
+        await client.start(root: FileManager.default.temporaryDirectory)
+        if case .failed = client.state {} else { Issue.record("expected failed, got \(client.state)") }
+        #expect(await client.definition(url: URL(fileURLWithPath: "/x.swift"), line: 0, column: 0) == nil)
+    }
+
+    @Test func mapsDiagnosticSeverityAndLocations() {
+        let raw: [[String: Any]] = [["range": ["start": ["line": 1, "character": 2], "end": ["line": 1, "character": 5]], "severity": 2, "message": "w"]]
+        #expect(LanguageServerClient.diagnostics(from: raw).first?.severity == .warning)
+        let link: [[String: Any]] = [["targetUri": "file:///tmp/x.swift", "targetSelectionRange": ["start": ["line": 3, "character": 4], "end": ["line": 3, "character": 6]]]]
+        #expect(LanguageServerClient.location(from: link) == LSPLocation(path: "/tmp/x.swift", line: 3, column: 4))
+    }
+}

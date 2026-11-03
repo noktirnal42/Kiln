@@ -14,6 +14,9 @@ public struct FileNode: Identifiable, Hashable, Sendable {
 public final class EditorWorkspace {
     public private(set) var root: URL?
     public var git = GitService()
+    /// Live diagnostics, go to definition and completion for Swift / C-family files (sourcekit-lsp).
+    public let languageServer = LanguageServerClient()
+    public var languageServerEnabled = true
     public private(set) var documents: [EditorDocument] = []
     public var activeID: UUID?
     /// A second editor pane beside the active one (split view); nil when not split.
@@ -74,6 +77,7 @@ public final class EditorWorkspace {
         guard let path, !path.isEmpty else { root = nil; return }
         let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
         guard url != root else { return }
+        if root != nil { languageServer.stop() }
         root = url
     }
 
@@ -129,9 +133,36 @@ public final class EditorWorkspace {
         }
         documents.append(document)
         loadGitBase(for: document)
+        startLanguageServerIfNeeded()
+        if serves(document) { languageServer.didOpen(url: document.url, text: document.text) }
         activeID = document.id
         if let line { pendingLine = (document.id, line, column) }
         return document
+    }
+
+    func serves(_ document: EditorDocument) -> Bool {
+        document.isEditable && LanguageServerClient.serves(SyntaxHighlighter.language(for: document.url))
+    }
+
+    /// Starts sourcekit-lsp for the project the first time a Swift/C file is open, then announces the open files.
+    public func startLanguageServerIfNeeded() {
+        guard languageServerEnabled, let root, documents.contains(where: serves) else { return }
+        switch languageServer.state {
+        case .stopped:
+            Task {
+                await languageServer.start(root: root)
+                if languageServer.state == .running {
+                    for document in documents where serves(document) { languageServer.didOpen(url: document.url, text: document.text) }
+                }
+            }
+        default: break
+        }
+    }
+
+    /// Called as the user types; the server sees the whole text (full sync).
+    public func noteEdited(_ document: EditorDocument) {
+        guard serves(document) else { return }
+        languageServer.didChange(url: document.url, text: document.text)
     }
 
     /// Reads the committed version off the main thread; the gutter markers appear once it arrives.
@@ -166,6 +197,7 @@ public final class EditorWorkspace {
             try document.save(overwrite: overwrite)
             recovery.discard(for: document.url)
             loadGitBase(for: document)
+            if serves(document) { languageServer.didSave(url: document.url) }
             message = nil
         } catch {
             message = error.localizedDescription
@@ -179,6 +211,7 @@ public final class EditorWorkspace {
     /// Removes the tab. The caller decides what to do about unsaved edits first (`document.isDirty`).
     public func close(_ document: EditorDocument) {
         guard let index = documents.firstIndex(where: { $0.id == document.id }) else { return }
+        if serves(document) { languageServer.didClose(url: document.url) }
         documents.remove(at: index)
         if secondaryID == document.id { secondaryID = nil }
         recovery.discard(for: document.url)

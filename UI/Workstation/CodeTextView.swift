@@ -11,6 +11,13 @@ struct CodeTextView: NSViewRepresentable {
     var jump: (line: Int, column: Int)?
     var onJumpDone: () -> Void
     var onCaretMove: (_ line: Int, _ column: Int) -> Void
+    /// Live diagnostics for this file, drawn as underlines.
+    var diagnostics: [LSPDiagnostic] = []
+    var onEdited: () -> Void = {}
+    /// ⌘-click: 0-based line and UTF-16 column.
+    var onDefinition: (_ line: Int, _ column: Int) -> Void = { _, _ in }
+    /// ⌥Esc / F5: asks the server, then shows the system completion popup.
+    var onComplete: (_ line: Int, _ column: Int) async -> [String] = { _, _ in [] }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -21,7 +28,7 @@ struct CodeTextView: NSViewRepresentable {
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
 
-        let textView = NSTextView(frame: .zero)
+        let textView = CodeNSTextView(frame: .zero)
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
@@ -46,6 +53,8 @@ struct CodeTextView: NSViewRepresentable {
         textView.insertionPointColor = .controlAccentColor
         textView.textContainerInset = NSSize(width: 4, height: 6)
         textView.delegate = context.coordinator
+        textView.onCommandClick = { [weak coordinator = context.coordinator] index in coordinator?.commandClick(at: index) }
+        textView.fetchCompletions = { [weak coordinator = context.coordinator] done in coordinator?.fetchCompletions(done) }
         textView.string = document.text
         scroll.documentView = textView
 
@@ -72,6 +81,7 @@ struct CodeTextView: NSViewRepresentable {
             coordinator.rehighlight(immediately: true)
         }
         coordinator.applySettings(settings, to: textView, scroll: scroll)
+        coordinator.applyDiagnostics(diagnostics, to: textView)
         if coordinator.lastGitBase != document.gitBase {
             coordinator.lastGitBase = document.gitBase
             coordinator.refreshGutter()
@@ -142,9 +152,69 @@ struct CodeTextView: NSViewRepresentable {
             parent.document.text = textView.string
             rehighlight(immediately: false)
             refreshGutter()
+            editWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.parent.onEdited() }
+            editWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
         }
 
         private var gutterWork: DispatchWorkItem?
+        private var editWork: DispatchWorkItem?
+        private var appliedDiagnostics: [LSPDiagnostic] = []
+        var completionCache: [String] = []
+
+        /// (line, UTF-16 column), both 0-based, for a character offset.
+        func position(of index: Int, in text: NSString) -> (Int, Int) {
+            var line = 0, lineStart = 0
+            var cursor = 0
+            while cursor < min(index, text.length) {
+                if text.character(at: cursor) == 10 { line += 1; lineStart = cursor + 1 }
+                cursor += 1
+            }
+            return (line, max(0, min(index, text.length) - lineStart))
+        }
+
+        func commandClick(at index: Int) {
+            guard let textView else { return }
+            let (line, column) = position(of: index, in: textView.string as NSString)
+            parent.onDefinition(line, column)
+        }
+
+        func fetchCompletions(_ done: @escaping () -> Void) {
+            guard let textView else { return done() }
+            let (line, column) = position(of: textView.selectedRange().location, in: textView.string as NSString)
+            Task { @MainActor in
+                self.completionCache = await self.parent.onComplete(line, column)
+                done()
+            }
+        }
+
+        func textView(_ textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
+                      indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String] {
+            let prefix = (textView.string as NSString).substring(with: charRange).lowercased()
+            return completionCache.filter { prefix.isEmpty || $0.lowercased().hasPrefix(prefix) }
+        }
+
+        /// Underlines the ranges the language server flagged; red for errors, orange for warnings.
+        func applyDiagnostics(_ diagnostics: [LSPDiagnostic], to textView: NSTextView) {
+            guard diagnostics != appliedDiagnostics, let layout = textView.layoutManager else { return }
+            appliedDiagnostics = diagnostics
+            let text = textView.string as NSString
+            let full = NSRange(location: 0, length: text.length)
+            layout.removeTemporaryAttribute(.underlineStyle, forCharacterRange: full)
+            layout.removeTemporaryAttribute(.underlineColor, forCharacterRange: full)
+            var lineStarts = [0]
+            for i in 0..<text.length where text.character(at: i) == 10 { lineStarts.append(i + 1) }
+            for diagnostic in diagnostics where diagnostic.line < lineStarts.count && diagnostic.endLine < lineStarts.count {
+                let start = lineStarts[diagnostic.line] + diagnostic.column
+                var end = lineStarts[diagnostic.endLine] + diagnostic.endColumn
+                if end <= start { end = start + 1 }
+                guard start < text.length else { continue }
+                let range = NSRange(location: start, length: min(end, text.length) - start)
+                layout.addTemporaryAttribute(.underlineStyle, value: NSUnderlineStyle.patternDot.union(.single).rawValue, forCharacterRange: range)
+                layout.addTemporaryAttribute(.underlineColor, value: diagnostic.severity == .error ? NSColor.systemRed : NSColor.systemOrange, forCharacterRange: range)
+            }
+        }
 
         /// Recomputes the change markers shortly after the text or the committed base changes.
         func refreshGutter() {
@@ -302,5 +372,27 @@ final class LineNumberRuler: NSRulerView {
             }
             glyphIndex = NSMaxRange(lineGlyphs)
         }
+    }
+}
+
+/// NSTextView with ⌘-click (go to definition) and server-backed completion.
+final class CodeNSTextView: NSTextView {
+    var onCommandClick: ((Int) -> Void)?
+    var fetchCompletions: ((@escaping () -> Void) -> Void)?
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.command) {
+            let point = convert(event.locationInWindow, from: nil)
+            onCommandClick?(characterIndexForInsertion(at: point))
+            return
+        }
+        super.mouseDown(with: event)
+    }
+
+    private func showCompletionPopup(_ sender: Any?) { super.complete(sender) }
+
+    override func complete(_ sender: Any?) {
+        guard let fetchCompletions else { return super.complete(sender) }
+        fetchCompletions { [weak self] in self?.showCompletionPopup(sender) }
     }
 }
