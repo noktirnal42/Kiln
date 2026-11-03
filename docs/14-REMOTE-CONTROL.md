@@ -72,3 +72,9 @@ The Mac is kept awake while remote control is on.
 ## Verification status (2026-11-03)
 
 The iOS simulator connected directly to a real Mac, listed and opened a conversation, sent a message and received a reply. A separate test used a local Node relay and a fake Mac to exercise chat and an approval. These do not establish real-Mac internet relay operation. A physical watch attempted direct and Bonjour connections without reaching the Mac; phone-to-watch pairing and physical three-device voice and approval flows remain unverified. The relay is not deployed by default. Do not treat simulator or fake-server results as physical-device certification.
+
+### Physical voice test of the iPhone bridge (2026-11-03)
+
+An integration candidate on `codex/companion-integration` was installed on a physical iPhone 16 Pro Max and Apple Watch Series 9. With Kiln Remote open on the phone and remote control enabled in the Mac debug build, the watch connected via the iPhone. A dictated request for one sentence about the moon appeared in the Mac conversation with a matching model reply, and the user reported hearing the watch speak its response. This verifies one foreground voice round trip, not unattended operation or all network conditions. WatchConnectivity reachability fluctuated during setup, and a connected indicator appeared while the Mac socket was not visible; reconnect and stale-state behavior needs further investigation.
+
+Real-device remote approval allow and deny remain unverified for this candidate. Earlier tests produced unexpected standing approval decisions on the Mac, whose source remains unresolved. No internet relay was used in this physical voice test.
