@@ -170,9 +170,9 @@ destructive, outside scope, new to the network, risky-shell or admin still asks.
 everything except hard policy blocks and behavior-monitor holds. A mode answers once: it never creates a standing grant,
 never answers a monitor hold, and resets to Ask whenever Kiln launches. Each decision it makes is written to
 `approvals.jsonl` with `via: auto-mode` or `bypass-mode`, mode changes go to the audit chain, and every human answer now
-records `via` (mouse, keyboard, programmatic, remote) and how long it waited. Unit-tested policy and logging; not yet
-exercised by a real agent run end to end. This is separate from macOS permissions (Accessibility, microphone), which a mode
-cannot grant. Codex's `codex/kiln-computer-use` branch changes the same approval code and is not merged.
+records `via` (mouse, keyboard, programmatic, remote) and how long it waited. Unit-tested policy and logging; Bypass was exercised
+by a real agent run on 2026-11-03 (computer-use calls approved with `via: bypass-mode`, no waits). Auto has not been run by a real agent yet. This is separate from macOS permissions (Accessibility, microphone), which a mode
+cannot grant. Codex's experimental native computer-use and MCP agent tools are merged (`Core/Tools/ComputerUseTool.swift`): off until enabled in Settings, macOS Accessibility required, each call asks in Ask and Auto, Bypass skips the question. Actions: `list_apps`, `open_app`, `read`, `inspect` (query, max_elements, max_depth), `press`, `set_value`. Verified 2026-11-03: Kiln's own agent opened Messages and read the latest message from a named contact. Lesson: macOS keeps a stale "Kiln: ON" Accessibility entry for an earlier build with a different signature; remove it and add the installed app (Settings shows whether this copy is trusted).
 
 ## Known limits and ideas
 
