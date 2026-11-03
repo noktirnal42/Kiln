@@ -154,6 +154,7 @@ struct MCPServerCard: View {
 struct RemoteControlCard: View {
     let server: RemoteServer
     @State private var confirmUnpair = false
+    @State private var relayText = ""
 
     var body: some View {
         HStack(alignment: .top, spacing: SSSpacing.m) {
@@ -176,6 +177,12 @@ struct RemoteControlCard: View {
                          : server.relayURL == nil ? "No internet relay set: devices can only connect on this network or over a VPN."
                          : "Internet relay set but not connected" + (server.relayError.map { " (\($0))" } ?? "") + ".")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    HStack {
+                        TextField("Internet relay, e.g. wss://kiln-relay.example.workers.dev", text: $relayText)
+                            .textFieldStyle(.roundedBorder).font(SSTypography.caption())
+                        Button("Set") { server.setRelay(URL(string: relayText.trimmingCharacters(in: .whitespaces))) }
+                        if server.relayURL != nil { Button("Clear") { relayText = ""; server.setRelay(nil) } }
+                    }
                     Text("Scan with Kiln Remote on your iPhone. Anyone who sees this code can pair, so do not share your screen with it open.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                     Button("Unpair all devices…") { confirmUnpair = true }
@@ -192,6 +199,7 @@ struct RemoteControlCard: View {
         }
         .padding(SSSpacing.m)
         .overlay(alignment: .bottom) { Divider() }
+        .onAppear { relayText = server.relayURL?.absoluteString ?? "" }
         .confirmationDialog("Unpair every device?", isPresented: $confirmUnpair) {
             Button("Unpair all", role: .destructive) { server.unpairAll() }
         } message: { Text("A new code is made. Each phone and watch has to scan it again.") }
