@@ -464,3 +464,41 @@ struct TabOrderAndMultiCursorTests {
         #expect(MultiCursor.nextSelection(in: " " as NSString, selected: [NSRange(location: 0, length: 0)]) == nil)
     }
 }
+
+struct CodeFoldingTests {
+    @Test func bracesFoldBodiesAndKeepTheClosingLine() {
+        let code = "func a() {\n  let x = 1\n  if x {\n    print(x)\n  }\n}\nlet y = 2\n"
+        let regions = CodeFolding.regions(in: code, indentationBased: false)
+        #expect(regions == [FoldRegion(startLine: 0, lastHiddenLine: 4), FoldRegion(startLine: 2, lastHiddenLine: 3)])
+        #expect(CodeFolding.innermost(containing: 3, in: regions)?.startLine == 2)
+    }
+
+    @Test func bracesInStringsAndCommentsAreIgnored() {
+        let code = "let s = \"{\"\n// {\n/* { */\nfunc f() {\n  1\n}\n"
+        #expect(CodeFolding.regions(in: code, indentationBased: false) == [FoldRegion(startLine: 3, lastHiddenLine: 4)])
+    }
+
+    @Test func oneLineBlocksAreNotFoldable() {
+        #expect(CodeFolding.regions(in: "a {\n}\nb { c }\n", indentationBased: false).isEmpty)
+    }
+
+    @Test func indentationBlocksFoldPythonStyle() {
+        let code = "def f():\n    x = 1\n\n    return x\n\nprint(f())\n"
+        #expect(CodeFolding.regions(in: code, indentationBased: true) == [FoldRegion(startLine: 0, lastHiddenLine: 3)])
+    }
+
+    @Test func hiddenRangesKeepTheStartLineAndTheLineAfter() {
+        let text = "a {\nb\nc\n}\nd" as NSString
+        let regions = CodeFolding.regions(in: text as String, indentationBased: false)
+        let hidden = CodeFolding.hiddenRanges(in: text, folded: regions)
+        #expect(hidden == [NSRange(location: 4, length: 4)])   // "b\nc\n"
+        let visible = text.replacingCharacters(in: hidden[0], with: "")
+        #expect(visible == "a {\n}\nd")
+    }
+
+    @Test func nestedFoldsMerge() {
+        let text = "a {\n b {\n c\n }\n}\n" as NSString
+        let regions = CodeFolding.regions(in: text as String, indentationBased: false)
+        #expect(CodeFolding.hiddenRanges(in: text, folded: regions).count == 1)
+    }
+}

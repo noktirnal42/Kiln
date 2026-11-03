@@ -67,7 +67,11 @@ struct CodeTextView: NSViewRepresentable {
         scroll.verticalRulerView = LineNumberRuler(scrollView: scroll, textView: textView)
 
         context.coordinator.textView = textView
+        textView.layoutManager?.delegate = context.coordinator
+        (scroll.verticalRulerView as? LineNumberRuler)?.onToggleFold = { [weak coordinator = context.coordinator] line in coordinator?.toggleFold(line: line - 1) }
+        textView.onFold = { [weak coordinator = context.coordinator] fold in coordinator?.foldAtCaret(fold: fold) }
         context.coordinator.rehighlight(immediately: true)
+        context.coordinator.recomputeFolds()
         return scroll
     }
 
@@ -83,6 +87,7 @@ struct CodeTextView: NSViewRepresentable {
             coordinator.isUpdatingFromModel = false
             textView.setSelectedRange(NSRange(location: min(selected.location, (document.text as NSString).length), length: 0))
             coordinator.rehighlight(immediately: true)
+            coordinator.recomputeFolds()
         }
         coordinator.applySettings(settings, to: textView, scroll: scroll)
         coordinator.applyDiagnostics(diagnostics, to: textView)
@@ -98,6 +103,7 @@ struct CodeTextView: NSViewRepresentable {
         if coordinator.lastLanguage != language {
             coordinator.lastLanguage = language
             coordinator.rehighlight(immediately: true)
+            coordinator.recomputeFolds()
         }
         if let jump {
             coordinator.go(to: jump.line, column: jump.column)
@@ -106,7 +112,7 @@ struct CodeTextView: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, @preconcurrency NSLayoutManagerDelegate {
         private var appliedFontSize: Double = 0
         private var appliedWrap: Bool?
         private var appliedLineNumbers: Bool?
@@ -161,10 +167,89 @@ struct CodeTextView: NSViewRepresentable {
             parent.document.text = textView.string
             rehighlight(immediately: false)
             refreshGutter()
+            recomputeFolds()
             editWork?.cancel()
             let work = DispatchWorkItem { [weak self] in self?.parent.onEdited() }
             editWork = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+        }
+
+        // MARK: Code folding
+
+        private(set) var foldRegions: [FoldRegion] = []
+        private(set) var foldedStarts = Set<Int>()
+        private var hiddenRanges: [NSRange] = []
+
+        private var indentationBased: Bool { parent.language == .python || parent.language == .yaml }
+
+        /// Recomputes foldable blocks after a text or language change, drops folds that no longer exist, and re-lays-out.
+        func recomputeFolds() {
+            guard let textView, let layout = textView.layoutManager else { return }
+            let text = textView.string
+            foldRegions = CodeFolding.regions(in: text, indentationBased: indentationBased)
+            foldedStarts.formIntersection(foldRegions.map(\.startLine))
+            applyFolds(layout: layout, textView: textView)
+        }
+
+        func toggleFold(line: Int) {
+            guard foldRegions.contains(where: { $0.startLine == line }) else { return }
+            if !foldedStarts.insert(line).inserted { foldedStarts.remove(line) }
+            guard let textView, let layout = textView.layoutManager else { return }
+            applyFolds(layout: layout, textView: textView)
+        }
+
+        /// ⌘⌥[ folds the innermost block around the caret; ⌘⌥] unfolds the one at the caret.
+        func foldAtCaret(fold: Bool) {
+            guard let textView else { return }
+            let (line, _) = position(of: textView.selectedRange().location, in: textView.string as NSString)
+            if fold {
+                let candidates = foldRegions.filter { $0.startLine <= line && line <= $0.lastHiddenLine && !foldedStarts.contains($0.startLine) }
+                if let region = candidates.max(by: { $0.startLine < $1.startLine }) { toggleFold(line: region.startLine) }
+            } else if let region = foldRegions.filter({ foldedStarts.contains($0.startLine) && $0.startLine <= line && line <= $0.lastHiddenLine })
+                        .max(by: { $0.startLine < $1.startLine }) {
+                toggleFold(line: region.startLine)
+            }
+        }
+
+        private func applyFolds(layout: NSLayoutManager, textView: NSTextView) {
+            let text = textView.string as NSString
+            hiddenRanges = CodeFolding.hiddenRanges(in: text, folded: foldRegions.filter { foldedStarts.contains($0.startLine) })
+            let all = NSRange(location: 0, length: text.length)
+            layout.invalidateGlyphs(forCharacterRange: all, changeInLength: 0, actualCharacterRange: nil)
+            layout.invalidateLayout(forCharacterRange: all, actualCharacterRange: nil)
+            if let ruler = textView.enclosingScrollView?.verticalRulerView as? LineNumberRuler {
+                ruler.foldableLines = Set(foldRegions.map { $0.startLine + 1 })
+                ruler.foldedLines = Set(foldedStarts.map { $0 + 1 })
+            }
+            textView.needsDisplay = true
+        }
+
+        private func isHidden(_ index: Int) -> Bool { hiddenRanges.contains { NSLocationInRange(index, $0) } }
+
+        func layoutManager(_ layoutManager: NSLayoutManager, shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
+                           properties props: UnsafePointer<NSLayoutManager.GlyphProperty>,
+                           characterIndexes charIndexes: UnsafePointer<Int>, font aFont: NSFont, forGlyphRange glyphRange: NSRange) -> Int {
+            guard !hiddenRanges.isEmpty else { return 0 }
+            var modified = Array(UnsafeBufferPointer(start: props, count: glyphRange.length))
+            let storage = (layoutManager.textStorage?.string ?? "") as NSString
+            for i in 0..<glyphRange.length where isHidden(charIndexes[i]) && charIndexes[i] < storage.length && storage.character(at: charIndexes[i]) != 10 {
+                modified[i] = .null
+            }
+            layoutManager.setGlyphs(glyphs, properties: modified, characterIndexes: charIndexes, font: aFont, forGlyphRange: glyphRange)
+            return glyphRange.length
+        }
+
+        /// A line whose characters are all folded away takes no height.
+        func layoutManager(_ layoutManager: NSLayoutManager, shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>,
+                           lineFragmentUsedRect: UnsafeMutablePointer<NSRect>, baselineOffset: UnsafeMutablePointer<CGFloat>,
+                           in textContainer: NSTextContainer, forGlyphRange glyphRange: NSRange) -> Bool {
+            guard !hiddenRanges.isEmpty, glyphRange.length > 0 else { return false }
+            let chars = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+            guard chars.length > 0, hiddenRanges.contains(where: { NSLocationInRange(chars.location, $0) && NSMaxRange(chars) <= NSMaxRange($0) }) else { return false }
+            lineFragmentRect.pointee.size.height = 0.01
+            lineFragmentUsedRect.pointee.size.height = 0.01
+            baselineOffset.pointee = 0
+            return true
         }
 
         private var gutterWork: DispatchWorkItem?
@@ -323,6 +408,10 @@ final class LineNumberRuler: NSRulerView {
     var breakpointLines: Set<Int> = [] { didSet { if oldValue != breakpointLines { needsDisplay = true } } }
     var executionLine: Int? { didSet { if oldValue != executionLine { needsDisplay = true } } }
     var onToggleBreakpoint: (Int) -> Void = { _ in }
+    /// 1-based lines that start a foldable block, and which of them are folded; the chevron toggles via `onToggleFold`.
+    var foldableLines: Set<Int> = [] { didSet { if oldValue != foldableLines { needsDisplay = true } } }
+    var foldedLines: Set<Int> = [] { didSet { if oldValue != foldedLines { needsDisplay = true } } }
+    var onToggleFold: (Int) -> Void = { _ in }
 
     /// A click in the gutter toggles a breakpoint on that line.
     override func mouseDown(with event: NSEvent) {
@@ -336,14 +425,18 @@ final class LineNumberRuler: NSRulerView {
         var line = 1
         var cursor = 0
         while cursor < min(char, text.length) { if text.character(at: cursor) == 10 { line += 1 }; cursor += 1 }
-        onToggleBreakpoint(line)
+        if convert(event.locationInWindow, from: nil).x >= ruleThickness - 16, foldableLines.contains(line) {
+            onToggleFold(line)
+        } else {
+            onToggleBreakpoint(line)
+        }
     }
 
     init(scrollView: NSScrollView, textView: NSTextView) {
         self.textView = textView
         super.init(scrollView: scrollView, orientation: .verticalRuler)
         clientView = textView
-        ruleThickness = 44
+        ruleThickness = 58
         NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: NSText.didChangeNotification, object: textView)
         NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: NSView.boundsDidChangeNotification,
                                                object: scrollView.contentView)
@@ -365,16 +458,7 @@ final class LineNumberRuler: NSRulerView {
         let visible = textView.visibleRect
         let glyphs = layout.glyphRange(forBoundingRect: visible, in: container)
         let text = textView.string as NSString
-        var line = 1
-        // Count lines before the first visible glyph.
-        let firstChar = layout.characterIndexForGlyph(at: glyphs.location)
-        var index = 0
-        while index < firstChar {
-            let range = text.lineRange(for: NSRange(location: index, length: 0))
-            if NSMaxRange(range) <= firstChar { line += 1 }
-            index = NSMaxRange(range)
-            if range.length == 0 { break }
-        }
+        var line = 1, counted = 0
         var glyphIndex = glyphs.location
         while glyphIndex < NSMaxRange(glyphs) {
             var lineGlyphs = NSRange()
@@ -382,10 +466,11 @@ final class LineNumberRuler: NSRulerView {
             let charIndex = layout.characterIndexForGlyph(at: glyphIndex)
             let paragraph = text.lineRange(for: NSRange(location: charIndex, length: 0))
             if paragraph.location == charIndex {
+                while counted < charIndex { if text.character(at: counted) == 10 { line += 1 }; counted += 1 }
                 let label = "\(line)" as NSString
                 let size = label.size(withAttributes: attributes)
                 let y = fragment.minY + textView.textContainerInset.height - visible.minY
-                label.draw(at: NSPoint(x: ruleThickness - size.width - 8, y: y + (fragment.height - size.height) / 2), withAttributes: attributes)
+                label.draw(at: NSPoint(x: ruleThickness - size.width - 18, y: y + (fragment.height - size.height) / 2), withAttributes: attributes)
                 if executionLine == line {
                     NSColor.systemYellow.withAlphaComponent(0.25).setFill()
                     NSRect(x: 0, y: y, width: ruleThickness, height: fragment.height).fill()
@@ -403,7 +488,18 @@ final class LineNumberRuler: NSRulerView {
                         NSRect(x: ruleThickness - 4, y: y, width: 3, height: fragment.height).fill()
                     }
                 }
-                line += 1
+                if foldableLines.contains(line) {
+                    NSColor.secondaryLabelColor.setStroke()
+                    let cx = ruleThickness - 9, cy = y + fragment.height / 2
+                    let path = NSBezierPath()
+                    if foldedLines.contains(line) {
+                        path.move(to: NSPoint(x: cx - 2, y: cy - 4)); path.line(to: NSPoint(x: cx + 2, y: cy)); path.line(to: NSPoint(x: cx - 2, y: cy + 4))
+                    } else {
+                        path.move(to: NSPoint(x: cx - 4, y: cy - 2)); path.line(to: NSPoint(x: cx, y: cy + 2)); path.line(to: NSPoint(x: cx + 4, y: cy - 2))
+                    }
+                    path.lineWidth = 1.2
+                    path.stroke()
+                }
             }
             glyphIndex = NSMaxRange(lineGlyphs)
         }
@@ -443,6 +539,8 @@ enum MultiCursor {
 final class CodeNSTextView: NSTextView {
     var onCommandClick: ((Int) -> Void)?
     var fetchCompletions: ((@escaping () -> Void) -> Void)?
+    /// ⌘⌥[ (true) folds, ⌘⌥] (false) unfolds at the caret.
+    var onFold: ((Bool) -> Void)?
 
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.command) {
@@ -455,6 +553,11 @@ final class CodeNSTextView: NSTextView {
 
     /// ⌘D adds the next occurrence of the selection as another cursor; typing then edits all of them.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == [.command, .option], window?.firstResponder === self,
+           let key = event.charactersIgnoringModifiers, key == "[" || key == "]" {
+            onFold?(key == "[")
+            return true
+        }
         if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.charactersIgnoringModifiers == "d",
            window?.firstResponder === self {
             let ranges = selectedRanges.map(\.rangeValue)
