@@ -109,6 +109,7 @@ final class URLSessionTransport: RemoteTransport, @unchecked Sendable {
     /// One ordered writer: sealed frames carry a counter, so they must leave in the order they were sent.
     private let outbound: AsyncStream<Data>.Continuation
     private var writer: Task<Void, Never>?
+    private var keepalive: Task<Void, Never>?
 
     init(url: URL, headers: [String: String] = [:]) {
         var request = URLRequest(url: url)
@@ -133,10 +134,32 @@ final class URLSessionTransport: RemoteTransport, @unchecked Sendable {
         let task = task
         try await withTimeout(timeout) {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                task.sendPing { error in if let error { continuation.resume(throwing: error) } else { continuation.resume() } }
+                let once = PingOnce(continuation)
+                task.sendPing { error in once.resume(error) }
             }
         }
         receive()
+        // A relay link can die silently (the wrist lowers, the phone's connection changes): ping so it ends promptly and the
+        // session reconnects instead of waiting on a socket that will never answer.
+        let continuation = continuation
+        keepalive = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(20))
+                guard !Task.isCancelled else { return }
+                do {
+                    try await withTimeout(10) {
+                        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+                            let once = PingOnce(c)
+                            task.sendPing { error in once.resume(error) }
+                        }
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                    task.cancel(with: .abnormalClosure, reason: nil)
+                    return
+                }
+            }
+        }
     }
 
     private func receive() {
@@ -153,6 +176,7 @@ final class URLSessionTransport: RemoteTransport, @unchecked Sendable {
     func send(_ data: Data) { outbound.yield(data) }
 
     func close() {
+        keepalive?.cancel()
         outbound.finish()
         task.cancel(with: .goingAway, reason: nil)
         continuation.finish()
@@ -206,5 +230,17 @@ enum BonjourResolver {
             }
         }
         throw RemoteError.closed
+    }
+}
+
+/// Resumes a ping's continuation exactly once, however many times URLSession calls the handler.
+private final class PingOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    init(_ continuation: CheckedContinuation<Void, Error>) { self.continuation = continuation }
+    func resume(_ error: Error?) {
+        lock.lock(); let c = continuation; continuation = nil; lock.unlock()
+        guard let c else { return }
+        if let error { c.resume(throwing: error) } else { c.resume() }
     }
 }

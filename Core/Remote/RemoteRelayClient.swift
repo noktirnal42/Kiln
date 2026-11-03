@@ -65,6 +65,20 @@ final class RemoteRelayClient {
             let writer = Task { for await frame in frames { try? await task.send(.data(frame)) } }
             defer { continuation.finish(); writer.cancel(); outbound = nil }
             isConnected = true; lastError = nil; onChange()
+            // A link that dies without a close (sleep, Wi-Fi change, a middlebox dropping idle sockets) would otherwise
+            // look connected forever and the relay would think this Mac is offline. Ping, and drop the socket when no answer.
+            let keepalive = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(20))
+                    guard !Task.isCancelled, let self else { return }
+                    do { try await self.pingWithTimeout(task, seconds: 10) } catch {
+                        self.lastError = "Relay: no answer, reconnecting"
+                        task.cancel(with: .abnormalClosure, reason: nil)
+                        return
+                    }
+                }
+            }
+            defer { keepalive.cancel() }
             while !Task.isCancelled {
                 let message = try await task.receive()
                 if case .data(let data) = message { handle(data) }
@@ -79,9 +93,20 @@ final class RemoteRelayClient {
         return Date().timeIntervalSince(started)
     }
 
+    private func pingWithTimeout(_ task: URLSessionWebSocketTask, seconds: Double) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await self.ping(task) }
+            group.addTask { try await Task.sleep(for: .seconds(seconds)); throw URLError(.timedOut) }
+            defer { group.cancelAll() }
+            _ = try await group.next()
+        }
+    }
+
     private func ping(_ task: URLSessionWebSocketTask) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            task.sendPing { error in if let error { continuation.resume(throwing: error) } else { continuation.resume() } }
+            // The pong handler can be called more than once when the socket is cancelled; resume only the first time.
+            let once = PingOnce(continuation)
+            task.sendPing { error in once.resume(error) }
         }
     }
 
@@ -118,4 +143,16 @@ final class RelayDeviceTransport: FrameTransport, @unchecked Sendable {
     }
     func send(_ data: Data) { sendFrame(data) }
     func close() { closeDevice() }
+}
+
+/// Resumes a ping's continuation exactly once, however many times URLSession calls the handler.
+private final class PingOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    init(_ continuation: CheckedContinuation<Void, Error>) { self.continuation = continuation }
+    func resume(_ error: Error?) {
+        lock.lock(); let c = continuation; continuation = nil; lock.unlock()
+        guard let c else { return }
+        if let error { c.resume(throwing: error) } else { c.resume() }
+    }
 }

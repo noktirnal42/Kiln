@@ -16,7 +16,8 @@ struct KilnRemoteApp: App {
         _session = State(initialValue: session)
         _voice = State(initialValue: VoiceController(session: session))
         AppDelegate.session = session
-        session.onPairingChanged = { WatchHandoff.shared.publish($0) }
+        session.onPairingChanged = { WatchHandoff.shared.publish($0); BackgroundKeeper.shared.wanted = ($0 != nil) }
+        BackgroundKeeper.shared.wanted = session.mac != nil
         WatchBridge.shared.attach(session)
         WatchHandoff.shared.activate()
         WatchHandoff.shared.publish(session.mac)

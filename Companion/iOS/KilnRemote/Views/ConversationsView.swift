@@ -81,6 +81,7 @@ struct SettingsView: View {
                     Button("Unpair this Mac", role: .destructive) { session.unpair(); dismiss() }
                         .accessibilityHint("Deletes the saved key; scan the code on your Mac to pair again")
                 }
+                KeepAliveSection()
                 WatchSection()
                 Section("Voice") {
                     Toggle("Read replies aloud", isOn: $voice.readRepliesAloud)
@@ -100,6 +101,22 @@ struct SettingsView: View {
         case .reconnecting: "Reconnecting"
         case .needsRepairing: "Needs pairing again"
         case .unpaired: "Not paired"
+        }
+    }
+}
+
+/// The switch for staying connected to the Mac while the iPhone is locked.
+struct KeepAliveSection: View {
+    var body: some View {
+        @Bindable var keeper = BackgroundKeeper.shared
+        Section("While locked") {
+            Toggle("Stay connected when locked", isOn: Binding(get: { keeper.isEnabled }, set: { keeper.isEnabled = $0 }))
+            Text(keeper.isEnabled
+                 ? (keeper.isRunning ? "Active. Approvals arrive as notifications (they mirror to your watch) and the watch can use this iPhone." : "Waiting for a paired Mac.")
+                 : "Off. The link to your Mac drops soon after the iPhone locks.")
+                .font(.footnote).foregroundStyle(.secondary)
+            Text("Keeps the app running with silent audio, which uses a little battery. Not for App Store builds.")
+                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 }
