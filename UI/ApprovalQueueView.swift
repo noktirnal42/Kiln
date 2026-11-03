@@ -130,7 +130,7 @@ private struct ApprovalRequestRow: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(request.toolName)
                         .font(SSTypography.headline())
-                    Text(request.isMonitorReview
+                    Text(request.isMonitorReview && !["computer_use", "mcp_call_tool"].contains(request.toolName)
                          ? "Held by the behavior monitor · \(request.toolSummary)"
                          : "\(request.permission.displayName) access · \(request.toolSummary)")
                         .font(SSTypography.caption())

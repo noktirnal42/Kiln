@@ -126,6 +126,7 @@ public final class AppModel {
             services: ToolServices(
                 git: gitService,
                 fileIndex: fileIndexService,
+                mcp: mcpService,
                 webSearchKey: { keychain.get(module: "com.kiln.tools", key: "web-search-key") }
             ),
             auditChain: auditChain,

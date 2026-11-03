@@ -15,6 +15,7 @@ public protocol ToolExecuting: Sendable {
 public struct ToolServices: Sendable {
     public var git: GitService?
     public var fileIndex: FileIndexService?
+    public var mcp: MCPClientService?
     /// A web-search backend key (e.g. Tavily). Nil means search is not
     /// configured, and the tool must say so specifically — never fake it.
     public var webSearchKey: (@Sendable () -> String?)?
@@ -22,10 +23,12 @@ public struct ToolServices: Sendable {
     public init(
         git: GitService? = nil,
         fileIndex: FileIndexService? = nil,
+        mcp: MCPClientService? = nil,
         webSearchKey: (@Sendable () -> String?)? = nil
     ) {
         self.git = git
         self.fileIndex = fileIndex
+        self.mcp = mcp
         self.webSearchKey = webSearchKey
     }
 }

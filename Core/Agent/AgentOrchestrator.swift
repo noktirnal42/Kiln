@@ -672,7 +672,7 @@ public final class AgentOrchestrator: Sendable {
             yield(.policyDenied(tool: call.name, rule: "tool_permissions", reason: "tool not enabled for this agent"))
             return finish(.denied, error: "The '\(call.name)' tool is not enabled for this agent.")
         }
-        guard spec.permission <= policy.mode.maxPermittedLevel else {
+        guard spec.permission <= policy.mode.maxPermittedLevel || (["mcp_call_tool", "computer_use"].contains(spec.name) && policy.mode.allowsDirectWrites) else {
             yield(.policyDenied(tool: call.name, rule: "mode_cap", reason: "mode '\(policy.mode.rawValue)' allows at most \(policy.mode.maxPermittedLevel.displayName) access"))
             return finish(.denied, error: "The current mode (\(policy.mode.displayName)) does not allow '\(call.name)', which requires \(spec.permission.displayName) access.")
         }
@@ -725,7 +725,8 @@ public final class AgentOrchestrator: Sendable {
         // The approval gate. `denied` at the permission-set level never
         // runs at all; `automatic` runs without asking; everything else
         // asks, with consequences spelled out.
-        let levelPolicy = profile.toolPermissions.policy(for: spec.permission)
+        let configuredPolicy = profile.toolPermissions.policy(for: spec.permission)
+        let levelPolicy: ApprovalPolicy = ["mcp_call_tool", "computer_use"].contains(spec.name) && configuredPolicy != .denied ? .always : configuredPolicy
         if levelPolicy == .denied {
             yield(.policyDenied(tool: call.name, rule: "permission_set", reason: "level \(spec.permission.rawValue) denied for this agent"))
             return finish(.denied, error: "The '\(call.name)' tool is denied for this agent.")
@@ -754,6 +755,9 @@ public final class AgentOrchestrator: Sendable {
                 consequences = Self.consequences(for: spec, args: args, kind: approvalKindFromPolicy)
             }
             let grantValue = Self.grantValue(for: call.name, args: args)
+            // Computer use and MCP calls are asked about one by one in Ask and Auto; only an explicitly confirmed Bypass skips them.
+            let currentMode = await MainActor.run { approvalCenter.mode }
+            let alwaysAsk = ["mcp_call_tool", "computer_use"].contains(spec.name) && currentMode != .bypass
             let request = ApprovalRequest(
                 toolName: spec.name,
                 toolSummary: spec.summary,
@@ -764,10 +768,13 @@ public final class AgentOrchestrator: Sendable {
                 consequences: consequences,
                 grantValue: grantValue.value,
                 grantKind: grantValue.kind,
+                isMonitorReview: alwaysAsk,
                 policyFlag: approvalKindFromPolicy
             )
             yield(.awaitingApproval(request))
-            let decision = await approvalCenter.requestApproval(request, conversationID: profile.id)
+            let decision = alwaysAsk
+                ? await approvalCenter.requestReview(request, conversationID: profile.id)
+                : await approvalCenter.requestApproval(request, conversationID: profile.id)
             // The event below only says yes/no; the audit also needs HOW (once, session, standing grant).
             audit?.record("approval.decision", [
                 "request_id": .string(request.id.uuidString),

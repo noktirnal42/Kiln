@@ -1,4 +1,5 @@
 import SwiftUI
+import ApplicationServices
 
 /// Drives the provider-key rows: what is stored, what is being typed, and what the last action said.
 @MainActor
@@ -76,6 +77,7 @@ struct ProviderSettingsView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.openURL) private var openURL
     @State private var model = ProviderSettingsModel()
+    @AppStorage("computerUse.enabled") private var computerUseEnabled = false
 
     var body: some View {
         ScrollView {
@@ -87,6 +89,20 @@ struct ProviderSettingsView: View {
                 }
                 ForEach(ProviderKeyEntry.all) { entry in
                     row(entry)
+                }
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                    Toggle("Computer use", isOn: $computerUseEnabled)
+                    Text("Allow the agent to inspect and interact with running apps. Each action asks for approval and macOS Accessibility permission is required.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Request Accessibility access") {
+                            let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+                            _ = AXIsProcessTrustedWithOptions(options)
+                        }
+                        Button("Open Accessibility settings") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") { NSWorkspace.shared.open(url) }
+                        }
+                    }
                 }
                 ModelStoreCard()
             }
