@@ -372,6 +372,23 @@ public final class ChatSession {
 
     // MARK: Agent runs
 
+    /// What to tell the person when the model stopped without writing an answer. Pure so it can be tested.
+    nonisolated static func noFinalAnswerNotice(activity: [ToolCallRecord]) -> String {
+        let steps = activity.count
+        guard let last = activity.last else { return "The model finished without writing an answer." }
+        let outcome: String
+        switch last.status {
+        case .succeeded: outcome = "succeeded"
+        case .failed: outcome = "failed"
+        case .cancelled: outcome = "was cancelled"
+        case .denied: outcome = "was denied"
+        default: outcome = "did not finish"
+        }
+        let detail = (last.errorText ?? last.resultText ?? "").replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
+        let snippet = detail.isEmpty ? "" : " Its output began: \"\(String(detail.prefix(160)))\"."
+        return "The model ran \(steps) step\(steps == 1 ? "" : "s") but stopped without writing an answer, so I can't tell you the task is done. The last step (\(last.toolName)) \(outcome).\(snippet) Ask it to continue, or check the activity above."
+    }
+
     /// Maps one orchestrator event onto the live activity list. Pure so it can be tested.
     static func apply(_ event: AgentEvent, to activity: inout [ToolCallRecord]) {
         switch event {
@@ -449,6 +466,10 @@ public final class ChatSession {
                 }
             }
             if finalText.isEmpty { finalText = self?.streamingText ?? "" }
+            // A run that ends without a word would otherwise leave no reply at all: say what happened, without claiming success.
+            if finalText.isEmpty, let self, self.errorText == nil, !self.agentActivity.isEmpty {
+                finalText = Self.noFinalAnswerNotice(activity: self.agentActivity)
+            }
             if !finalText.isEmpty, let saved = try? await store.appendMessage(
                 conversationID: conversationID, role: .assistant, content: finalText,
                 reasoning: nil, tokenCount: tokens, toolCalls: [], modelID: model

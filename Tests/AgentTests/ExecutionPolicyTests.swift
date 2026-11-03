@@ -312,3 +312,26 @@ struct ApprovalModeTests {
         #expect(center.mode == .ask)
     }
 }
+
+@Suite("Computer use keyboard and empty runs")
+struct ComputerUseKeyboardTests {
+    @Test("only navigation, confirmation and a few command shortcuts are allowed") func allowlist() {
+        for allowed in ["return", "Enter", "tab", "escape", "left", "pagedown", "cmd+return", "CMD+A", "cmd + f"] {
+            #expect(ComputerUseService.parseKey(allowed) != nil, "\(allowed) should be allowed")
+        }
+        for refused in ["cmd+q", "cmd+w", "cmd+h", "cmd+m", "cmd+tab", "cmd+opt+esc", "ctrl+cmd+q", "option+return", "shift+cmd+3", "f4", "", "cmd+v"] {
+            #expect(ComputerUseService.parseKey(refused) == nil, "\(refused) must be refused")
+        }
+        #expect(ComputerUseService.parseKey("return")?.code == 36)
+    }
+
+    @Test("a run with no final answer says so instead of staying silent, and never claims success") func noAnswer() {
+        var record = ToolCallRecord(toolName: "computer_use", argumentsJSON: "{}", resultText: "Pressed element 216.", status: .succeeded)
+        let notice = ChatSession.noFinalAnswerNotice(activity: [record, record])
+        #expect(notice.contains("2 steps") && notice.contains("computer_use") && notice.contains("Pressed element 216"))
+        #expect(notice.contains("can't tell you the task is done"))
+        record.status = .failed; record.errorText = "no such element"
+        #expect(ChatSession.noFinalAnswerNotice(activity: [record]).contains("failed"))
+        #expect(ChatSession.noFinalAnswerNotice(activity: []) == "The model finished without writing an answer.")
+    }
+}

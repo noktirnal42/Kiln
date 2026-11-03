@@ -11,7 +11,7 @@ final class ComputerUseService {
     private var maxElements = 400
     private var maxDepth = 14
 
-    func run(action: String, app: String?, index: Int?, text: String?, query: String? = nil, maxElements limit: Int? = nil, maxDepth depth: Int? = nil) -> String {
+    func run(action: String, app: String?, index: Int?, text: String?, query: String? = nil, maxElements limit: Int? = nil, maxDepth depth: Int? = nil, key: String? = nil) -> String {
         guard UserDefaults.standard.bool(forKey: "computerUse.enabled") else { return "Computer use is off. Enable it in Kiln Settings first." }
         if action == "list_apps" {
             return NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.compactMap { item in
@@ -56,6 +56,31 @@ final class ComputerUseService {
             readText(AXUIElementCreateApplication(target.processIdentifier), depth: 0, seen: &seen, lines: &lines)
             let text = lines.joined(separator: "\n")
             return text.isEmpty ? "No readable text was exposed by \(name). It may be minimized, locked or showing nothing yet." : String(text.prefix(30_000))
+        case "activate":
+            target.activate()
+            return "Brought \(name) to the front. Inspect it again before using element indices."
+        case "focus":
+            guard snapshotPID == target.processIdentifier, let index, elements.indices.contains(index) else { return "Inspect this app again before using an element index." }
+            let element = elements[index]
+            let role = attribute(element, kAXRoleAttribute as String) as? String ?? ""
+            guard role != "AXSecureTextField" else { return "Secure text fields cannot be focused by this tool." }
+            let result = AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+            return result == .success ? "Focused element \(index). Use type_text or key next." : "The element did not accept focus (Accessibility error \(result.rawValue)). Try press on it first."
+        case "type_text":
+            guard let text, !text.isEmpty else { return "Specify text to type." }
+            guard text.count <= 500 else { return "Text is longer than 500 characters; type it in parts." }
+            if let refusal = Self.refuseIfSecureFocus(in: target) { return refusal }
+            target.activate()
+            Self.pause(0.25)
+            Self.typeUnicode(text, pid: target.processIdentifier)
+            return "Typed \(text.count) characters into \(name). Use read or inspect to confirm they appear before sending or pressing Return."
+        case "key":
+            guard let key, let combo = Self.parseKey(key) else { return "Unsupported key. Allowed: return, enter, tab, space, delete, escape, left, right, up, down, pageup, pagedown, home, end, cmd+return, cmd+a, cmd+f, cmd+l." }
+            if let refusal = Self.refuseIfSecureFocus(in: target) { return refusal }
+            target.activate()
+            Self.pause(0.25)
+            Self.pressKey(combo, pid: target.processIdentifier)
+            return "Pressed \(key) in \(name). Use read to confirm what changed; do not assume it worked."
         case "press", "set_value":
             guard snapshotPID == target.processIdentifier, let index, elements.indices.contains(index) else { return "Inspect this app again before using an element index." }
             let element = elements[index]
@@ -70,7 +95,63 @@ final class ComputerUseService {
             guard let text else { return "Specify text for set_value." }
             let result = AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, text as CFTypeRef)
             return result == .success ? "Updated element \(index). Inspect the app again before another action." : "The element did not accept a value (Accessibility error \(result.rawValue))."
-        default: return "Unknown action. Use list_apps, open_app, read, inspect, press, or set_value."
+        default: return "Unknown action. Use list_apps, open_app, activate, focus, type_text, key, read, inspect, press, or set_value."
+        }
+    }
+
+    // MARK: Keyboard
+
+    struct KeyCombo: Equatable { let code: CGKeyCode; let flags: CGEventFlags }
+
+    /// Only plain navigation and confirmation keys, and a few command shortcuts. Nothing that quits, closes, hides or switches apps.
+    nonisolated static func parseKey(_ text: String) -> KeyCombo? {
+        let name = text.lowercased().replacingOccurrences(of: " ", with: "")
+        let codes: [String: CGKeyCode] = ["return": 36, "enter": 76, "tab": 48, "space": 49, "delete": 51, "escape": 53, "left": 123, "right": 124,
+                                          "down": 125, "up": 126, "pageup": 116, "pagedown": 121, "home": 115, "end": 119]
+        if let code = codes[name] { return KeyCombo(code: code, flags: []) }
+        let combos: [String: KeyCombo] = ["cmd+return": KeyCombo(code: 36, flags: .maskCommand), "cmd+a": KeyCombo(code: 0, flags: .maskCommand),
+                                          "cmd+f": KeyCombo(code: 3, flags: .maskCommand), "cmd+l": KeyCombo(code: 37, flags: .maskCommand)]
+        return combos[name]
+    }
+
+    private static func pause(_ seconds: Double) { Thread.sleep(forTimeInterval: seconds) }
+
+    /// Typing and key presses go to whatever has focus in the app, so refuse when that is a password field.
+    private static func refuseIfSecureFocus(in target: NSRunningApplication) -> String? {
+        let appElement = AXUIElementCreateApplication(target.processIdentifier)
+        var focused: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focused) == .success, let focused else { return nil }
+        let element = focused as! AXUIElement
+        var role: CFTypeRef?, subrole: CFTypeRef?
+        _ = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
+        _ = AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole)
+        if (role as? String) == "AXSecureTextField" || (subrole as? String) == "AXSecureTextField" {
+            return "The focused field is a secure (password) field; this tool does not type into it."
+        }
+        return nil
+    }
+
+    private static func typeUnicode(_ text: String, pid: pid_t) {
+        let units = Array(text.utf16)
+        var index = 0
+        while index < units.count {
+            let end = min(index + 16, units.count)
+            var chunk = Array(units[index..<end])
+            for down in [true, false] {
+                guard let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down) else { continue }
+                event.keyboardSetUnicodeString(stringLength: chunk.count, unicodeString: &chunk)
+                event.postToPid(pid)
+            }
+            index = end
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+    }
+
+    private static func pressKey(_ combo: KeyCombo, pid: pid_t) {
+        for down in [true, false] {
+            guard let event = CGEvent(keyboardEventSource: nil, virtualKey: combo.code, keyDown: down) else { continue }
+            event.flags = combo.flags
+            event.postToPid(pid)
         }
     }
 
@@ -122,10 +203,10 @@ final class ComputerUseService {
 
 public struct ComputerUseTool: ToolExecuting {
     public init() {}
-    public var spec: ToolSpec { ToolSpec(name: "computer_use", summary: "Inspect and control a running Mac app using Accessibility", detail: "Enable Computer use in Kiln Settings and grant Accessibility access. Inspect an app before pressing or setting an element. Every call requires approval; secure fields and Kiln itself are blocked. Actions: list_apps, open_app (launch in the background), read (the text an app shows, in order: use this for messages, mail, notes, calendars), inspect (a numbered element tree, optionally filtered by query and sized by max_elements and max_depth), press, set_value. To read Messages: open_app Messages, press a conversation from inspect (query the contact name), then read.", parameters: [ToolParam(name: "action", description: "list_apps, open_app, read, inspect, press, or set_value"), ToolParam(name: "app", description: "App name or bundle ID, for example Messages or com.apple.MobileSMS", required: false), ToolParam(name: "element_index", type: "integer", description: "Index from the latest inspect", required: false), ToolParam(name: "text", description: "Value to set", required: false), ToolParam(name: "query", description: "inspect only: keep lines containing this text", required: false), ToolParam(name: "max_elements", type: "integer", description: "inspect only: how many elements to walk (default 400, up to 2500)", required: false), ToolParam(name: "max_depth", type: "integer", description: "inspect only: how deep (default 14, up to 30)", required: false)], permission: .admin) }
+    public var spec: ToolSpec { ToolSpec(name: "computer_use", summary: "Inspect and control a running Mac app using Accessibility", detail: "Enable Computer use in Kiln Settings and grant Accessibility access. Inspect an app before pressing or setting an element. Every call requires approval; secure fields and Kiln itself are blocked. Actions: list_apps, open_app (launch in the background), activate (bring to front), focus (give a numbered field keyboard focus), type_text (real keystrokes), key (return, tab, escape, arrows, cmd+return), read (the text an app shows, in order: use this for messages, mail, notes, calendars), inspect (a numbered element tree, optionally filtered by query and sized by max_elements and max_depth), press, set_value. To read Messages: open_app Messages, press a conversation from inspect (query the contact name), then read. To SEND a message: open the conversation, inspect to find the compose field, focus it, type_text the message, key return, then read the conversation to confirm the message appears. Never use set_value for chat apps (it does not register as typing), never press unrelated numbered elements hoping one is Send, and never say a message was sent until read shows it.", parameters: [ToolParam(name: "action", description: "list_apps, open_app, activate, focus, type_text, key, read, inspect, press, or set_value"), ToolParam(name: "app", description: "App name or bundle ID, for example Messages or com.apple.MobileSMS", required: false), ToolParam(name: "element_index", type: "integer", description: "Index from the latest inspect", required: false), ToolParam(name: "text", description: "Value to set", required: false), ToolParam(name: "query", description: "inspect only: keep lines containing this text", required: false), ToolParam(name: "max_elements", type: "integer", description: "inspect only: how many elements to walk (default 400, up to 2500)", required: false), ToolParam(name: "max_depth", type: "integer", description: "inspect only: how deep (default 14, up to 30)", required: false), ToolParam(name: "key", description: "key action only: return, enter, tab, space, delete, escape, left, right, up, down, pageup, pagedown, home, end, cmd+return, cmd+a, cmd+f, cmd+l", required: false)], permission: .admin) }
     public func execute(argumentsJSON: String, context: ToolExecutionContext) async throws -> String {
-        struct Args: Decodable { let action: String; let app: String?; let element_index: Int?; let text: String?; let query: String?; let max_elements: Int?; let max_depth: Int? }
+        struct Args: Decodable { let action: String; let app: String?; let element_index: Int?; let text: String?; let query: String?; let max_elements: Int?; let max_depth: Int?; let key: String? }
         let args = try JSONDecoder().decode(Args.self, from: Data(argumentsJSON.utf8))
-        return await ComputerUseService.shared.run(action: args.action, app: args.app, index: args.element_index, text: args.text, query: args.query, maxElements: args.max_elements, maxDepth: args.max_depth)
+        return await ComputerUseService.shared.run(action: args.action, app: args.app, index: args.element_index, text: args.text, query: args.query, maxElements: args.max_elements, maxDepth: args.max_depth, key: args.key)
     }
 }
