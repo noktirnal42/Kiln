@@ -17,6 +17,9 @@ struct MCPPanelView: View {
                 Text("MCP Servers").font(SSTypography.title())
                 Spacer()
                 Button("Rescan") { Task { await loadAll() } }
+                if hiddenCount > 0 {
+                    Button("Show \(hiddenCount) hidden") { Task { await service.unhideAllServers(); await loadAll() } }
+                }
             }
             .padding(SSSpacing.m)
             Divider()
@@ -49,6 +52,11 @@ struct MCPPanelView: View {
                         .font(SSTypography.mono(11))
                         .lineLimit(1)
                         .foregroundStyle(.secondary)
+                    if !status.sources.isEmpty {
+                        Text("From " + status.sources.joined(separator: " · "))
+                            .font(SSTypography.caption())
+                            .foregroundStyle(.tertiary)
+                    }
                     if let error = status.lastError {
                         Text(error)
                             .font(SSTypography.caption())
@@ -93,6 +101,17 @@ struct MCPPanelView: View {
                                 }
                             }
                             .controlSize(.small)
+                        }
+                        if !status.sources.isEmpty {
+                            Button("Hide") {
+                                Task {
+                                    await service.disconnect(status.config.id)
+                                    await service.hideServer(status.config.id)
+                                    await loadAll()
+                                }
+                            }
+                            .controlSize(.small)
+                            .help("Stop listing this imported server. Show hidden servers again with Rescan → Show hidden.")
                         }
                         Button("Revoke Approval") {
                             Task {
@@ -192,6 +211,7 @@ struct MCPPanelView: View {
     }
 
     @State private var registryTab = "tools"
+    private var hiddenCount: Int { UserDefaults.standard.stringArray(forKey: "mcp.hiddenServers")?.count ?? 0 }
 
     private func loadAll() async {
         await service.discoverServers()

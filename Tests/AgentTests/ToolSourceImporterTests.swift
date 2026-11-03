@@ -36,6 +36,19 @@ struct ToolSourceImporterTests {
         #expect(servers.first { $0.config.id == "docs" }?.config.transport == .http)
     }
 
+    @Test func enabledClaudePluginsContributeTheirMcpServers() throws {
+        let root = try home([
+            ".claude/settings.json": #"{"enabledPlugins":{"docs@market":true,"off@market":false}}"#,
+            ".claude/plugins/cache/market/docs/1.0.0/.mcp.json": #"{"mcpServers":{"docs-server":{"command":"${CLAUDE_PLUGIN_ROOT}/bin/serve","args":["--x"]}}}"#,
+            ".claude/plugins/cache/market/off/1.0.0/.mcp.json": #"{"mcpServers":{"never":{"command":"x"}}}"#,
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let servers = ToolSourceImporter.importServers(home: root)
+        #expect(servers.map(\.config.id) == ["docs-server"])
+        #expect(servers.first?.config.command.hasSuffix("/docs/1.0.0/bin/serve") == true)
+        #expect(servers.first?.sources == ["Claude Code plugin"])
+    }
+
     @Test func sameNameWithADifferentCommandIsKeptApart() {
         let a = MCPServerConfig(id: "kettle", transport: .stdio, command: "kettle", arguments: ["a"])
         let b = MCPServerConfig(id: "kettle", transport: .stdio, command: "other", arguments: ["b"])

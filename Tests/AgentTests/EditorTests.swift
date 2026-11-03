@@ -108,6 +108,29 @@ struct EditorDocumentTests {
         #expect(workspace.documents.isEmpty)
     }
 
+    @Test func recoverableFilesAreListedUntilOpenedOrDiscarded() throws {
+        let (dir, file) = try temp()
+        let recoveryDir = dir.appendingPathComponent("recovery")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let first = EditorWorkspace(recovery: EditorRecoveryStore(directory: recoveryDir))
+        first.setRoot(dir.path)
+        first.open(file).text = "work in progress\n"
+        first.writeRecovery()
+
+        let next = EditorWorkspace(recovery: EditorRecoveryStore(directory: recoveryDir))
+        next.refreshRecoverable()
+        #expect(next.recoverable.map(\.lastPathComponent) == ["a.swift"])
+        next.restoreRecoverable()
+        #expect(next.active?.text == "work in progress\n" && next.recoverable.isEmpty)
+
+        let again = EditorWorkspace(recovery: EditorRecoveryStore(directory: recoveryDir))
+        again.refreshRecoverable()
+        again.discardRecoverable()
+        let last = EditorWorkspace(recovery: EditorRecoveryStore(directory: recoveryDir))
+        last.refreshRecoverable()
+        #expect(last.recoverable.isEmpty)
+    }
+
     @Test func navigatorHidesBuildOutputAndSortsFoldersFirst() throws {
         let (dir, _) = try temp()
         defer { try? FileManager.default.removeItem(at: dir) }

@@ -27,6 +27,30 @@ public final class EditorWorkspace {
         self.recovery = recovery
     }
 
+    /// Files from a previous session that have unsaved work waiting; shown as a banner until opened or discarded.
+    public private(set) var recoverable: [URL] = []
+
+    public func refreshRecoverable() {
+        let open = Set(documents.map(\.url))
+        recoverable = recovery.pendingURLs().filter { !open.contains($0.standardizedFileURL) }
+    }
+
+    public func restoreRecoverable() {
+        for url in recoverable { open(url) }
+        recoverable = []
+    }
+
+    public func discardRecoverable() {
+        for url in recoverable { recovery.discard(for: url) }
+        recoverable = []
+    }
+
+    /// Called when the user quits and chooses Don't Save: nothing should be offered back next launch.
+    public func discardAllUnsaved() {
+        recovery.discardAll()
+        recoverable = []
+    }
+
     public var active: EditorDocument? { documents.first { $0.id == activeID } }
     public var hasUnsavedChanges: Bool { documents.contains { $0.isDirty } }
     public var dirtyDocuments: [EditorDocument] { documents.filter(\.isDirty) }
@@ -246,6 +270,24 @@ public final class EditorRecoveryStore: @unchecked Sendable {
               entry.path == url.path,
               entry.baseHash == KeychainService.fingerprint(of: currentDiskText) else { return nil }
         return entry.text
+    }
+
+    /// Files with saved-but-unrestored work whose disk content still matches what the edits were based on.
+    func pendingURLs() -> [URL] {
+        lock.lock(); defer { lock.unlock() }
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        return files.compactMap { file -> URL? in
+            guard file.pathExtension == "json", let data = try? Data(contentsOf: file),
+                  let entry = try? JSONDecoder().decode(Entry.self, from: data),
+                  let disk = try? String(contentsOfFile: entry.path, encoding: .utf8),
+                  entry.baseHash == KeychainService.fingerprint(of: disk) else { return nil }
+            return URL(fileURLWithPath: entry.path)
+        }.sorted { $0.path < $1.path }
+    }
+
+    func discardAll() {
+        lock.lock(); defer { lock.unlock() }
+        try? FileManager.default.removeItem(at: directory)
     }
 
     func discard(for url: URL) {

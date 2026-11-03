@@ -17,6 +17,7 @@ public enum ToolSourceImporter {
     public static func importServers(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [ImportedServer] {
         var found: [(source: String, config: MCPServerConfig)] = []
         found += claudeServers(home: home).map { ("Claude Code", $0) }
+        found += claudePluginServers(home: home).map { ("Claude Code plugin", $0) }
         found += codexServers(home: home).map { ("Codex", $0) }
         found += openCodeServers(home: home).map { ("OpenCode", $0) }
         return merge(found)
@@ -76,6 +77,35 @@ public enum ToolSourceImporter {
             guard let fields = servers[name] as? [String: Any] else { return nil }
             return config(name: name, fields: fields, commandIsArray: false)
         }
+    }
+
+    /// MCP servers bundled in enabled Claude Code plugins: `<plugin>/.mcp.json`, with `${CLAUDE_PLUGIN_ROOT}` filled in.
+    static func claudePluginServers(home: URL) -> [MCPServerConfig] {
+        let settings = home.appendingPathComponent(".claude/settings.json")
+        guard let data = try? Data(contentsOf: settings),
+              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let enabled = root["enabledPlugins"] as? [String: Any] else { return [] }
+        let cache = home.appendingPathComponent(".claude/plugins/cache", isDirectory: true)
+        var result: [MCPServerConfig] = []
+        for (key, value) in enabled.sorted(by: { $0.key < $1.key }) where (value as? Bool) == true {
+            // "name@marketplace" → cache/<marketplace>/<name>/<version>/
+            let parts = key.split(separator: "@", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { continue }
+            let pluginDir = cache.appendingPathComponent(parts[1]).appendingPathComponent(parts[0])
+            guard let versions = try? FileManager.default.contentsOfDirectory(atPath: pluginDir.path) else { continue }
+            guard let latest = versions.filter({ !$0.hasPrefix(".") }).sorted().last else { continue }
+            let directory = pluginDir.appendingPathComponent(latest)
+            guard let raw = try? String(contentsOf: directory.appendingPathComponent(".mcp.json"), encoding: .utf8) else { continue }
+            let text = raw.replacingOccurrences(of: "${CLAUDE_PLUGIN_ROOT}", with: directory.path)
+            guard let parsed = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] else { continue }
+            let servers = (parsed["mcpServers"] as? [String: Any]) ?? parsed
+            for name in servers.keys.sorted() {
+                if let fields = servers[name] as? [String: Any], let config = config(name: name, fields: fields, commandIsArray: false) {
+                    result.append(config)
+                }
+            }
+        }
+        return result
     }
 
     // MARK: OpenCode

@@ -7,8 +7,11 @@ public struct MCPServerStatus: Identifiable, Equatable, Sendable {
     public var connected: Bool
     public var toolCount: Int
     public var lastError: String?
+    /// Tools (Claude Code, Codex, OpenCode) that define this server; empty for Kiln's own configuration.
+    public var sources: [String]
 
-    public init(config: MCPServerConfig, approved: Bool, connected: Bool, toolCount: Int, lastError: String? = nil) {
+    public init(config: MCPServerConfig, approved: Bool, connected: Bool, toolCount: Int, lastError: String? = nil, sources: [String] = []) {
+        self.sources = sources
         self.config = config
         self.approved = approved
         self.connected = connected
@@ -106,12 +109,31 @@ public actor MCPClientService {
         // Servers already configured for Claude Code, Codex and OpenCode, merged so each appears once.
         // Anything with the same command line as a server loaded above is skipped, not duplicated.
         let known = Set(configs.values.map { ToolSourceImporter.identity(of: $0) })
+        let hidden = hiddenServerIDs
         for imported in ToolSourceImporter.importServers(home: home) where !known.contains(ToolSourceImporter.identity(of: imported.config)) {
-            guard configs[imported.config.id] == nil else { continue }
+            guard configs[imported.config.id] == nil, !hidden.contains(imported.config.id) else { continue }
             configs[imported.config.id] = imported.config
             importedFrom[imported.config.id] = imported.sources
         }
         return Array(configs.values).sorted { $0.id < $1.id }
+    }
+
+    /// Imported servers the user chose not to see; kept across launches.
+    public var hiddenServerIDs: Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: "mcp.hiddenServers") ?? [])
+    }
+
+    public func hideServer(_ id: String) {
+        var hidden = hiddenServerIDs
+        hidden.insert(id)
+        UserDefaults.standard.set(Array(hidden).sorted(), forKey: "mcp.hiddenServers")
+        configs.removeValue(forKey: id)
+        connections.removeValue(forKey: id)
+        importedFrom.removeValue(forKey: id)
+    }
+
+    public func unhideAllServers() {
+        UserDefaults.standard.removeObject(forKey: "mcp.hiddenServers")
     }
 
     /// Which tools (Claude Code, Codex, OpenCode) define each imported server.
@@ -303,7 +325,8 @@ public actor MCPClientService {
                 approved: approved,
                 connected: connections[config.id] != nil,
                 toolCount: tools[config.id]?.count ?? 0,
-                lastError: errors[config.id]
+                lastError: errors[config.id],
+                sources: importedFrom[config.id] ?? []
             ))
         }
         return result

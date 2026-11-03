@@ -1,0 +1,28 @@
+name: Build and test
+# Manual until a hosted runner with the project's Xcode (see xcodeVersion in project.yml) is confirmed.
+# Run it from the Actions tab; once it passes reliably, add `pull_request:` below.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the newest Xcode on the runner
+        run: |
+          ls -d /Applications/Xcode*.app | sort -V | tail -1 | xargs -I{} sudo xcode-select -s "{}/Contents/Developer"
+          xcodebuild -version
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Build
+        run: xcodebuild -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS' -jobs 2 CODE_SIGNING_ALLOWED=NO build
+      - name: Test (live provider tests are opt-in and stay off)
+        run: xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS' -jobs 2 CODE_SIGNING_ALLOWED=NO
+      - name: Site checks
+        run: python3 Scripts/check_site.py

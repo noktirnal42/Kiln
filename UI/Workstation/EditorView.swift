@@ -72,6 +72,7 @@ struct EditorView: View {
         .onAppear {
             editor.setRoot(app.chatSession?.workspaceRoot)
             editor.startWatching()
+            editor.refreshRecoverable()
         }
         .onChange(of: app.chatSession?.workspaceRoot) { _, root in editor.setRoot(root) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in editor.writeRecovery() }
@@ -305,6 +306,12 @@ struct EditorView: View {
 
     @ViewBuilder
     private var banners: some View {
+        if !editor.recoverable.isEmpty {
+            Banner(text: "Unsaved changes from your last session are available for \(editor.recoverable.count) file(s).", tint: SSColor.accent) {
+                Button("Open them") { editor.restoreRecoverable() }
+                Button("Discard") { editor.discardRecoverable() }
+            }
+        }
         if let message = editor.message {
             Banner(text: message, tint: SSColor.danger) {
                 Button("Dismiss") { editor.message = nil }
