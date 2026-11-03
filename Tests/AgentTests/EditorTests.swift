@@ -207,6 +207,8 @@ struct SyntaxAndBuildTests {
         #expect(warning.line == 3 && warning.column == 1 && warning.severity == .warning)
         let spm = try #require(DiagnosticParser.parse("error: /p/Sources/F.swift:81:13 expected ':' after '? ...' in ternary expression"))
         #expect(spm.path == "/p/Sources/F.swift" && spm.line == 81 && spm.column == 13 && spm.message.hasPrefix("expected ':'"))
+        let issue = try #require(DiagnosticParser.parse("✘ Test failsOnPurpose() recorded an issue at helloTests.swift:3:31: Expectation failed: 1 + 1 == 3"))
+        #expect(issue.path == "helloTests.swift" && issue.line == 3 && issue.column == 31 && issue.message.hasPrefix("Expectation failed"))
         #expect(DiagnosticParser.parse("error: Build failed") == nil)
         #expect(DiagnosticParser.parse("Compiling Foo.swift") == nil)
     }
@@ -297,6 +299,36 @@ struct EditorFileOperationTests {
     }
 }
 
+struct LineDiffTests {
+    @Test func classifiesAddedModifiedAndRemovedLines() {
+        let base = ["a", "b", "c", "d", "e"]
+        let current = ["a", "B", "c", "new", "d"]      // b→B modified, "new" added, e removed
+        let hunks = LineDiff.hunks(base: base, current: current)
+        #expect(hunks.map(\.kind) == [.modified, .added, .removed])
+        #expect(hunks[0].current == 1..<2 && hunks[0].base == ["b"])
+        #expect(hunks[1].current == 3..<4)
+        #expect(hunks[2].base == ["e"] && hunks[2].current == 5..<5)
+        #expect(LineDiff.hunks(base: base, current: base).isEmpty)
+    }
+
+    @Test func revertsAHunkBackToTheCommittedLines() {
+        let base = ["a", "b", "c"]
+        let text = "a\nB\nB2\nc"
+        let hunks = LineDiff.hunks(base: base, current: text.components(separatedBy: "\n"))
+        #expect(hunks.count == 1)
+        #expect(LineDiff.revert(hunks[0], in: text) == "a\nb\nc")
+        #expect(LineDiff.hunk(at: 2, in: hunks) == hunks[0] && LineDiff.hunk(at: 0, in: hunks) == nil)
+    }
+
+    @Test func removalsAreRestoredAtTheirPosition() {
+        let base = ["a", "b", "c"]
+        let text = "a\nc"
+        let hunk = LineDiff.hunks(base: base, current: text.components(separatedBy: "\n"))[0]
+        #expect(hunk.kind == .removed)
+        #expect(LineDiff.revert(hunk, in: text) == "a\nb\nc")
+    }
+}
+
 struct ProjectCommandTests {
     @Test func parsesXcodebuildListAndPackageDescription() {
         let list = #"{"project":{"configurations":["Debug","Release"],"name":"App","schemes":["App","AppTests"],"targets":["App"]}}"#
@@ -329,11 +361,13 @@ struct ProjectCommandTests {
         Test Case '-[AppTests.FooTests testA]' passed (0.012 seconds).
         Test Case '-[AppTests.FooTests testB]' failed (0.500 seconds).
         ✔ Test mergesByLaunchIdentity() passed after 0.001 seconds.
+        ✘ Test brokenThing() recorded an issue at T.swift:3:31: Expectation failed: 1 + 1 == 3
         ✘ Test brokenThing() failed after 0.200 seconds with 1 issue.
+        ✘ Test run with 2 tests in 0 suites failed after 0.201 seconds with 1 issue.
         random noise
         """
         let results = TestOutputParser.parse(output)
-        #expect(results.map(\.name) == ["AppTests.FooTests testA", "AppTests.FooTests testB", "mergesByLaunchIdentity()", "brokenThing()"] || results.count == 4)
+        #expect(results.map(\.name) == ["AppTests.FooTests testA", "AppTests.FooTests testB", "mergesByLaunchIdentity()", "brokenThing()"])
         #expect(results.filter { $0.status == .failed }.count == 2)
         #expect(results.first?.seconds == 0.012)
     }

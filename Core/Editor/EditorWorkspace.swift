@@ -13,6 +13,7 @@ public struct FileNode: Identifiable, Hashable, Sendable {
 @MainActor @Observable
 public final class EditorWorkspace {
     public private(set) var root: URL?
+    public var git = GitService()
     public private(set) var documents: [EditorDocument] = []
     public var activeID: UUID?
     /// A second editor pane beside the active one (split view); nil when not split.
@@ -127,9 +128,31 @@ public final class EditorWorkspace {
             document.applyRecovered(saved)
         }
         documents.append(document)
+        loadGitBase(for: document)
         activeID = document.id
         if let line { pendingLine = (document.id, line, column) }
         return document
+    }
+
+    /// Reads the committed version off the main thread; the gutter markers appear once it arrives.
+    public func loadGitBase(for document: EditorDocument) {
+        let url = document.url
+        let service = git
+        Task { [weak document] in
+            let directory = url.deletingLastPathComponent().path
+            guard let top = await service.topLevel(directory), url.path.hasPrefix(top + "/") else { return }
+            let relative = String(url.path.dropFirst(top.count + 1))
+            let base = await service.headContent(top, relativePath: relative)
+            await MainActor.run { document?.gitBase = base }
+        }
+    }
+
+    /// Files with uncommitted changes in the project (what an agent run or a manual edit left behind).
+    public func changedFiles() async -> [GitFileStatus] {
+        guard let root else { return [] }
+        let service = git
+        guard let top = await service.topLevel(root.path) else { return [] }
+        return (try? await service.status(top)) ?? []
     }
 
     /// Path relative to the project root (or absolute when outside it), as shown in diagnostics and tabs.
@@ -142,6 +165,7 @@ public final class EditorWorkspace {
         do {
             try document.save(overwrite: overwrite)
             recovery.discard(for: document.url)
+            loadGitBase(for: document)
             message = nil
         } catch {
             message = error.localizedDescription

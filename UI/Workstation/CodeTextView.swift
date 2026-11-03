@@ -72,6 +72,10 @@ struct CodeTextView: NSViewRepresentable {
             coordinator.rehighlight(immediately: true)
         }
         coordinator.applySettings(settings, to: textView, scroll: scroll)
+        if coordinator.lastGitBase != document.gitBase {
+            coordinator.lastGitBase = document.gitBase
+            coordinator.refreshGutter()
+        }
         if coordinator.lastLanguage != language {
             coordinator.lastLanguage = language
             coordinator.rehighlight(immediately: true)
@@ -125,6 +129,7 @@ struct CodeTextView: NSViewRepresentable {
         weak var textView: NSTextView?
         var isUpdatingFromModel = false
         var lastLanguage: SyntaxHighlighter.Language?
+        var lastGitBase: String?
         private var pending: DispatchWorkItem?
 
         init(_ parent: CodeTextView) {
@@ -136,6 +141,20 @@ struct CodeTextView: NSViewRepresentable {
             guard !isUpdatingFromModel, let textView else { return }
             parent.document.text = textView.string
             rehighlight(immediately: false)
+            refreshGutter()
+        }
+
+        private var gutterWork: DispatchWorkItem?
+
+        /// Recomputes the change markers shortly after the text or the committed base changes.
+        func refreshGutter() {
+            gutterWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, let ruler = self.textView?.enclosingScrollView?.verticalRulerView as? LineNumberRuler else { return }
+                ruler.hunks = self.parent.document.gitHunks
+            }
+            gutterWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -220,6 +239,8 @@ struct CodeTextView: NSViewRepresentable {
 /// Line numbers in the gutter, drawn from the layout manager.
 final class LineNumberRuler: NSRulerView {
     private weak var textView: NSTextView?
+    /// Committed-vs-current differences, drawn as coloured bars beside the numbers.
+    var hunks: [LineDiff.Hunk] = [] { didSet { needsDisplay = true } }
 
     init(scrollView: NSScrollView, textView: NSTextView) {
         self.textView = textView
@@ -267,7 +288,16 @@ final class LineNumberRuler: NSRulerView {
                 let label = "\(line)" as NSString
                 let size = label.size(withAttributes: attributes)
                 let y = fragment.minY + textView.textContainerInset.height - visible.minY
-                label.draw(at: NSPoint(x: ruleThickness - size.width - 6, y: y + (fragment.height - size.height) / 2), withAttributes: attributes)
+                label.draw(at: NSPoint(x: ruleThickness - size.width - 8, y: y + (fragment.height - size.height) / 2), withAttributes: attributes)
+                if let hunk = LineDiff.hunk(at: line - 1, in: hunks) {
+                    let color: NSColor = hunk.kind == .added ? .systemGreen : hunk.kind == .modified ? .systemBlue : .systemRed
+                    color.setFill()
+                    if hunk.kind == .removed {
+                        NSRect(x: 0, y: y - 1, width: ruleThickness, height: 2).fill()
+                    } else {
+                        NSRect(x: ruleThickness - 4, y: y, width: 3, height: fragment.height).fill()
+                    }
+                }
                 line += 1
             }
             glyphIndex = NSMaxRange(lineGlyphs)

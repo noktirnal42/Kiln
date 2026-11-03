@@ -13,6 +13,14 @@ public struct Diagnostic: Identifiable, Equatable, Sendable {
 public enum DiagnosticParser {
     /// `path:line:col: error: message` (clang, swiftc, xcodebuild, tsc, rustc short form, gcc) and the same without a column.
     public static func parse(_ line: String) -> Diagnostic? {
+        // Swift Testing: `✘ Test name() recorded an issue at File.swift:3:31: Expectation failed: …`
+        if let regex = try? NSRegularExpression(pattern: #"recorded an issue at (.+?):(\d+):(\d+): (.+)$"#),
+           let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+           let path = Range(match.range(at: 1), in: line), let number = Range(match.range(at: 2), in: line),
+           let column = Range(match.range(at: 3), in: line), let message = Range(match.range(at: 4), in: line),
+           let lineNumber = Int(line[number]) {
+            return Diagnostic(path: String(line[path]), line: lineNumber, column: Int(line[column]) ?? 1, severity: .error, message: String(line[message]))
+        }
         // SwiftPM prefixes its own form: `error: /path/File.swift:81:13 message` (no colon after the column).
         if let regex = try? NSRegularExpression(pattern: #"^(error|warning|note): (/.+?):(\d+)(?::(\d+))?:? (.+)$"#),
            let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),

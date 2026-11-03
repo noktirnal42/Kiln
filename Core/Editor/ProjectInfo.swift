@@ -164,15 +164,19 @@ public enum TestOutputParser {
             results[name] = TestResult(name: name, status: status, seconds: seconds)
         }
         let xctest = try? NSRegularExpression(pattern: #"Test Case '(.+?)' (passed|failed) \(([\d.]+) seconds\)"#)
-        let swiftTesting = try? NSRegularExpression(pattern: #"^[✔✘◇↳]\s*Test (.+?) (passed|failed|skipped)(?: after ([\d.]+) seconds)?"#)
+        // Requires "after N seconds" so "recorded an issue … Expectation failed:" lines and the closing "Test run with …" summary don't match.
+        let swiftTesting = try? NSRegularExpression(pattern: #"^[✔✘]\s*Test (.+?) (passed|failed) after ([\d.]+) seconds"#)
         for line in output.components(separatedBy: .newlines) {
             let range = NSRange(line.startIndex..., in: line)
             if let match = xctest?.firstMatch(in: line, range: range),
                let name = Range(match.range(at: 1), in: line), let status = Range(match.range(at: 2), in: line),
                let seconds = Range(match.range(at: 3), in: line) {
-                record(String(line[name]), TestResult.Status(rawValue: String(line[status])) ?? .failed, Double(line[seconds]))
+                var testName = String(line[name])
+                if testName.hasPrefix("-["), testName.hasSuffix("]") { testName = String(testName.dropFirst(2).dropLast()) }
+                record(testName, TestResult.Status(rawValue: String(line[status])) ?? .failed, Double(line[seconds]))
             } else if let match = swiftTesting?.firstMatch(in: line, range: range),
-                      let name = Range(match.range(at: 1), in: line), let status = Range(match.range(at: 2), in: line) {
+                      let name = Range(match.range(at: 1), in: line), let status = Range(match.range(at: 2), in: line),
+                      !line[name].hasPrefix("run with") {
                 let seconds = Range(match.range(at: 3), in: line).flatMap { Double(line[$0]) }
                 record(String(line[name]), TestResult.Status(rawValue: String(line[status])) ?? .failed, seconds)
             }

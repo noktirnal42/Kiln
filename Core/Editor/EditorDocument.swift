@@ -54,6 +54,14 @@ public final class EditorDocument: Identifiable {
     private var stamp: FileStamp?
     private var permissions: Int?
 
+    /// The committed (HEAD) text, when the file is tracked in a repository; set by the workspace after opening and saving.
+    public var gitBase: String?
+
+    public var gitHunks: [LineDiff.Hunk] {
+        guard let gitBase, status == .editable else { return [] }
+        return LineDiff.hunks(base: gitBase.components(separatedBy: "\n"), current: text.components(separatedBy: "\n"))
+    }
+
     public var isDirty: Bool { status == .editable && text != savedText }
     public var name: String { url.lastPathComponent }
     public var isEditable: Bool { status == .editable }

@@ -178,6 +178,25 @@ public actor GitService {
         return results
     }
 
+    /// The file as committed at HEAD, or nil when it is untracked, new, or there is no commit yet.
+    public func headContent(_ repositoryPath: String, relativePath: String) -> String? {
+        try? run(["show", "HEAD:\(relativePath)"], in: repositoryPath, maxBytes: 3 * 1024 * 1024)
+    }
+
+    /// The repository's top-level folder for a path inside it.
+    public func topLevel(_ path: String) -> String? {
+        (try? run(["rev-parse", "--show-toplevel"], in: path))?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Discards uncommitted changes to one file (a modified file returns to HEAD; an untracked file is removed).
+    public func discardChanges(_ repositoryPath: String, path: String, untracked: Bool) throws {
+        if untracked {
+            _ = try run(["clean", "-f", "--", path], in: repositoryPath)
+        } else {
+            _ = try run(["checkout", "HEAD", "--", path], in: repositoryPath)
+        }
+    }
+
     public func diff(_ repositoryPath: String, staged: Bool = false, path: String? = nil) throws -> String {
         var arguments = ["diff", "--no-color"]
         if staged { arguments.append("--cached") }

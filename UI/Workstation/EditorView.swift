@@ -23,7 +23,9 @@ struct EditorView: View {
     @State private var showSettings = false
     private var settings: EditorSettings { EditorSettings.shared }
 
-    enum NavigatorMode: String, CaseIterable { case files = "Files", search = "Find" }
+    enum NavigatorMode: String, CaseIterable { case files = "Files", search = "Find", changes = "Changes" }
+    @State private var changed: [GitFileStatus] = []
+    @State private var discarding: GitFileStatus?
 
     /// A pending create/rename/delete the user has to confirm with a name or a click.
     struct FileAction: Identifiable {
@@ -122,6 +124,10 @@ struct EditorView: View {
                       systemImage: status == 0 ? "checkmark.circle.fill" : "xmark.octagon.fill")
                     .foregroundStyle(status == 0 ? SSColor.success : SSColor.danger)
                     .font(SSTypography.caption())
+            }
+            if let document = editor.active, let hunk = LineDiff.hunk(at: caret.line - 1, in: document.gitHunks) {
+                Button { document.text = LineDiff.revert(hunk, in: document.text) } label: { Label("Revert Change", systemImage: "arrow.uturn.backward") }
+                    .help("Put the lines at the caret back to the committed version")
             }
             Button { showSettings.toggle() } label: { Image(systemName: "slider.horizontal.3") }
                 .help("Editor settings")
@@ -245,6 +251,62 @@ struct EditorView: View {
         fileAction = FileAction(kind: kind, url: url)
     }
 
+    private func refreshChanges() {
+        Task { changed = await editor.changedFiles() }
+    }
+
+    /// Uncommitted work in the project, including whatever an agent run left: open, review with the gutter, or discard.
+    private var changesList: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(changed.isEmpty ? "No uncommitted changes" : "\(changed.count) changed file(s)").font(SSTypography.caption())
+                Spacer()
+                Button { refreshChanges() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless)
+            }
+            .padding(SSSpacing.xs)
+            List(changed) { file in
+                HStack(spacing: 6) {
+                    Text(file.statusCode.isEmpty ? "?" : file.statusCode)
+                        .font(SSTypography.mono(10)).frame(width: 18)
+                        .foregroundStyle(file.statusCode.contains("?") || file.statusCode == "A" ? SSColor.success : SSColor.warning)
+                    Text(file.path).font(SSTypography.caption()).lineLimit(1).truncationMode(.head)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if let root = editor.root { Task {
+                        let top = await editor.git.topLevel(root.path) ?? root.path
+                        editor.open(URL(fileURLWithPath: top).appendingPathComponent(file.path))
+                    } }
+                }
+                .contextMenu { Button("Discard Changes…", role: .destructive) { discarding = file } }
+            }
+        }
+        .onAppear { refreshChanges() }
+        .confirmationDialog("Discard changes to \(discarding?.path ?? "this file")?", isPresented: Binding(
+            get: { discarding != nil }, set: { if !$0 { discarding = nil } })) {
+            Button("Discard Changes", role: .destructive) { discardSelected() }
+            Button("Cancel", role: .cancel) { discarding = nil }
+        } message: { Text("This cannot be undone. Unsaved edits in an open tab for it are dropped too.") }
+    }
+
+    private func discardSelected() {
+        guard let file = discarding, let root = editor.root else { return }
+        discarding = nil
+        Task {
+            let top = await editor.git.topLevel(root.path) ?? root.path
+            let url = URL(fileURLWithPath: top).appendingPathComponent(file.path)
+            do {
+                try await editor.git.discardChanges(top, path: file.path, untracked: file.statusCode.contains("?"))
+                if let open = editor.documents.first(where: { $0.url == url.standardizedFileURL }) {
+                    if FileManager.default.fileExists(atPath: url.path) { open.reload() } else { editor.close(open) }
+                }
+                changed = await editor.changedFiles()
+            } catch {
+                fileError = error.localizedDescription
+            }
+        }
+    }
+
     private var projectSearch: some View {
         VStack(spacing: 0) {
             TextField("Find in project", text: $searchQuery)
@@ -322,6 +384,8 @@ struct EditorView: View {
             .pickerStyle(.segmented).labelsHidden().padding(SSSpacing.xs)
             if navigatorMode == .search {
                 projectSearch
+            } else if navigatorMode == .changes {
+                changesList
             } else if let root = editor.root {
                 HStack {
                     Image(systemName: "folder").foregroundStyle(.secondary)
