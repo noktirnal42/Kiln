@@ -21,6 +21,15 @@ struct KilnWatchApp: App {
             haptics: WatchHaptics()
         )
         Demo.applyIfRequested(to: session)
+        #if DEBUG
+        // `-pair <kiln-remote://pair?...>` stands in for the iPhone hand-off while testing on a device.
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-pair"), arguments.indices.contains(index + 1),
+           let url = URL(string: arguments[index + 1]), let payload = PairingPayload(url: url) {
+            KeychainPairingStore().save(payload)
+            session.pairingChanged(payload)
+        }
+        #endif
         _session = State(initialValue: session)
         phoneLink = PhoneLink { [session] payload in session.pairingChanged(payload) }
         phoneLink.activate()
