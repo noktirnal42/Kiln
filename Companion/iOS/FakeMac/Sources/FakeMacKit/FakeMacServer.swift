@@ -47,7 +47,56 @@ public final class FakeMacServer: @unchecked Sendable {
         port = listener.port?.rawValue ?? 0
     }
 
+    // MARK: relay (the Mac side of Relay/: one outbound socket carrying many devices)
+
+    private var relayTask: URLSessionWebSocketTask?
+    private var relayDevices: [UInt32: Session] = [:]
+    private var relayOutbound: AsyncStream<Data>.Continuation?
+    private let relaySession = URLSession(configuration: .ephemeral)
+
+    /// Connects out to a Kiln relay as the Mac, like `Core/Remote/RemoteRelayClient`.
+    public func connectToRelay(_ relay: URL) async throws {
+        guard let url = RelayAddress.url(relay: relay, pairingKey: key, role: .mac) else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        request.setValue(RelayAddress.authorizationHeader(pairingKey: key), forHTTPHeaderField: "Authorization")
+        let task = relaySession.webSocketTask(with: request)
+        relayTask = task
+        task.resume()
+        // One ordered writer: sealed frames carry a counter, so they must reach the relay in order.
+        let (frames, continuation) = AsyncStream.makeStream(of: Data.self)
+        relayOutbound = continuation
+        Task { for await frame in frames { try? await task.send(.data(frame)) } }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            task.sendPing { error in if let error { continuation.resume(throwing: error) } else { continuation.resume() } }
+        }
+        Task { [weak self] in
+            while let self, let task = self.relayTask {
+                guard let message = try? await task.receive(), case .data(let frame) = message else { break }
+                self.handleRelay(frame)
+            }
+        }
+    }
+
+    private func handleRelay(_ frame: Data) {
+        guard let (kind, id, payload) = RelayFrame.decode(frame), let outbound = relayOutbound else { return }
+        switch kind {
+        case .deviceJoined:
+            let session = Session(server: self, send: { data in
+                outbound.yield(RelayFrame.encode(.data, device: id, payload: data))
+            }, close: {
+                outbound.yield(RelayFrame.encode(.closeDevice, device: id))
+            })
+            lock.withLock { relayDevices[id] = session; connections[ObjectIdentifier(session)] = session }
+        case .deviceLeft:
+            lock.withLock { relayDevices.removeValue(forKey: id) }
+        case .data:
+            lock.withLock { relayDevices[id] }?.deliver(payload)
+        case .closeDevice: break
+        }
+    }
+
     public func stop() {
+        relayTask?.cancel(with: .goingAway, reason: nil); relayTask = nil
         listener?.cancel(); listener = nil
         let all = lock.withLock { Array(connections.values) }
         for session in all { session.close() }
@@ -89,9 +138,12 @@ public final class FakeMacServer: @unchecked Sendable {
     }
 
     final class Session: @unchecked Sendable {
-        private let connection: NWConnection
+        private let connection: NWConnection?
         private unowned let server: FakeMacServer
         private let queue = DispatchQueue(label: "fakemac.session")
+        /// Set for sessions carried by a relay socket instead of an NWConnection.
+        private var relaySend: (@Sendable (Data) -> Void)?
+        private var relayClose: (@Sendable () -> Void)?
         private var channel: SecureChannel?
         private var authenticated = false
         private var openID = "c1"
@@ -100,7 +152,16 @@ public final class FakeMacServer: @unchecked Sendable {
 
         init(connection: NWConnection, server: FakeMacServer) { self.connection = connection; self.server = server }
 
+        /// A device that reached this Mac through the relay.
+        init(server: FakeMacServer, send: @escaping @Sendable (Data) -> Void, close: @escaping @Sendable () -> Void) {
+            connection = nil; self.server = server; relaySend = send; relayClose = close
+        }
+
+        /// Called by the relay client for each frame from this device.
+        func deliver(_ data: Data) { queue.async { [self] in process(data) } }
+
         func start() {
+            guard let connection else { return }
             connection.stateUpdateHandler = { [weak self] state in
                 if case .cancelled = state { self?.onClose() }
                 if case .failed = state { self?.close() }
@@ -109,7 +170,7 @@ public final class FakeMacServer: @unchecked Sendable {
             receive()
         }
 
-        func close() { connection.cancel() }
+        func close() { if let connection { connection.cancel() } else { relayClose?(); onClose() } }
 
         func send(_ event: RemoteEvent) {
             queue.async { [self] in
@@ -120,11 +181,14 @@ public final class FakeMacServer: @unchecked Sendable {
         }
 
         private func transmit(_ data: Data) {
+            if let relaySend { relaySend(data); return }
+            guard let connection else { return }
             let context = NWConnection.ContentContext(identifier: "frame", metadata: [NWProtocolWebSocket.Metadata(opcode: .binary)])
             connection.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed { _ in })
         }
 
         private func receive() {
+            guard let connection else { return }
             connection.receiveMessage { [weak self] data, _, _, error in
                 guard let self else { return }
                 guard let data, error == nil else { self.close(); return }

@@ -24,7 +24,8 @@ The pairing is also handed to the Apple Watch app over WatchConnectivity (Settin
 ## Trying it without a Mac build
 
 `cd FakeMac && swift run fakemac` starts a scripted stand-in Mac (also used by the unit tests): it prints a pairing link,
-advertises over Bonjour and answers the real protocol. Typing "approve" in a message triggers an approval request.
+advertises over Bonjour and answers the real protocol. `FAKEMAC_RELAY=ws://127.0.0.1:8787 FAKEMAC_NO_BONJOUR=1` makes it
+connect out to a Kiln relay as the Mac and hide from Bonjour, to exercise the relay path. Typing "approve" in a message triggers an approval request.
 
 ## What was verified
 
@@ -32,6 +33,7 @@ advertises over Bonjour and answers the real protocol. Typing "approve" in a mes
 | --- | --- |
 | Unit tests with the fake Mac (10 tests, simulator) | handshake and framing, connect, streamed reply, approval allow, reconnect after a drop, wrong key goes to "pair again", Keychain round trip, spoken-text cleaning, event merging |
 | Simulator against the real, notarized Kiln on this Mac | pairing by link, Bonjour discovery by service name, conversation list, open conversation with history and markdown, send a message and get the reply, approval card with the exact command, Allow once (command ran), Deny (recorded as `deny` in the Mac's approvals log) |
+| Simulator over the Node relay (`Relay/`, local) with the fake Mac as the relay's Mac-side client | pairing link with `relay=` and no direct address or Bonjour: the app falls back to the relay, lists, sends a message, receives an approval card, Allow once, reply comes back. The real Mac's relay client was not exercised (the installed Kiln reads `remote.relayURL` only at launch) |
 | Physical iPhone 16 Pro Max | installs and signs; paired to the real Mac, connects (after a first cold Bonjour miss, a retry succeeds), lists real conversations and shows history. Driven through iPhone Mirroring, which cannot type |
 | Not verified | QR scanning with the camera; dictation, spoken replies, hands-free conversation and voice approvals (need a real microphone); local notification for an approval while backgrounded; typing and Allow/Deny tapped on the physical phone; the watch hand-off end to end; token-by-token streaming against the real Mac (replies arrived as whole messages) |
 
