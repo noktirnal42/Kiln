@@ -5,5 +5,8 @@
 	<!-- Deliberately unsandboxed: the agent runs real git, package managers and shells in any folder. Hardened
 	     runtime and notarization still apply; approvals, policy gates, tripwires and the audit chain are the
 	     safety layer. See docs/11-CURRENT-STATE.md. -->
+	<!-- Hardened runtime blocks the microphone unless it is declared; used only for dictation and voice conversations. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
 </dict>
 </plist>

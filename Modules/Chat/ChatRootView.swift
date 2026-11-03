@@ -4,6 +4,8 @@ struct ChatRootView: View {
     @Bindable var session: ChatSession
     @State private var input = ""
     @State private var showArtifacts = false
+    @State private var voice = VoiceController()
+    @State private var lastSpokenID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -63,7 +65,25 @@ struct ChatRootView: View {
                     .padding(.vertical, SSSpacing.xs)
                 Divider()
             }
-            ComposerView(session: session, input: $input, onSend: send)
+            ComposerView(session: session, voice: voice, input: $input, onSend: send)
+        }
+        .onAppear {
+            voice.onUtterance = { text in
+                if voice.conversation {
+                    input = ""
+                    Task { await session.send(text) }
+                } else {
+                    input += (input.isEmpty ? "" : " ") + text
+                }
+            }
+        }
+        .onDisappear { voice.stopEverything() }
+        .onChange(of: session.isStreaming) { _, streaming in
+            guard !streaming, voice.speakReplies else { return }
+            Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                speakLatestReply()
+            }
         }
         .sheet(isPresented: $showArtifacts) {
             ArtifactsBrowserView(artifactStore: session.artifacts)
@@ -102,7 +122,18 @@ struct ChatRootView: View {
         .padding(.vertical, SSSpacing.s)
     }
 
+    /// Reads the newest assistant message aloud once; with nothing to say in conversation mode, goes straight back to listening.
+    private func speakLatestReply() {
+        guard let reply = session.messages.last, reply.role == .assistant, reply.id != lastSpokenID else {
+            if voice.conversation, voice.phase == .idle { Task { await voice.startListening() } }
+            return
+        }
+        lastSpokenID = reply.id
+        voice.speak(reply.content)
+    }
+
     private func send() {
+        voice.stopSpeaking()
         let text = input
         input = ""
         Task { await session.send(text) }
@@ -146,6 +177,7 @@ struct ChatHero: View {
 
 struct ComposerView: View {
     let session: ChatSession
+    var voice: VoiceController?
     @Binding var input: String
     let onSend: () -> Void
     @State private var editorWidth: CGFloat = 0
@@ -153,6 +185,10 @@ struct ComposerView: View {
     var body: some View {
         VStack(spacing: 0) {
             AgentModeBar(session: session)
+            if let voiceError = voice?.errorText {
+                Text(voiceError).font(SSTypography.caption()).foregroundStyle(SSColor.danger)
+                    .padding(.horizontal, SSSpacing.m).frame(maxWidth: .infinity, alignment: .leading)
+            }
             composer
         }
         .onChange(of: session.draft) { _, text in takeDraft(text) }
@@ -187,6 +223,34 @@ struct ComposerView: View {
         return min(160, max(44, ceil(bounds.height) + 16))
     }
 
+    /// Dictate, read replies aloud, or hold a spoken conversation.
+    private func voiceControls(_ voice: VoiceController) -> some View {
+        HStack(spacing: SSSpacing.xs) {
+            Button { voice.toggleListening() } label: {
+                Image(systemName: voice.phase == .listening ? "mic.fill" : "mic")
+                    .font(.title3)
+                    .foregroundStyle(voice.phase == .listening ? SSColor.danger : Color.primary)
+            }
+            .help(voice.phase == .listening ? "Stop listening" : "Dictate into the message")
+            .accessibilityLabel(voice.phase == .listening ? "Stop dictation" : "Start dictation")
+
+            Button { voice.speakReplies.toggle(); if !voice.speakReplies { voice.stopEverything() } } label: {
+                Image(systemName: voice.speakReplies ? "speaker.wave.2.fill" : "speaker.slash").font(.title3)
+            }
+            .help(voice.speakReplies ? "Replies are read aloud (click to mute)" : "Read replies aloud")
+            .accessibilityLabel(voice.speakReplies ? "Mute spoken replies" : "Read replies aloud")
+
+            Button { voice.conversation ? voice.stopEverything() : voice.setConversation(true) } label: {
+                Image(systemName: "waveform.circle\(voice.conversation ? ".fill" : "")")
+                    .font(.title3)
+                    .foregroundStyle(voice.conversation ? SSColor.accent : Color.primary)
+            }
+            .help(voice.conversation ? "End the voice conversation" : "Talk with the model: speak, pause to send, hear the reply")
+            .accessibilityLabel(voice.conversation ? "End voice conversation" : "Start voice conversation")
+        }
+        .buttonStyle(.borderless)
+    }
+
     private var composer: some View {
         HStack(alignment: .bottom, spacing: SSSpacing.s) {
             TextEditor(text: $input)
@@ -194,7 +258,14 @@ struct ComposerView: View {
                 .frame(height: editorHeight)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { editorWidth = $0 }
                 .overlay(alignment: .topLeading) {
-                    if input.isEmpty {
+                    if let voice, voice.phase == .listening {
+                        Text(voice.partial.isEmpty ? "Listening…" : voice.partial)
+                            .foregroundStyle(.secondary)
+                            .font(SSTypography.caption())
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 10)
+                            .allowsHitTesting(false)
+                    } else if input.isEmpty {
                         Text("Message…  (@ to reference files, ⏎ to send, ⌘⏎ for a new line)")
                             .foregroundStyle(.tertiary)
                             .font(SSTypography.caption())
@@ -212,6 +283,8 @@ struct ComposerView: View {
                     insertNewline()
                     return .handled
                 }
+
+            if let voice { voiceControls(voice) }
 
             if session.isStreaming {
                 Button { session.stopStreaming() } label: {

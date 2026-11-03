@@ -101,6 +101,8 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: Kiln
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Kiln listens when you dictate or hold a voice conversation with the model.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Kiln turns your speech into text for dictation and voice conversations, on this Mac when possible.
         ENABLE_TESTABILITY: YES
         # Xcode also writes (and XcodeGen presets) an SDK-conditional identity that wins over the
         # unconditional one above. In Release it was "-" (Sign to Run Locally), which produced archives
