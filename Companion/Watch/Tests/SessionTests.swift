@@ -51,6 +51,59 @@ final class SessionTests: XCTestCase {
         XCTAssertTrue(connected)
     }
 
+    func testTalkRecordsStraightAwayAndTheMacTranscribesIt() async throws {
+        let store = InMemoryPairingStore(PairingPayload(hostName: "Fake Mac", serviceName: "Fake", key: key))
+        let url = server.url
+        let recorder = StubRecorder(VoiceRecording(data: Data([1, 2, 3]), format: "m4a"))
+        let dictation = SpyDictation()
+        let session = RemoteSession(store: store, connector: { pairing, _ in
+            let transport = NWTransport(url: url)
+            try await transport.start()
+            return RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: "Test Watch")
+        }, transcriber: dictation, recorder: recorder, speaker: speaker, haptics: haptics)
+        session.connect()
+        let connected = await waitUntil { session.isConnected }
+        XCTAssertTrue(connected)
+        await session.talkTapped()
+        XCTAssertEqual(recorder.started, 1)
+        XCTAssertEqual(dictation.calls, 0, "the system dictation sheet must not open")
+        let heard = await waitUntil { session.lastHeard == "run the tests" }
+        XCTAssertTrue(heard)
+        let sent = await waitUntil { self.server.received.contains(.sendAudio(data: Data([1, 2, 3]), format: "m4a")) }
+        XCTAssertTrue(sent)
+    }
+
+    func testNothingHeardTellsThePersonAndGoesIdle() async throws {
+        let store = InMemoryPairingStore(PairingPayload(hostName: "Fake Mac", serviceName: "Fake", key: key))
+        let url = server.url
+        let session = RemoteSession(store: store, connector: { pairing, _ in
+            let transport = NWTransport(url: url)
+            try await transport.start()
+            return RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: "Test Watch")
+        }, transcriber: StubTranscriber(text: nil), recorder: StubRecorder(nil), speaker: speaker, haptics: haptics)
+        session.connect()
+        let connected = await waitUntil { session.isConnected }
+        XCTAssertTrue(connected)
+        await session.talkTapped()
+        XCTAssertEqual(session.talk, .idle)
+        XCTAssertTrue(session.latestReply.contains("didn't hear"))
+    }
+
+    func testSecondTapWhileListeningEndsTheRecording() async throws {
+        let recorder = StubRecorder(nil)
+        let store = InMemoryPairingStore(PairingPayload(hostName: "Fake Mac", serviceName: "Fake", key: key))
+        let url = server.url
+        let session = RemoteSession(store: store, connector: { pairing, _ in
+            let transport = NWTransport(url: url)
+            try await transport.start()
+            return RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: "Test Watch")
+        }, transcriber: StubTranscriber(text: nil), recorder: recorder, speaker: speaker, haptics: haptics)
+        session.seedDemo(link: .connected(host: "Fake Mac"), reply: "", heard: "", approval: nil)
+        session.forceTalk(.listening)
+        await session.talkTapped()
+        XCTAssertEqual(recorder.finished, 1)
+    }
+
     func testConnectsOpensConversationAndReportsHost() async throws {
         let (session, _) = makeSession()
         session.connect()

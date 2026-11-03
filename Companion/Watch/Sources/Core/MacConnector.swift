@@ -19,9 +19,21 @@ enum ManualAddress {
 enum MacConnector {
     typealias Progress = @Sendable @MainActor (String) -> Void
 
-    /// iPhone bridge first (a real watch usually has no LAN path of its own), then the Mac directly.
+    /// The relay first when there is one (over URLSession, which watchOS routes through the iPhone even while it is locked,
+    /// and which works from any network), then the iPhone bridge, then the Mac directly.
     static func channel(_ pairing: PairingPayload, bridge: PhoneBridge?, manual: String? = ManualAddress.value, progress: Progress) async throws -> RemoteChannel {
         var failures: [String] = []
+        if let relay = pairing.relay, let url = RelayAddress.url(relay: relay, pairingKey: pairing.key, role: .device) {
+            await progress("Connecting through the relay…")
+            let transport = URLSessionTransport(url: url, headers: ["Authorization": RelayAddress.authorizationHeader(pairingKey: pairing.key)])
+            do {
+                try await transport.start(timeout: 10)
+                return RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: "Apple Watch")
+            } catch {
+                transport.close()
+                failures.append("Relay: " + describe(error))
+            }
+        }
         if let bridge {
             if bridge.isReachable {
                 await progress("Connecting via iPhone…")
@@ -61,12 +73,6 @@ enum MacConnector {
             return try await open(url, timeout: 6)
         } catch { failures.append("Bonjour: \(describe(error))") }
 
-        if let relay = pairing.relay, let url = RelayAddress.url(relay: relay, pairingKey: pairing.key, role: .device) {
-            await progress("Trying the relay…")
-            do {
-                return try await open(url, headers: ["Authorization": RelayAddress.authorizationHeader(pairingKey: pairing.key)], timeout: 10)
-            } catch { failures.append("Relay: \(describe(error))") }
-        }
         throw RemoteError.attemptsFailed(failures)
     }
 

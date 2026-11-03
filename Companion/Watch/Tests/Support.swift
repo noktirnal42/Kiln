@@ -28,6 +28,22 @@ struct StubTranscriber: SpeechTranscribing {
 }
 
 @MainActor
+final class SpyDictation: SpeechTranscribing {
+    private(set) var calls = 0
+    func transcribe() async -> String? { calls += 1; return "typed instead" }
+}
+
+@MainActor
+final class StubRecorder: VoiceRecording_ {
+    var recording: VoiceRecording?
+    private(set) var started = 0
+    private(set) var finished = 0
+    init(_ recording: VoiceRecording?) { self.recording = recording }
+    func record() async -> VoiceRecording? { started += 1; return recording }
+    func finish() { finished += 1 }
+}
+
+@MainActor
 func waitUntil(timeout: Double = 5, _ condition: @MainActor () -> Bool) async -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {

@@ -15,6 +15,7 @@ struct KilnWatchApp: App {
             store: KeychainPairingStore(),
             connector: { pairing, progress in try await MacConnector.channel(pairing, bridge: bridge, progress: progress) },
             transcriber: DictationTranscriber(),
+            recorder: MicrophoneRecorder(),
             speaker: SystemSpeaker(),
             haptics: WatchHaptics()
         )

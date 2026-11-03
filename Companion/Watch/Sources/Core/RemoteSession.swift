@@ -34,6 +34,7 @@ final class RemoteSession {
     private let store: PairingStoring
     private let connector: Connector
     private let transcriber: SpeechTranscribing
+    private let recorder: VoiceRecording_?
     private let speaker: Speaking
     private let haptics: Haptics
     private let deviceName: String
@@ -44,10 +45,11 @@ final class RemoteSession {
     private var conversationOpen = false
     private var buffer = ""
 
-    init(store: PairingStoring, connector: @escaping Connector, transcriber: SpeechTranscribing, speaker: Speaking, haptics: Haptics, deviceName: String = "Apple Watch") {
+    init(store: PairingStoring, connector: @escaping Connector, transcriber: SpeechTranscribing, recorder: VoiceRecording_? = nil, speaker: Speaking, haptics: Haptics, deviceName: String = "Apple Watch") {
         self.store = store
         self.connector = connector
         self.transcriber = transcriber
+        self.recorder = recorder
         self.speaker = speaker
         self.haptics = haptics
         self.deviceName = deviceName
@@ -191,6 +193,8 @@ final class RemoteSession {
             latestReply = text
             talk = .idle
             haptics.play(.failure)
+        case .transcript(let text):
+            lastHeard = text
         case .pong:
             break
         }
@@ -225,14 +229,33 @@ final class RemoteSession {
             send(.stop)
             talk = .idle
         case .listening:
-            break
+            recorder?.finish()   // a second tap ends the recording now
         case .idle:
             guard isConnected else { connect(); return }
             talk = .listening
+            if let recorder {
+                // Record immediately and let the Mac transcribe: no system dictation sheet to pick a mode in.
+                guard let recording = await recorder.record() else {
+                    talk = .idle
+                    latestReply = "I didn't hear anything. Tap and speak."
+                    return
+                }
+                sendRecording(recording)
+                return
+            }
             let text = await transcriber.transcribe()
             guard let text else { talk = .idle; return }
             sendSpoken(text)
         }
+    }
+
+    func sendRecording(_ recording: VoiceRecording) {
+        lastHeard = "…"
+        awaitingSpokenReply = true
+        buffer = ""
+        latestReply = ""
+        talk = .thinking
+        send(.sendAudio(data: recording.data, format: recording.format))
     }
 
     func sendSpoken(_ text: String) {
@@ -257,6 +280,9 @@ final class RemoteSession {
     }
 
     // MARK: Demo
+
+    /// Puts the session in a talk state without doing the work (previews and tests).
+    func forceTalk(_ state: Talk) { talk = state }
 
     func seedDemo(link: Link, reply: String, heard: String, approval: RemoteApproval?) {
         self.link = link

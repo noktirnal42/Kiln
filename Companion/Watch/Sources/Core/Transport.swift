@@ -98,6 +98,68 @@ final class NWTransport: RemoteTransport, @unchecked Sendable {
     }
 }
 
+/// WebSocket client over URLSession. Unlike a raw Network.framework socket, watchOS carries URLSession traffic through the
+/// paired iPhone's connection (and the iPhone does not need to be unlocked), so this is how the watch reaches the relay
+/// when it has no Wi-Fi or cellular of its own.
+final class URLSessionTransport: RemoteTransport, @unchecked Sendable {
+    private let task: URLSessionWebSocketTask
+    private let session: URLSession
+    let incoming: AsyncThrowingStream<Data, Error>
+    private let continuation: AsyncThrowingStream<Data, Error>.Continuation
+    /// One ordered writer: sealed frames carry a counter, so they must leave in the order they were sent.
+    private let outbound: AsyncStream<Data>.Continuation
+    private var writer: Task<Void, Never>?
+
+    init(url: URL, headers: [String: String] = [:]) {
+        var request = URLRequest(url: url)
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        session = URLSession(configuration: .default)
+        task = session.webSocketTask(with: request)
+        task.maximumMessageSize = 2_000_000
+        (incoming, continuation) = AsyncThrowingStream.makeStream(of: Data.self)
+        let (frames, outbound) = AsyncStream.makeStream(of: Data.self)
+        self.outbound = outbound
+        let task = task, continuation = continuation
+        writer = Task {
+            for await frame in frames {
+                do { try await task.send(.data(frame)) } catch { continuation.finish(throwing: error); return }
+            }
+        }
+    }
+
+    /// Resolves once the server has accepted the socket; throws if it does not within `timeout` seconds.
+    func start(timeout: Double = 10) async throws {
+        task.resume()
+        let task = task
+        try await withTimeout(timeout) {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                task.sendPing { error in if let error { continuation.resume(throwing: error) } else { continuation.resume() } }
+            }
+        }
+        receive()
+    }
+
+    private func receive() {
+        task.receive { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .failure(let error): self.continuation.finish(throwing: error)
+            case .success(.data(let data)): self.continuation.yield(data); self.receive()
+            case .success: self.receive()
+            }
+        }
+    }
+
+    func send(_ data: Data) { outbound.yield(data) }
+
+    func close() {
+        outbound.finish()
+        task.cancel(with: .goingAway, reason: nil)
+        continuation.finish()
+        session.invalidateAndCancel()
+    }
+}
+
 /// Finds the Mac's `_kiln-remote._tcp` service by name and resolves it to a `ws://host:port` URL.
 enum BonjourResolver {
     static func resolve(serviceName: String, timeout: Double = 10) async throws -> URL {
