@@ -37,9 +37,13 @@ public struct SwarmTask: Identifiable, Codable, Sendable, Equatable {
     public var status: SwarmTaskStatus = .pending
     public var result: String?
     public var attempts = 0
+    /// Artifacts the task must leave behind (`file:<path>`, `nonempty:<path>`), checked on disk after it finishes.
+    public var expects: [String] = []
+    /// One line of what the worker actually did (tools executed, files written, commands run).
+    public var evidence: String?
 
-    public init(id: String, title: String, details: String = "", role: SwarmRole, dependsOn: [String] = []) {
-        self.id = id; self.title = title; self.details = details; self.role = role; self.dependsOn = dependsOn
+    public init(id: String, title: String, details: String = "", role: SwarmRole, dependsOn: [String] = [], expects: [String] = []) {
+        self.id = id; self.title = title; self.details = details; self.role = role; self.dependsOn = dependsOn; self.expects = expects
     }
 }
 
@@ -134,7 +138,8 @@ public enum SwarmPlanner {
 
     public static let prompt = """
     Break the user's goal into at most 8 tasks for a small team. Reply with JSON only:
-    {"tasks":[{"id":"short-id","title":"...","details":"...","role":"researcher|implementer|reviewer","depends_on":["other-id"]}]}
+    {"tasks":[{"id":"short-id","title":"...","details":"...","role":"researcher|implementer|reviewer","depends_on":["other-id"],"expects":["file:relative/path"]}]}
+    "expects" is optional: list the files an implementer must leave behind ("file:path" must exist, "nonempty:path" must have content); the team lead checks them on disk.
     IDs must be lowercase and use only letters, digits, dots, underscores or hyphens, at most 57 characters.
     Tasks with no dependency on each other run in parallel. Use researcher for reading, implementer for changes, reviewer for checking.
     """
@@ -151,7 +156,8 @@ public enum SwarmPlanner {
                   let role = (row["role"] as? String).flatMap(SwarmRole.init(rawValue:)) else { return nil }
             if row["depends_on"] != nil && !(row["depends_on"] is [String]) { return nil }
             tasks.append(SwarmTask(id: id, title: title, details: row["details"] as? String ?? "", role: role,
-                                   dependsOn: row["depends_on"] as? [String] ?? []))
+                                   dependsOn: row["depends_on"] as? [String] ?? [],
+                                   expects: (row["expects"] as? [String] ?? []).filter { TaskExpectation($0) != nil }))
         }
         return try? SwarmGraph(tasks: tasks)
     }

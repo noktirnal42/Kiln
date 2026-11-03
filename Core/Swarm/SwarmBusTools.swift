@@ -92,12 +92,22 @@ public enum SwarmWorkers {
                 runTimeoutSeconds: 900
             )
             var finalText = ""
+            var collector = RunEvidenceCollector(toolsOffered: Array(profile.toolPermissions.enabledTools))
             for try await event in orchestrator.run(profile: profile, prompt: prompt, workspaceRoot: workspaceRoot, chat: chat) {
+                collector.record(event)
                 if case .finished(let summary) = event { finalText = summary.finalText }
             }
             if let reason = blocker.reason { throw SwarmBlocked(reason) }
+            let evidence = collector.evidence
+            let simulated = (try? validateSummary(finalText)) == nil && !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if let failure = RunVerifier.verdict(evidence: evidence, summary: finalText, role: task.role,
+                                                 expectations: task.expects.compactMap(TaskExpectation.init),
+                                                 workspace: workspaceRoot, simulatedToolCall: simulated) {
+                throw SwarmBlocked(failure.description + " (\(evidence.summaryLine))")
+            }
             try validateSummary(finalText)
-            return finalText
+            // The evidence line travels with the result, so a reviewer sees what the earlier worker really did.
+            return finalText + "\n[\(evidence.summaryLine)]"
         }
     }
 
