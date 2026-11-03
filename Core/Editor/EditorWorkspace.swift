@@ -1,0 +1,197 @@
+import Foundation
+
+/// A node in the file navigator.
+public struct FileNode: Identifiable, Hashable, Sendable {
+    public var url: URL
+    public var isDirectory: Bool
+    public var id: String { url.path }
+    public var name: String { url.lastPathComponent }
+}
+
+/// The editor's shared state for the whole app: which folder is open, which files are open, and which one is in
+/// front. It lives in `AppModel`, not in a view, so unsaved edits are still there after visiting another tool.
+@MainActor @Observable
+public final class EditorWorkspace {
+    public private(set) var root: URL?
+    public private(set) var documents: [EditorDocument] = []
+    public var activeID: UUID?
+    /// A line to scroll to the next time the active document is shown (from a diagnostic or go-to-line).
+    public var pendingLine: (id: UUID, line: Int, column: Int)?
+    public var message: String?
+    public var showHidden = false
+
+    private var pollTask: Task<Void, Never>?
+    private let recovery: EditorRecoveryStore
+
+    public init(recovery: EditorRecoveryStore = EditorRecoveryStore()) {
+        self.recovery = recovery
+    }
+
+    public var active: EditorDocument? { documents.first { $0.id == activeID } }
+    public var hasUnsavedChanges: Bool { documents.contains { $0.isDirty } }
+    public var dirtyDocuments: [EditorDocument] { documents.filter(\.isDirty) }
+
+    // MARK: Workspace
+
+    /// Points the editor at a project folder. Open files outside it stay open (they are still the user's work).
+    public func setRoot(_ path: String?) {
+        guard let path, !path.isEmpty else { root = nil; return }
+        let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        guard url != root else { return }
+        root = url
+    }
+
+    public static let ignoredNames: Set<String> = [
+        ".git", ".build", "DerivedData", "node_modules", ".DS_Store", "build", "dist", "xcuserdata", "__pycache__", ".venv",
+        ".swiftpm", "Pods", "target",
+    ]
+
+    /// One level of the navigator, folders first. Hidden files and build output are skipped unless asked for.
+    public func children(of directory: URL) -> [FileNode] {
+        let keys: [URLResourceKey] = [.isDirectoryKey]
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: keys, options: showHidden ? [] : [.skipsHiddenFiles]) else { return [] }
+        return entries
+            .filter { showHidden || !Self.ignoredNames.contains($0.lastPathComponent) }
+            .map { FileNode(url: $0, isDirectory: (try? $0.resourceValues(forKeys: Set(keys)))?.isDirectory ?? false) }
+            .sorted { lhs, rhs in
+                if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
+                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+            }
+    }
+
+    /// Every file under the root (bounded), for quick open.
+    public func allFiles(limit: Int = 20_000) -> [URL] {
+        guard let root else { return [] }
+        var result: [URL] = []
+        guard let walker = FileManager.default.enumerator(
+            at: root, includingPropertiesForKeys: [.isDirectoryKey],
+            options: showHidden ? [] : [.skipsHiddenFiles]) else { return [] }
+        for case let url as URL in walker {
+            if Self.ignoredNames.contains(url.lastPathComponent) { walker.skipDescendants(); continue }
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true { continue }
+            result.append(url)
+            if result.count >= limit { break }
+        }
+        return result
+    }
+
+    // MARK: Documents
+
+    @discardableResult
+    public func open(_ url: URL, line: Int? = nil, column: Int = 1) -> EditorDocument {
+        let url = url.standardizedFileURL
+        if let existing = documents.first(where: { $0.url == url }) {
+            activeID = existing.id
+            existing.checkForExternalChange()
+            if let line { pendingLine = (existing.id, line, column) }
+            return existing
+        }
+        let document = EditorDocument(url: url)
+        if let saved = recovery.recovered(for: url, currentDiskText: document.text) {
+            document.applyRecovered(saved)
+        }
+        documents.append(document)
+        activeID = document.id
+        if let line { pendingLine = (document.id, line, column) }
+        return document
+    }
+
+    /// Path relative to the project root (or absolute when outside it), as shown in diagnostics and tabs.
+    public func displayPath(_ url: URL) -> String {
+        guard let root, url.path.hasPrefix(root.path + "/") else { return url.path }
+        return String(url.path.dropFirst(root.path.count + 1))
+    }
+
+    public func save(_ document: EditorDocument, overwrite: Bool = false) {
+        do {
+            try document.save(overwrite: overwrite)
+            recovery.discard(for: document.url)
+            message = nil
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    public func saveAll() {
+        for document in dirtyDocuments { save(document) }
+    }
+
+    /// Removes the tab. The caller decides what to do about unsaved edits first (`document.isDirty`).
+    public func close(_ document: EditorDocument) {
+        guard let index = documents.firstIndex(where: { $0.id == document.id }) else { return }
+        documents.remove(at: index)
+        recovery.discard(for: document.url)
+        if activeID == document.id {
+            activeID = documents.indices.contains(index) ? documents[index].id : documents.last?.id
+        }
+    }
+
+    // MARK: Safety nets
+
+    /// Starts checking open files for outside changes and keeping recovery copies of unsaved work.
+    public func startWatching(interval: TimeInterval = 2) {
+        guard pollTask == nil else { return }
+        pollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                self?.tick()
+            }
+        }
+    }
+
+    public func stopWatching() {
+        pollTask?.cancel()
+        pollTask = nil
+    }
+
+    public func tick() {
+        for document in documents { document.checkForExternalChange() }
+        writeRecovery()
+    }
+
+    public func writeRecovery() {
+        for document in documents where document.isDirty {
+            recovery.store(document.text, for: document.url)
+        }
+    }
+}
+
+/// Keeps unsaved text on disk so quitting or crashing with edits does not lose them. The copy is offered back the
+/// next time that file is opened, and only if the file on disk still matches what the edits were based on.
+public final class EditorRecoveryStore: @unchecked Sendable {
+    private struct Entry: Codable { var path: String; var text: String; var baseHash: String }
+    private let directory: URL
+    private let lock = NSLock()
+
+    public init(directory: URL? = nil) {
+        self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Kiln/EditorRecovery", isDirectory: true)
+    }
+
+    private func file(for url: URL) -> URL {
+        directory.appendingPathComponent(KeychainService.fingerprint(of: url.path) + ".json")
+    }
+
+    func store(_ text: String, for url: URL) {
+        lock.lock(); defer { lock.unlock() }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let base = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        let entry = Entry(path: url.path, text: text, baseHash: KeychainService.fingerprint(of: base))
+        if let data = try? JSONEncoder().encode(entry) { try? data.write(to: file(for: url), options: .atomic) }
+    }
+
+    func recovered(for url: URL, currentDiskText: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        guard let data = try? Data(contentsOf: file(for: url)),
+              let entry = try? JSONDecoder().decode(Entry.self, from: data),
+              entry.path == url.path,
+              entry.baseHash == KeychainService.fingerprint(of: currentDiskText) else { return nil }
+        return entry.text
+    }
+
+    func discard(for url: URL) {
+        lock.lock(); defer { lock.unlock() }
+        try? FileManager.default.removeItem(at: file(for: url))
+    }
+}

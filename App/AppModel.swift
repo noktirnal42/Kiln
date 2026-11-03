@@ -33,6 +33,9 @@ public final class AppModel {
     public private(set) var busEntries: [BusEntry] = []
     public private(set) var uiModules: [String: any ModuleUI] = [:]
     public private(set) var chatSession: ChatSession?
+    /// Open files and the folder navigator; here, not in a view, so unsaved edits survive switching tools.
+    public let editor = EditorWorkspace()
+    public let builder = BuildRunner()
     public var activeModuleID: String?
     public private(set) var bootstrapError: String?
     /// Bumped whenever providers are registered or reloaded, so screens that show them can refresh. Home loads

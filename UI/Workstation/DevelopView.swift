@@ -1,13 +1,14 @@
 import SwiftUI
 
 /// Develop: the working tools that used to hide behind chat toolbar sheets, in one place. There is
-/// no source editor yet; this is the terminal, git, workspace search and MCP servers.
+/// source editor (no language server, debugger or previews yet), terminal, git, workspace search and MCP servers.
 struct DevelopView: View {
     enum Tool: String, CaseIterable, Identifiable {
-        case terminal = "Terminal", git = "Git", search = "Search", mcp = "MCP"
+        case editor = "Editor", terminal = "Terminal", git = "Git", search = "Search", mcp = "MCP"
         var id: String { rawValue }
         var symbol: String {
             switch self {
+            case .editor: "chevron.left.forwardslash.chevron.right"
             case .terminal: "terminal"
             case .git: "arrow.triangle.branch"
             case .search: "magnifyingglass"
@@ -17,7 +18,7 @@ struct DevelopView: View {
     }
 
     @Environment(AppModel.self) private var app
-    @State private var tool: Tool = .terminal
+    @State private var tool: Tool = .editor
     @State private var terminalModel: TerminalDockModel?
     @State private var gitModel: GitPanelModel?
 
@@ -45,6 +46,8 @@ struct DevelopView: View {
     @ViewBuilder
     private var content: some View {
         switch tool {
+        case .editor:
+            EditorView()
         case .terminal:
             if let terminalModel { TerminalDockView(model: terminalModel) }
         case .git:
