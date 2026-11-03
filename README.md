@@ -1,7 +1,7 @@
 <p align="center"><img src="Branding/export/kiln-icon-256.png" width="144" alt="Kiln — a glowing ceramic kiln"></p>
 <h1 align="center">Kiln</h1>
 <p align="center"><strong>One native Mac workspace. Many ways to make.</strong><br>AI agents · development tools · reverse engineering · model experimentation</p>
-<p align="center"><a href="https://github.com/noktirnal42/Kiln/releases/latest">Download the preview</a> · <a href="https://noktirnal42.github.io/Kiln/">Project website</a> · <a href="https://noktirnal42.github.io/Kiln/docs.html">Get started</a> · <a href="docs/KNOWN-ISSUES.md">Known issues</a> · <a href="https://github.com/noktirnal42/Kiln/issues">Help build it</a></p>
+<p align="center"><a href="https://github.com/noktirnal42/Kiln/releases">Download the preview</a> · <a href="https://noktirnal42.github.io/Kiln/">Project website</a> · <a href="https://noktirnal42.github.io/Kiln/docs.html">Get started</a> · <a href="docs/KNOWN-ISSUES.md">Known issues</a> · <a href="https://github.com/noktirnal42/Kiln/issues">Help build it</a></p>
 <p align="center"><a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-d8b38a"></a> <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-25231e"> <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-e89b61"></p>
 
 Kiln is an open-source Swift and SwiftUI workstation exploring what happens when conversation, tools, binary analysis, and model creation share a common foundation. Move between disciplines while keeping project context, agent activity, approvals, and audit evidence close to the work.
@@ -66,7 +66,7 @@ TEST_RUNNER_KILN_LIVE=1 xcodebuild test \
   -only-testing:KilnTests/LiveQATests
 ```
 
-A reproducible [build/run script](script/build_and_run.sh) and detailed [setup and verification notes](docs/11-CURRENT-STATE.md) are included. A **notarized preview build** is on the [Releases page](https://github.com/noktirnal42/Kiln/releases/latest) (Developer ID signed and stapled; read its notes for what was and was not verified). It is a preview, not a stable release.
+A reproducible [build/run script](script/build_and_run.sh) and detailed [setup and verification notes](docs/11-CURRENT-STATE.md) are included. A **notarized preview build** (0.1.1) is on the [Releases page](https://github.com/noktirnal42/Kiln/releases) (Developer ID signed and stapled; read its notes for what was and was not verified). It is a preview, not a stable release.
 
 ## Where we need help
 
