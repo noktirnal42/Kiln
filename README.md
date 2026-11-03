@@ -19,7 +19,7 @@ Kiln is an open-source Swift and SwiftUI workstation exploring what happens when
 ## What exists today
 
 > Current state (2026-11-03): see [`docs/11-CURRENT-STATE.md`](docs/11-CURRENT-STATE.md) for what was verified, how to
-> build/sign/notarize, and what is still open. The full suite (538 tests) passes.
+> build/sign/notarize, and what is still open. The full Mac suite (592 tests) passes; the iOS and watchOS companions, the shared remote kit and the relay have their own tests.
 
 | Area | Working foundation | Important limits |
 |---|---|---|
