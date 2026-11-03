@@ -55,6 +55,6 @@ public final class ChatRemoteBackend: RemoteBackend {
 
     public func decide(_ approvalID: String, _ decision: RemoteApprovalDecision) {
         guard let id = UUID(uuidString: approvalID) else { return }
-        approvals.resolve(id, decision: decision == .allowOnce ? .approveOnce : .deny)
+        approvals.resolve(id, decision: decision == .allowOnce ? .approveOnce : .deny, via: "remote")
     }
 }
