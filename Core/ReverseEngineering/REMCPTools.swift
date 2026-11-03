@@ -57,10 +57,13 @@ public enum REMCPTools {
         ),
         REMCPToolDefinition(
             name: "analyze_binary",
-            description: "Run installed Ghidra over an imported project and save recovered functions, pseudocode and references. Launches the analysis engine, never the target binary. Bounded to 240 seconds; one analysis at a time.",
+            description: "Run an analysis engine over an imported project and save recovered functions and references. engine=ghidra (default) also produces pseudocode; engine=radare2 is a fast fallback with call graph and basic blocks but no decompiler. Launches the analysis engine, never the target binary. Ghidra is bounded to 240 seconds; one analysis at a time. Analyst renames and comments are preserved.",
             inputSchema: [
                 "type": "object",
-                "properties": ["project_id": ["type": "string"]],
+                "properties": [
+                    "project_id": ["type": "string"],
+                    "engine": ["type": "string", "description": "ghidra (default) or radare2."]
+                ],
                 "required": ["project_id"],
                 "additionalProperties": false
             ],
@@ -220,6 +223,94 @@ public enum REMCPTools {
             readOnly: true
         ),
         REMCPToolDefinition(
+            name: "rename_function",
+            description: "Change a function's analyst display name in the saved project. Does not modify the binary or Ghidra's own symbols.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID."],
+                    "address": ["type": "string", "description": "Function address."],
+                    "name": ["type": "string", "description": "New name."],
+                    "expected_revision": ["type": "integer", "description": "The project's current revision (from re_open or any earlier edit result); a stale value is rejected so edits never overwrite newer work."]
+                ],
+                "required": ["project_id", "address", "name", "expected_revision"],
+                "additionalProperties": false
+            ],
+            readOnly: false
+        ),
+        REMCPToolDefinition(
+            name: "set_comment",
+            description: "Set an analyst note on a function. An empty string clears it.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID."],
+                    "address": ["type": "string", "description": "Function address."],
+                    "comment": ["type": "string", "description": "Note text."],
+                    "expected_revision": ["type": "integer", "description": "The project's current revision (from re_open or any earlier edit result); a stale value is rejected so edits never overwrite newer work."]
+                ],
+                "required": ["project_id", "address", "comment", "expected_revision"],
+                "additionalProperties": false
+            ],
+            readOnly: false
+        ),
+        REMCPToolDefinition(
+            name: "toggle_bookmark",
+            description: "Add or remove an analyst bookmark on a function.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID."],
+                    "address": ["type": "string", "description": "Function address."],
+                    "expected_revision": ["type": "integer", "description": "The project's current revision (from re_open or any earlier edit result); a stale value is rejected so edits never overwrite newer work."]
+                ],
+                "required": ["project_id", "address", "expected_revision"],
+                "additionalProperties": false
+            ],
+            readOnly: false
+        ),
+        REMCPToolDefinition(
+            name: "undo_edit",
+            description: "Revert the most recent analyst rename, comment or bookmark.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID."],
+                    "expected_revision": ["type": "integer", "description": "The project's current revision (from re_open or any earlier edit result); a stale value is rejected so edits never overwrite newer work."]
+                ],
+                "required": ["project_id", "expected_revision"],
+                "additionalProperties": false
+            ],
+            readOnly: false
+        ),
+        REMCPToolDefinition(
+            name: "redo_edit",
+            description: "Re-apply the most recently undone analyst edit.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID."],
+                    "expected_revision": ["type": "integer", "description": "The project's current revision (from re_open or any earlier edit result); a stale value is rejected so edits never overwrite newer work."]
+                ],
+                "required": ["project_id", "expected_revision"],
+                "additionalProperties": false
+            ],
+            readOnly: false
+        ),
+        REMCPToolDefinition(
+            name: "scan_pointers",
+            description: "Offsets of aligned 8-byte values in a plausible arm64 user-space pointer range (a heuristic lead list for memory dumps). Read-only.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID."]
+                ],
+                "required": ["project_id"],
+                "additionalProperties": false
+            ],
+            readOnly: true
+        ),
+        REMCPToolDefinition(
             name: "auto_decrypt",
             description: "Attempt XOR, RC4, AES (ECB/CBC/GCM), Blowfish and ChaCha20-Poly1305 decryption against typed keys, strings found in the binary, and/or a wordlist file. Results carry validator evidence and key fingerprints — never key material.",
             inputSchema: [
@@ -279,7 +370,10 @@ public enum REMCPTools {
             return try text(JSONSerialization.data(withJSONObject: summary(analysis, projectID: projectID)))
         case "analyze_binary":
             let projectID = try projectArgument(arguments)
-            let analysis = try await service.analyzeWithGhidra(projectID: projectID)
+            let engine = ((arguments["engine"] as? String) ?? "ghidra").lowercased()
+            guard engine == "ghidra" || engine == "radare2" else { throw REMToolError.missingArgument("engine (ghidra or radare2)") }
+            let analysis = engine == "radare2" ? try await service.analyzeWithRadare2(projectID: projectID)
+                                               : try await service.analyzeWithGhidra(projectID: projectID)
             return try text(JSONSerialization.data(withJSONObject: summary(analysis, projectID: projectID)))
         case "analyze_function":
             let (projectID, address, name) = try functionArguments(arguments)
@@ -323,6 +417,31 @@ public enum REMCPTools {
             let projectID = try projectArgument(arguments)
             let hits = try await service.carveFormats(projectID: projectID)
             return try text(JSONSerialization.data(withJSONObject: hits.map { ["offset": $0.offset, "format": $0.format, "category": $0.category, "note": $0.note.map { $0 as Any } ?? NSNull(), ]}))
+        case "rename_function", "set_comment", "toggle_bookmark", "undo_edit", "redo_edit":
+            let projectID = try projectArgument(arguments)
+            guard let revision = arguments["expected_revision"] as? Int else { throw REMToolError.missingArgument("expected_revision") }
+            let updated: Analysis
+            switch name {
+            case "rename_function":
+                guard let address = arguments["address"] as? String, let newName = arguments["name"] as? String else { throw REMToolError.missingArgument("address and name") }
+                updated = try await service.editProject(projectID: projectID, expectedRevision: revision,
+                                                        operations: [.function(address: address, name: newName, comment: nil, signature: nil)])
+            case "set_comment":
+                guard let address = arguments["address"] as? String, let comment = arguments["comment"] as? String else { throw REMToolError.missingArgument("address and comment") }
+                updated = try await service.editProject(projectID: projectID, expectedRevision: revision,
+                                                        operations: [.function(address: address, name: nil, comment: comment, signature: nil)])
+            case "toggle_bookmark":
+                guard let address = arguments["address"] as? String else { throw REMToolError.missingArgument("address") }
+                updated = try await service.toggleBookmark(projectID: projectID, expectedRevision: revision, address: address)
+            case "undo_edit":
+                updated = try await service.undo(projectID: projectID, expectedRevision: revision)
+            default:
+                updated = try await service.redo(projectID: projectID, expectedRevision: revision)
+            }
+            return try text(JSONSerialization.data(withJSONObject: ["revision": updated.revision]))
+        case "scan_pointers":
+            let offsets = try await service.scanPointers(projectID: try projectArgument(arguments))
+            return try text(JSONSerialization.data(withJSONObject: ["count": offsets.count, "offsets": offsets]))
         case "entropy_regions":
             let regions = try await service.entropyRegions(projectID: try projectArgument(arguments))
             return try text(JSONSerialization.data(withJSONObject: regions.map { ["offset": $0.offset, "length": $0.length, "meanEntropy": $0.meanEntropy] }))

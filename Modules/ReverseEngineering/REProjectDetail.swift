@@ -32,6 +32,14 @@ struct REProjectDetail: View {
                 }
                 .disabled(!module.isGhidraAvailable || module.isGhidraAnalysisRunning)
                 .help("Recover functions, pseudocode and references. Runs the analysis engine without executing this binary.")
+                Button("radare2", systemImage: "hare") {
+                    Task {
+                        do { _ = try await module.analyzeWithRadare2(projectID: project.id) }
+                        catch { analysisError = error.localizedDescription }
+                    }
+                }
+                .disabled(!module.isRadare2Available || module.isGhidraAnalysisRunning)
+                .help("Fast function, call-graph and basic-block recovery without a decompiler. Install with brew install radare2.")
             }
             .padding(8)
             Divider()

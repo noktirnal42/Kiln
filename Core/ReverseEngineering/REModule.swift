@@ -165,6 +165,35 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
         return analysis
     }
 
+    public var isRadare2Available: Bool { Analyzer.radare2Available() }
+
+    /// radare2 over an existing project: functions, calls and basic blocks, no decompiler. A fast fallback when Java or
+    /// Ghidra is unavailable; analyst annotations are preserved like a Ghidra re-analysis.
+    public func analyzeWithRadare2(projectID: String) async throws -> Analysis {
+        guard Analyzer.radare2Available() else { throw REError.radare2NotInstalled }
+        guard !isGhidraAnalysisRunning else { throw REError.analysisInProgress }
+        isGhidraAnalysisRunning = true
+        defer { isGhidraAnalysisRunning = false }
+        let project = try await MainActor.run { try self.projectFolder(id: projectID) }
+        let analysis = try await Task.detached(priority: .userInitiated) {
+            let existing = try ProjectStore.load(project.folder.path)
+            let result = try Analyzer.radare2(project.binaryURL.path, arch: existing.slice)
+            return try ProjectStore.replace(result, to: project.folder.path, expectedID: existing.id,
+                                            expectedRevision: existing.revision, preserveAnnotations: true)
+        }.value
+        await MainActor.run { self.replace(projectID: projectID, with: analysis) }
+        return analysis
+    }
+
+    /// Offsets of aligned values that look like arm64 user-space pointers (a lead list for memory dumps).
+    public func scanPointers(projectID: String) async throws -> [Int] {
+        try await Task.detached(priority: .userInitiated) {
+            let project = try await MainActor.run { try self.projectFolder(id: projectID) }
+            let data = try ToolBelt.readData(project.binaryURL.path, limit: ToolBelt.scanLimit)
+            return DumpForensics.scanPointers(data, limit: 500)
+        }.value
+    }
+
     /// Analysis as stored on disk for this project.
     public func analysis(projectID: String) async throws -> Analysis {
         try await MainActor.run { try self.loadedAnalysis(projectID: projectID) }
@@ -581,11 +610,14 @@ public enum REError: LocalizedError {
     case unknownFunction
     case noDecompilation(String)
     case ghidraNotConfigured
+    case radare2NotInstalled
     case analysisInProgress
     case scriptTimedOut(Int)
 
     public var errorDescription: String? {
         switch self {
+        case .radare2NotInstalled:
+            "radare2 was not found. Install it with `brew install radare2`, or use Ghidra."
         case .scriptTimedOut(let seconds):
             "Script did not finish within \(seconds) s and was abandoned. Its background thread may stay busy until the process exits."
         case .notAFile(let path): "Not a regular file: \(path)"
