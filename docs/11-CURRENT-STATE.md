@@ -12,7 +12,7 @@ Older docs describe the plan; this describes the app.
 - Signing: automatic, team `LH8KLB9N4F`, Apple Development identity; Release archives are re-signed with
   Developer ID at export. `xcodeVersion: 2710` plus the recommended build settings keep Xcode's
   "Update to recommended settings" prompt away. Bump it when moving to a newer Xcode.
-- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (466 tests, no
+- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (520 tests, no
   warnings except four from mlx-swift's Metal kernels, which cannot be silenced from this project; mlx-swift 0.32
   is worse, 76 warnings).
 - **Notarize from Xcode:** Product → Archive, Organizer → Distribute App → Direct Distribution → Export
@@ -34,15 +34,17 @@ One window, one sidebar, one conversation.
 - **Sidebar** (`UI/Workstation/WorkstationSidebar.swift`): New chat, project switcher, chat history grouped by day
   (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit. The Kiln logo opens
   Overview (the old Home). ⌘1–⌘7 and ⌘K still work.
-- **Develop → Editor** (`UI/Workstation/EditorView.swift`, `Core/Editor/*`): file navigator (new/rename/trash, hidden-file toggle),
-  tabs, native text editing (system undo, find bar, line numbers, auto-indent, regex syntax colouring), Open Quickly (⌘P),
-  Find in Project, go to line (⌘L), save (⌘S / ⇧⌘S). Documents live in `AppModel.editor`, so unsaved edits survive switching tools;
-  recovery copies of unsaved work are written to `Application Support/Kiln/EditorRecovery` and offered back; files changed on
-  disk by an agent, git or another editor reload when clean and raise a Reload / Keep mine / Overwrite banner when edited; binary,
-  over 2 MB and unreadable files are refused with a reason. **Build** (⌘B) detects xcodebuild / swift / cargo / go / npm / make (or
-  runs a custom command through a login shell), streams output and turns `file:line:col: error:` into clickable problems, with
-  "Ask the agent to fix the errors". **Not an IDE like Xcode:** no language server (completion, go to definition, live
-  diagnostics), debugger, run/launch, SwiftUI previews, scheme/target picker, test navigator or inline git changes.
+- **Develop → Editor** (`UI/Workstation/EditorView.swift`, `Core/Editor/*`): file navigator (new / rename / trash, Find in Project, Changes list with
+  discard), tabs and a split pane, native text editing (system undo, find bar, line numbers, auto-indent, regex syntax colouring, bracket matching,
+  soft wrap, font/tab settings), Open Quickly (⌘P), go to line (⌘L), save (⌘S / ⇧⌘S). Documents live in `AppModel.editor`, so unsaved edits survive
+  switching tools; recovery copies are written to `Application Support/Kiln/EditorRecovery` and offered back, and quitting with unsaved edits asks first. Files
+  changed on disk by an agent, git or another editor reload when clean and raise a Reload / Keep mine / Overwrite banner when edited; binary, over 2 MB and
+  unreadable files are refused with a reason. **Language server:** sourcekit-lsp (Swift and C-family files) gives live diagnostics as underlines and in Problems,
+  ⌘-click go to definition and ⌥Esc completion; it degrades to nothing when `xcrun sourcekit-lsp` is unavailable. **Git:** gutter markers against HEAD, "Revert
+  Change" at the caret. **Build / Test / Run** (⌘B, ⌘U, ⌘R): scheme and configuration pickers from `xcodebuild -list` / `swift package describe` (remembered per
+  project), streamed output, `file:line:col: error:` and Swift Testing issues as clickable problems, a test list with per-test results and "Run only this test", and
+  Run for packages and Xcode apps; "Ask the agent to fix the errors" drafts a prompt. **Not in Kiln:** a debugger (breakpoints, stepping, variables), SwiftUI
+  previews, code folding, multi-cursor, completion/diagnostics for languages other than Swift/C-family, and stage-hunk / blame UI in the editor.
 - **Project** = the folder the agent works in. `WorkspaceStore` keeps a security-scoped bookmark per recent folder;
   without it the sandbox forgets the folder on every relaunch.
 - **Composer** (model, Agent toggle, agent profile) is shared by the Agent view and the panel beside every tool.

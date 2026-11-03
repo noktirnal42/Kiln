@@ -4,11 +4,11 @@ See the [public work-item index](ISSUE-INDEX.md) for scoped issues and acceptanc
 
 This is the contributor-facing gap list for Kiln's current development state. The [issue tracker](https://github.com/noktirnal42/Kiln/issues) owns assignment, discussion, and implementation status. Specifications describe intended behavior; they are not evidence that a feature is complete.
 
-## Development workspace is a text editor with a build button, not an IDE like Xcode
+## Develop is a capable editor, not Xcode
 
-**Observed:** Develop → Editor can open, edit and save files, build and jump to compiler errors (see `docs/11-CURRENT-STATE.md`). It has no language server, debugger, run/launch, previews, scheme/target selection, test navigator, inline git changes, split editors or editor settings (font, theme, tab width).
+**Observed:** Develop → Editor has a language server (Swift and C-family only), build/test/run with schemes, git gutter markers and a split pane (see `docs/11-CURRENT-STATE.md`). It has **no debugger**, no SwiftUI previews, no code folding or multi-cursor, no language server for other languages, and no stage-hunk or blame UI in the editor.
 
-**Needed:** each of those is a separate scoped issue (#15–#21). Do not describe Kiln as having Xcode parity.
+**Needed:** a debugger (LLDB) is tracked in #16; remaining editor features in #20. Do not describe Kiln as having Xcode parity.
 
 ## Small local model tool use is unreliable
 
@@ -88,4 +88,4 @@ A full regression run exercised 456 tests and found one nested-path indexing fai
 
 Live tests require compatible providers, credentials, model availability, and sometimes API credits. A listed model may return a payment error even when another model on the same provider works. A command reporting success with zero selected tests is not verification.
 
-The suite was 476 tests and passing on 2026-11-02.
+The suite was 520 tests and passing on 2026-11-02.
