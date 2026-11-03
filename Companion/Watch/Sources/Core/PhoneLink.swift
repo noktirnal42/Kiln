@@ -3,7 +3,13 @@ import KilnRemoteKit
 import OSLog
 import WatchConnectivity
 
-let pairingLog = Logger(subsystem: "com.kiln.remote.watchkitapp", category: "pairing")
+/// Milestones go to the unified log and to stdout (visible with `devicectl ... launch --console`). Never the key.
+struct PairingLog: Sendable {
+    private let logger = Logger(subsystem: "com.kiln.remote.watchkitapp", category: "pairing")
+    func notice(_ message: String) { logger.notice("\(message, privacy: .public)"); print("[pairing] \(message)") }
+    func error(_ message: String) { logger.error("\(message, privacy: .public)"); print("[pairing] ERROR \(message)") }
+}
+let pairingLog = PairingLog()
 
 /// Receives the pairing link from the iPhone. Contract for the iOS app: `updateApplicationContext(["kilnPairing": url])`
 /// (also accepted through `transferUserInfo`) with the `kiln-remote://pair?...` string; an empty string revokes it.

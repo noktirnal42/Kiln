@@ -99,7 +99,7 @@ final class RemoteSession {
         do {
             let transport = try await connector(pairing) { [weak self] text in
                 self?.stage = text
-                pairingLog.notice("stage: \(text, privacy: .public)")
+                pairingLog.notice("stage: \(text)")
             }
             let client = RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: deviceName)
             self.client = client
@@ -108,7 +108,7 @@ final class RemoteSession {
             if !Task.isCancelled { link = .offline("Mac disconnected") }
         } catch {
             if !Task.isCancelled {
-                pairingLog.error("connect failed: \(String(describing: error), privacy: .public)")
+                pairingLog.error("connect failed: \(String(describing: error))")
                 link = .offline(Self.describe(error))
             }
         }
