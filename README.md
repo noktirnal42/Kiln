@@ -29,7 +29,7 @@ Kiln is an open-source Swift and SwiftUI workstation exploring what happens when
 | Analyze | Binary import, strings, native Mach-O inspection/disassembly, analysis tools | Ghidra recovery requires setup; cipher classifier is a placeholder |
 | Model Lab | Datasets/models, experiments, Create ML and MLX engines, evaluation, LoRA and distillation (also as agent tools) | Full GUI lifecycle/export compatibility coverage remains open |
 | Voice | Dictation, spoken replies, hands-free conversation mode | Not yet tried with a real microphone in QA; replies are spoken after they finish |
-| Remote control | Encrypted remote protocol and iPhone / Apple Watch companion projects (`Companion/`); optional relay software (`Relay/`) | A candidate completed watch voice and iPhone cellular relay message checks; approval verification remains open |
+| Remote control | Encrypted remote protocol and iPhone / Apple Watch companion projects (`Companion/`); optional relay software (`Relay/`) | A candidate completed a physical watch voice round trip; phone relay and approval verification remain open |
 
 **Real QA examples:** the app’s chat layer received correct live responses across five configured providers; a hosted agent created and ran a program; a researcher → implementer → reviewer swarm produced a real summary artifact; MLX from-scratch and LoRA smoke runs saved artifacts. These establish specific workflows, not universal reliability. See the [verification record](docs/12-USER-QA-2026-11-01.md) and [current state](docs/11-CURRENT-STATE.md) for evidence and limits.
 
