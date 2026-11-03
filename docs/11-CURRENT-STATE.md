@@ -156,7 +156,7 @@ in Settings; none are read or printed by the tests.
   (conversations listed, message sent, a real approval allowed from the app and the command ran).
   **Not verified:** a physical iPhone and Apple Watch end to end, voice with a real microphone, pairing through the camera.
 - **Known limits:** one pairing key is shared by all devices, so unpairing is all-or-nothing; the link is local network
-  only (no relay); each remote message goes into the one open conversation on the Mac.
+  across devices; relay software exists but is not deployed by default or verified end to end with a real Mac. Each remote message goes into the one open conversation on the Mac. Unexpected standing approval decisions observed in testing remain under investigation.
 - **Model Lab tools added:** `lab_start_lora` (verified end to end: SmolLM-135M, 20 iterations, completed) and
   `lab_start_distillation` (verified: Qwen2.5-3B teacher into SmolLM-135M, loss 0.83 training / 1.88 validation), both
   approval-gated with a download policy. Agents polling `lab_get_experiment` can exhaust their tool rounds on a slow job.
