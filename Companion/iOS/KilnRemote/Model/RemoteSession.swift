@@ -26,6 +26,8 @@ final class RemoteSession {
     private(set) var activity: String?
     private(set) var approvals: [RemoteApproval] = []
     private(set) var lastError: String?
+    /// What the connection loop is doing right now ("Trying 192.168.1.5:47900…"), nil when connected or idle.
+    private(set) var attemptStatus: String?
     private(set) var hostName: String?
 
     /// A live assistant message arrived (not history loaded by opening a conversation).
@@ -59,7 +61,7 @@ final class RemoteSession {
     // MARK: pairing and lifecycle
 
     func pair(with payload: PairingPayload) {
-        let paired = PairedMac(hostName: payload.hostName, serviceName: payload.serviceName, key: payload.key)
+        let paired = PairedMac(hostName: payload.hostName, serviceName: payload.serviceName, key: payload.key, relay: payload.relay, direct: payload.direct)
         do { try store.save(paired) } catch { lastError = error.localizedDescription; return }
         stop()
         resetConversationState()
@@ -96,6 +98,17 @@ final class RemoteSession {
         if status != .connected, status != .connecting { stop(); start() }
     }
 
+    /// Saves (or clears) the host:port typed in Settings and reconnects.
+    func setManualAddress(_ address: String?) {
+        guard var mac else { return }
+        let trimmed = address?.trimmingCharacters(in: .whitespaces)
+        mac.address = (trimmed?.isEmpty ?? true) ? nil : trimmed
+        do { try store.save(mac) } catch { lastError = error.localizedDescription; return }
+        self.mac = mac
+        cachedAddress = nil
+        stop(); start()
+    }
+
     // MARK: commands
 
     func refreshConversations() { link?.send(.listConversations) }
@@ -124,6 +137,7 @@ final class RemoteSession {
             if attempt > 0 { status = .reconnecting(lastError ?? "Waiting for your Mac") }
             let outcome = await connectOnce(mac)
             if Task.isCancelled { return }
+            if status == .connected { status = .reconnecting(lastError ?? "Connection lost") }   // not "connected" while waiting to retry
             if case .rejected = outcome { keyRejections += 1 } else { keyRejections = 0 }
             if case .welcomed = outcome { attempt = 0 }
             if keyRejections >= 2 { status = .needsRepairing; loop = nil; return }
@@ -135,13 +149,100 @@ final class RemoteSession {
 
     private enum Outcome { case welcomed, rejected, failed }
 
+    /// How the Mac can be reached, tried in order: addresses typed in Settings or from the pairing link, Bonjour on
+    /// this network, then the relay.
+    enum Step: Equatable, Sendable {
+        case direct(host: String, port: UInt16)
+        case bonjour
+        case relay(URL)
+
+        var label: String {
+            switch self {
+            case .direct(let host, let port): "Trying \(host):\(port)…"
+            case .bonjour: "Looking for your Mac on this network…"
+            case .relay(let url): "Trying the relay \(url.host ?? "")…"
+            }
+        }
+    }
+
+    enum Target: Equatable, Sendable {
+        case lan(host: String, port: UInt16)
+        case relay(URL)
+    }
+
+    private func steps(for mac: PairedMac) -> [Step] {
+        var steps: [Step] = []
+        func addDirect(_ host: String, _ port: UInt16) {
+            let step = Step.direct(host: host, port: port)
+            if !steps.contains(step) { steps.append(step) }
+        }
+        if let endpointOverride {
+            switch endpointOverride {
+            case .hostPort(let host, let port): addDirect(host, port)
+            case .bonjour: steps.append(.bonjour)
+            }
+        } else {
+            if let manual = mac.manualEndpoint { addDirect(manual.host, manual.port) }
+            for text in mac.direct { if let parsed = PairedMac.parse(text) { addDirect(parsed.host, parsed.port) } }
+            steps.append(.bonjour)
+        }
+        if let relay = mac.relay { steps.append(.relay(relay)) }
+        return steps
+    }
+
+    /// Tries each way of reaching the Mac until one gets a reply from it.
     private func connectOnce(_ mac: PairedMac) async -> Outcome {
+        var last = Outcome.failed
+        let steps = steps(for: mac)
+        for step in steps {
+            if Task.isCancelled { return .failed }
+            attemptStatus = step.label
+            guard let target = await resolve(step, mac) else { continue }
+            let timeout: TimeInterval = { if case .direct = step { 4 } else { 10 } }()   // a stale direct address should not hold up the rest
+            let outcome = await attempt(target, mac, timeout: timeout)
+            if Task.isCancelled { return .failed }
+            if case .failed = outcome { last = .failed; continue }
+            attemptStatus = nil
+            return outcome
+        }
+        attemptStatus = nil
+        return last
+    }
+
+    private func resolve(_ step: Step, _ mac: PairedMac) async -> Target? {
+        switch step {
+        case .direct(let host, let port): return .lan(host: host, port: port)
+        case .relay(let url): return .relay(url)
+        case .bonjour:
+            if let cachedAddress { return .lan(host: cachedAddress.0, port: cachedAddress.1) }
+            do {
+                if case .bonjour(let name)? = endpointOverride {
+                    let found = try await BonjourResolver.resolve(serviceName: name, timeout: .seconds(4))
+                    return .lan(host: found.0, port: found.1)
+                }
+                let found = try await BonjourResolver.resolve(serviceName: mac.serviceName, timeout: mac.relay == nil ? .seconds(10) : .seconds(4))
+                cachedAddress = found
+                return .lan(host: found.0, port: found.1)
+            } catch {
+                lastError = error.localizedDescription
+                return nil
+            }
+        }
+    }
+
+    private func attempt(_ target: Target, _ mac: PairedMac, timeout: TimeInterval) async -> Outcome {
         do {
-            let (host, port) = try await address(for: mac)
-            NSLog("KilnRemote: connecting to %@:%d", host, Int(port))
-            let link = RemoteLink(pairingKey: mac.key, deviceName: deviceName)
+            let link = RemoteLink(pairingKey: mac.key, deviceName: deviceName, handshakeTimeout: timeout)
             self.link = link
-            try link.connect(host: host, port: port)
+            switch target {
+            case .lan(let host, let port):
+                NSLog("KilnRemote: connecting to %@:%d", host, Int(port))
+                try link.connect(host: host, port: port)
+            case .relay(let base):
+                guard let url = RelayAddress.url(relay: base, pairingKey: mac.key, role: .device) else { throw LinkError.badURL }
+                NSLog("KilnRemote: connecting through the relay %@", base.host ?? "")
+                try link.connect(url: url, headers: [("Authorization", RelayAddress.authorizationHeader(pairingKey: mac.key))])
+            }
             var handshook = false, welcomed = false
             for await event in link.events {
                 switch event {
@@ -152,7 +253,7 @@ final class RemoteSession {
                 case .closed(let reason, let sawFrames):
                     self.link = nil
                     NSLog("KilnRemote: closed (%@) handshook=%d frames=%d", reason, handshook ? 1 : 0, sawFrames ? 1 : 0)
-                    if !welcomed { lastError = reason; cachedAddress = nil }   // the Mac may have restarted on another port
+                    if !welcomed { lastError = reason; if case .lan = target { cachedAddress = nil } }
                     resetLiveState()
                     if handshook, !sawFrames { return .rejected }
                     return welcomed ? .welcomed : .failed
@@ -160,24 +261,10 @@ final class RemoteSession {
             }
             return .failed
         } catch {
-            cachedAddress = nil
             NSLog("KilnRemote: connect failed: %@", error.localizedDescription)
             lastError = error.localizedDescription
             return .failed
         }
-    }
-
-    private func address(for mac: PairedMac) async throws -> (String, UInt16) {
-        if let endpointOverride {
-            switch endpointOverride {
-            case .hostPort(let host, let port): return (host, port)
-            case .bonjour(let name): return try await BonjourResolver.resolve(serviceName: name)
-            }
-        }
-        if let cachedAddress { return cachedAddress }
-        let found = try await BonjourResolver.resolve(serviceName: mac.serviceName)
-        cachedAddress = found
-        return found
     }
 
     // MARK: events

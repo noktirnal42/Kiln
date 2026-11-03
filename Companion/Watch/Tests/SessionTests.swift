@@ -24,7 +24,7 @@ final class SessionTests: XCTestCase {
         let url = server.url
         let session = RemoteSession(
             store: store,
-            connector: { _ in
+            connector: { _, _ in
                 let transport = NWTransport(url: url)
                 try await transport.start()
                 return transport

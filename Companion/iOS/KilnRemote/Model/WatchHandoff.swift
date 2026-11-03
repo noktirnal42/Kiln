@@ -33,7 +33,7 @@ final class WatchHandoff: NSObject {
     /// `nil` revokes the watch's pairing.
     func publish(_ mac: PairedMac?) {
         hasPairing = mac != nil
-        link = mac.map { PairingPayload(hostName: $0.hostName, serviceName: $0.serviceName, key: $0.key).url.absoluteString } ?? ""
+        link = mac.map { PairingPayload(hostName: $0.hostName, serviceName: $0.serviceName, key: $0.key, relay: $0.relay, direct: $0.direct).url.absoluteString } ?? ""
         send()
     }
 
@@ -54,7 +54,7 @@ final class WatchHandoff: NSObject {
         let session = WCSession.default
         guard activated else { blocked = "Waiting for the watch link to activate."; NSLog("KilnRemote watch: send skipped, session not activated"); return }
         guard watchPaired else { blocked = "No Apple Watch is paired with this iPhone."; NSLog("KilnRemote watch: send skipped, no watch paired"); return }
-        guard watchAppInstalled else { blocked = "Kiln Remote is not installed on the watch yet."; NSLog("KilnRemote watch: send skipped, watch app not installed"); return }
+        // isWatchAppInstalled can stay false for a watch app installed from Xcode, so it is shown but not required.
         let payload = ["kilnPairing": link]
         do { try session.updateApplicationContext(payload) } catch { NSLog("KilnRemote watch: context failed: %@", error.localizedDescription) }
         // Replace any earlier queued transfer so the watch never replays an old (revoked) pairing after a newer one.
@@ -75,7 +75,23 @@ extension WatchHandoff: WCSessionDelegate {
     nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
         Task { @MainActor in self.send() }
     }
+    /// The watch asks for the pairing ("kilnPairingRequest"); answer with it (empty if not paired) and push again.
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        guard message["kilnPairingRequest"] != nil else { replyHandler([:]); return }
+        let reply = ReplyBox(replyHandler)
+        Task { @MainActor in
+            reply.send(["kilnPairing": self.link])
+            self.send()
+        }
+    }
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in self.send() }
     }
+}
+
+/// WatchConnectivity hands over a non-Sendable reply closure; it is only ever called once, from the main actor.
+private final class ReplyBox: @unchecked Sendable {
+    private let handler: ([String: Any]) -> Void
+    init(_ handler: @escaping ([String: Any]) -> Void) { self.handler = handler }
+    func send(_ reply: [String: Any]) { handler(reply) }
 }

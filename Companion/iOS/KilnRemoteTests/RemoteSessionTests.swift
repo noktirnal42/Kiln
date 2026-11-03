@@ -169,3 +169,72 @@ struct SpokenTextTests {
         #expect(chunks.allSatisfy { $0.count <= 240 })
     }
 }
+
+@MainActor
+struct ManualAddressTests {
+    @Test func parsesHostAndPort() {
+        func mac(_ address: String?) -> PairedMac { PairedMac(hostName: "x", serviceName: "y", key: Data(count: 32), address: address) }
+        #expect(mac("100.64.1.2:47900").manualEndpoint?.host == "100.64.1.2")
+        #expect(mac("100.64.1.2:47900").manualEndpoint?.port == 47900)
+        #expect(mac("[fd7a::1]:47900").manualEndpoint?.host == "fd7a::1")
+        #expect(mac("mac.tailnet.ts.net:1").manualEndpoint?.port == 1)
+        #expect(mac("nonsense").manualEndpoint == nil)
+        #expect(mac("host:99999").manualEndpoint == nil)
+        #expect(mac(nil).manualEndpoint == nil)
+    }
+
+    @Test func connectsThroughATypedAddressWithoutBonjour() async throws {
+        let server = FakeMacServer()
+        try await server.start()
+        defer { server.stop() }
+        let mac = PairedMac(hostName: server.hostName, serviceName: "unused", key: server.key, address: "127.0.0.1:\(server.port)")
+        let session = RemoteSession(store: MemoryPairingStore(mac), deviceName: "Test Phone", backoff: [.milliseconds(100)])
+        session.start()
+        defer { session.stop() }
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !session.isConnected, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(session.isConnected)
+    }
+
+    @Test func relayURLAndHeaderComeFromThePairingKey() throws {
+        let key = PairingPayload.makeKey()
+        let url = try #require(RelayAddress.url(relay: URL(string: "wss://relay.example")!, pairingKey: key, role: .device))
+        #expect(url.absoluteString.hasPrefix("wss://relay.example/v1/room/"))
+        #expect(url.absoluteString.hasSuffix("role=device"))
+        #expect(!url.absoluteString.contains(key.base64EncodedString()))
+        #expect(RelayAddress.authorizationHeader(pairingKey: key).hasPrefix("Bearer "))
+    }
+
+    @Test func keychainKeepsRelayAndAddress() throws {
+        let store = KeychainPairingStore(service: "com.kiln.remote.tests.\(UUID().uuidString)")
+        defer { store.clear() }
+        let mac = PairedMac(hostName: "Studio", serviceName: "s", key: PairingPayload.makeKey(), relay: URL(string: "wss://relay.example"), address: "1.2.3.4:5")
+        try store.save(mac)
+        #expect(store.load() == mac)
+    }
+
+    @Test func triesDirectAddressesInOrderUntilOneAnswers() async throws {
+        let server = FakeMacServer()
+        try await server.start()
+        defer { server.stop() }
+        // First address refuses, second is the Mac; no Bonjour or relay needed.
+        let mac = PairedMac(hostName: server.hostName, serviceName: "unused", key: server.key, direct: ["127.0.0.1:1", "127.0.0.1:\(server.port)"])
+        let session = RemoteSession(store: MemoryPairingStore(mac), deviceName: "Test Phone", backoff: [.milliseconds(100)])
+        session.start()
+        defer { session.stop() }
+        let deadline = ContinuousClock.now + .seconds(8)
+        while !session.isConnected, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(session.isConnected)
+    }
+
+    @Test func pairingKeepsDirectAndRelayFromTheLink() throws {
+        let key = PairingPayload.makeKey()
+        let payload = PairingPayload(hostName: "Studio", serviceName: "s", key: key, relay: URL(string: "wss://relay.example"), direct: ["192.168.1.5:47900"])
+        let parsed = try #require(PairingPayload(url: payload.url))
+        let session = RemoteSession(store: MemoryPairingStore(), endpointOverride: .hostPort("127.0.0.1", 1), deviceName: "x")
+        session.pair(with: parsed)
+        #expect(session.mac?.direct == ["192.168.1.5:47900"])
+        #expect(session.mac?.relay?.host == "relay.example")
+        session.unpair()
+    }
+}

@@ -36,15 +36,17 @@ final class RemoteLink: @unchecked Sendable {
     private let queue = DispatchQueue(label: "kiln.remote.link")
     private let pairingKey: Data
     private let deviceName: String
+    private let handshakeTimeout: TimeInterval
     private var connection: NWConnection?
     private var channel: SecureChannel?
     private var clientNonce = Data()
     private var finished = false
     private var sawFrames = false
 
-    init(pairingKey: Data, deviceName: String) {
+    init(pairingKey: Data, deviceName: String, handshakeTimeout: TimeInterval = 10) {
         self.pairingKey = pairingKey
         self.deviceName = deviceName
+        self.handshakeTimeout = handshakeTimeout
         (events, continuation) = AsyncStream.makeStream(of: LinkEvent.self)
     }
 
@@ -52,15 +54,23 @@ final class RemoteLink: @unchecked Sendable {
         var hostText = host
         if hostText.contains(":"), !hostText.hasPrefix("[") { hostText = "[\(hostText.replacingOccurrences(of: "%", with: "%25"))]" }
         guard let url = URL(string: "ws://\(hostText):\(port)") else { throw LinkError.badURL }
-        let parameters = NWParameters.tcp
-        parameters.defaultProtocolStack.applicationProtocols.insert(NWProtocolWebSocket.Options(), at: 0)
+        try connect(url: url, headers: [])
+    }
+
+    /// Any ws:// or wss:// URL; `headers` is for the relay's `Authorization`.
+    func connect(url: URL, headers: [(String, String)]) throws {
+        guard let scheme = url.scheme, scheme == "ws" || scheme == "wss" else { throw LinkError.badURL }
+        let parameters = scheme == "wss" ? NWParameters(tls: NWProtocolTLS.Options(), tcp: NWProtocolTCP.Options()) : NWParameters.tcp
+        let websocket = NWProtocolWebSocket.Options()
+        if !headers.isEmpty { websocket.setAdditionalHeaders(headers) }
+        parameters.defaultProtocolStack.applicationProtocols.insert(websocket, at: 0)
         let connection = NWConnection(to: .url(url), using: parameters)
         queue.async { [self] in
             self.connection = connection
             connection.stateUpdateHandler = { [weak self] state in self?.stateChanged(state) }
             connection.start(queue: queue)
             // Handshake, then the first frame, has to finish promptly or the Mac drops us anyway.
-            queue.asyncAfter(deadline: .now() + 10) { [weak self] in
+            queue.asyncAfter(deadline: .now() + handshakeTimeout) { [weak self] in
                 guard let self, !finished, !(channel != nil && sawFrames) else { return }
                 finish("The Mac did not answer in time.")
             }
