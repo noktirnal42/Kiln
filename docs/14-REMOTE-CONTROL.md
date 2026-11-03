@@ -12,7 +12,7 @@ tested with `swift test` inside the package.
 ## Pairing
 
 1. On the Mac, Develop → MCP → Remote control shows a QR code (and a `kiln-remote://pair?...` link) with a fresh 256-bit key,
-   the Mac's name and its Bonjour service name. The key is only ever on that screen; it is not sent over any network.
+   the Mac's name and its Bonjour service name. The QR code contains a secret pairing key; scanning transfers it to the companion, and the iPhone can hand it to the watch through WatchConnectivity. Treat the code and link as credentials.
 2. The device scans it and stores the key in its Keychain. A paired device can be revoked at the Mac, which deletes the key.
 3. The watch pairs through its iPhone (the key is handed over WatchConnectivity); it may also reach the Mac directly.
 
