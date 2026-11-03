@@ -77,3 +77,15 @@ struct REProjectIDTests {
         }
     }
 }
+
+struct AxiomParityToolTests {
+    @Test func axiomsReadOnlyAnalysisToolsAreAvailableToAgents() {
+        let byName = Dictionary(uniqueKeysWithValues: REMCPTools.definitions.map { ($0.name, $0) })
+        for name in ["entropy_regions", "digest_file", "wildcard_search", "scan_rules", "list_modules"] {
+            #expect(byName[name] != nil, "missing re_\(name)")
+            #expect(byName[name]?.readOnly == true)
+        }
+        #expect((byName["wildcard_search"]?.inputSchema["required"] as? [String])?.contains("pattern") == true)
+        #expect((byName["scan_rules"]?.inputSchema["required"] as? [String])?.contains("rules") == true)
+    }
+}

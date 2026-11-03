@@ -248,6 +248,33 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
         }.value
     }
 
+    /// Entropy profile of the project's binary: contiguous high-entropy regions.
+    public func entropyRegions(projectID: String) async throws -> [EntropyRegion] {
+        try await Task.detached(priority: .userInitiated) {
+            let project = try await MainActor.run { try self.projectFolder(id: projectID) }
+            let data = try ToolBelt.readData(project.binaryURL.path, limit: ToolBelt.scanLimit)
+            return EntropyScanner.regions(in: data)
+        }.value
+    }
+
+    /// Digests plus byte statistics (entropy, printable ratio, dominant byte).
+    public func digestReport(projectID: String) async throws -> [String: String] {
+        try await Task.detached(priority: .userInitiated) {
+            let project = try await MainActor.run { try self.projectFolder(id: projectID) }
+            let data = try ToolBelt.readData(project.binaryURL.path, limit: ToolBelt.scanLimit)
+            return UtilityBelt.digestReport(data).merging(UtilityBelt.stats(data)) { current, _ in current }
+        }.value
+    }
+
+    /// File offsets matching a hex pattern with `??` wildcards.
+    public func wildcardSearch(projectID: String, pattern: String) async throws -> [Int] {
+        try await Task.detached(priority: .userInitiated) {
+            let project = try await MainActor.run { try self.projectFolder(id: projectID) }
+            let data = try ToolBelt.readData(project.binaryURL.path, limit: ToolBelt.scanLimit)
+            return try UtilityBelt.wildcardSearch(data, pattern: pattern)
+        }.value
+    }
+
     /// Runs analyst-supplied YARA-subset rules over the project's binary. Syntax
     /// errors surface as `RuleSyntaxError` with the position the compiler reports.
     public func scanRules(projectID: String, source: String) async throws -> [RuleMatch] {

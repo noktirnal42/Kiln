@@ -153,6 +153,73 @@ public enum REMCPTools {
             readOnly: true
         ),
         REMCPToolDefinition(
+            name: "entropy_regions",
+            description: "Sliding-window entropy profile of a project's binary; reports contiguous high-entropy regions that may be encrypted or compressed. Read-only.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID from re_import_binary."]
+                ],
+                "required": ["project_id"],
+                "additionalProperties": false
+            ],
+            readOnly: true
+        ),
+        REMCPToolDefinition(
+            name: "digest_file",
+            description: "MD5, SHA-1, SHA-256, CRC-32 and byte statistics (entropy, printable ratio, dominant byte) for a project's binary. Read-only.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID from re_import_binary."]
+                ],
+                "required": ["project_id"],
+                "additionalProperties": false
+            ],
+            readOnly: true
+        ),
+        REMCPToolDefinition(
+            name: "wildcard_search",
+            description: "Search a project's binary for a hex pattern with ?? byte wildcards (for example 41 42 ?? 44). Returns file offsets. Read-only.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID from re_import_binary."],
+                    "pattern": ["type": "string", "description": "Hex bytes separated by spaces; ?? matches any byte."]
+                ],
+                "required": ["project_id", "pattern"],
+                "additionalProperties": false
+            ],
+            readOnly: true
+        ),
+        REMCPToolDefinition(
+            name: "scan_rules",
+            description: "Compile YARA-subset rules (literals with nocase/wide/ascii/fullword, hex with wildcards, regex; and/or/not, at/in, N of them, filesize, uint8/16/32) and scan a project's binary. Syntax errors report their position. Read-only.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID from re_import_binary."],
+                    "rules": ["type": "string", "description": "Rule source text."]
+                ],
+                "required": ["project_id", "rules"],
+                "additionalProperties": false
+            ],
+            readOnly: true
+        ),
+        REMCPToolDefinition(
+            name: "list_modules",
+            description: "Find Mach-O/ELF modules embedded anywhere in a raw memory or flash dump and report each one's offset and size. Read-only; nothing is extracted.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "project_id": ["type": "string", "description": "Project ID from re_import_binary."]
+                ],
+                "required": ["project_id"],
+                "additionalProperties": false
+            ],
+            readOnly: true
+        ),
+        REMCPToolDefinition(
             name: "auto_decrypt",
             description: "Attempt XOR, RC4, AES (ECB/CBC/GCM), Blowfish and ChaCha20-Poly1305 decryption against typed keys, strings found in the binary, and/or a wordlist file. Results carry validator evidence and key fingerprints — never key material.",
             inputSchema: [
@@ -256,6 +323,25 @@ public enum REMCPTools {
             let projectID = try projectArgument(arguments)
             let hits = try await service.carveFormats(projectID: projectID)
             return try text(JSONSerialization.data(withJSONObject: hits.map { ["offset": $0.offset, "format": $0.format, "category": $0.category, "note": $0.note.map { $0 as Any } ?? NSNull(), ]}))
+        case "entropy_regions":
+            let regions = try await service.entropyRegions(projectID: try projectArgument(arguments))
+            return try text(JSONSerialization.data(withJSONObject: regions.map { ["offset": $0.offset, "length": $0.length, "meanEntropy": $0.meanEntropy] }))
+        case "digest_file":
+            let report = try await service.digestReport(projectID: try projectArgument(arguments))
+            return try text(JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]))
+        case "wildcard_search":
+            guard let pattern = arguments["pattern"] as? String, !pattern.isEmpty else { throw REMToolError.missingArgument("pattern") }
+            let offsets = try await service.wildcardSearch(projectID: try projectArgument(arguments), pattern: pattern)
+            return try text(JSONSerialization.data(withJSONObject: ["count": offsets.count, "offsets": Array(offsets.prefix(500))]))
+        case "scan_rules":
+            guard let rules = arguments["rules"] as? String, !rules.isEmpty else { throw REMToolError.missingArgument("rules") }
+            let matches = try await service.scanRules(projectID: try projectArgument(arguments), source: rules)
+            return try text(JSONSerialization.data(withJSONObject: matches.map { match in
+                ["rule": match.rule, "tags": match.tags, "meta": match.meta, "matches": match.strings.count]
+            }))
+        case "list_modules":
+            let modules = try await service.dumpForensics(projectID: try projectArgument(arguments)).modules
+            return try text(JSONSerialization.data(withJSONObject: modules.map { String(describing: $0) }))
         default:
             throw REMToolError.unknownTool(name)
         }
