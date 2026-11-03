@@ -15,6 +15,17 @@ public final class EditorWorkspace {
     public private(set) var root: URL?
     public private(set) var documents: [EditorDocument] = []
     public var activeID: UUID?
+    /// A second editor pane beside the active one (split view); nil when not split.
+    public var secondaryID: UUID?
+    public var secondary: EditorDocument? {
+        guard let secondaryID, secondaryID != activeID else { return nil }
+        return documents.first { $0.id == secondaryID }
+    }
+    public func openInSplit(_ document: EditorDocument) {
+        guard document.id != activeID else { return }
+        secondaryID = document.id
+    }
+    public func closeSplit() { secondaryID = nil }
     /// A line to scroll to the next time the active document is shown (from a diagnostic or go-to-line).
     public var pendingLine: (id: UUID, line: Int, column: Int)?
     public var message: String?
@@ -145,6 +156,7 @@ public final class EditorWorkspace {
     public func close(_ document: EditorDocument) {
         guard let index = documents.firstIndex(where: { $0.id == document.id }) else { return }
         documents.remove(at: index)
+        if secondaryID == document.id { secondaryID = nil }
         recovery.discard(for: document.url)
         if activeID == document.id {
             activeID = documents.indices.contains(index) ? documents[index].id : documents.last?.id

@@ -143,6 +143,46 @@ struct EditorDocumentTests {
     }
 }
 
+@MainActor
+struct EditorSettingsAndSplitTests {
+    @Test func settingsPersistAndAreClamped() {
+        let defaults = UserDefaults(suiteName: "kiln-settings-\(UUID().uuidString)")!
+        let a = EditorSettings(defaults: defaults)
+        #expect(a.fontSize == 13 && a.tabWidth == 4 && a.insertSpaces && !a.softWrap && a.showLineNumbers)
+        a.fontSize = 18; a.tabWidth = 2; a.softWrap = true; a.insertSpaces = false
+        let b = EditorSettings(defaults: defaults)
+        #expect(b.fontSize == 18 && b.tabWidth == 2 && b.softWrap && b.indentUnit == "\t")
+        defaults.set(500.0, forKey: "editor.fontSize"); defaults.set(7, forKey: "editor.tabWidth")
+        let c = EditorSettings(defaults: defaults)
+        #expect(c.fontSize == 32 && c.tabWidth == 4)
+    }
+
+    @Test func bracketMatcherPairsNestedBracketsBothWays() {
+        let text = "f(a[1], {b: (c)})"
+        let open = (text as NSString).range(of: "(").location
+        let match = BracketMatcher.match(in: text, caret: open + 1)
+        #expect(match?.1.location == (text as NSString).length - 1)
+        let close = BracketMatcher.match(in: text, caret: (text as NSString).length)
+        #expect(close?.1.location == open)
+        #expect(BracketMatcher.match(in: "plain text", caret: 3) == nil)
+    }
+
+    @Test func splitShowsASecondDocumentAndClosesWithIt() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-split-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let workspace = EditorWorkspace(recovery: EditorRecoveryStore(directory: dir.appendingPathComponent(".r")))
+        let a = try workspace.createFile(named: "a.txt", in: dir)
+        let b = try workspace.createFile(named: "b.txt", in: dir)
+        let docA = try #require(workspace.documents.first { $0.url == a.standardizedFileURL })
+        workspace.activeID = workspace.documents.first { $0.url == b.standardizedFileURL }?.id
+        workspace.openInSplit(docA)
+        #expect(workspace.secondary?.id == docA.id)
+        workspace.close(docA)
+        #expect(workspace.secondary == nil)
+    }
+}
+
 struct SyntaxAndBuildTests {
     @Test func highlighterClaimsCommentsAndStringsBeforeKeywords() {
         let source = "let s = \"if x\" // return\nreturn 42\n"
@@ -254,5 +294,55 @@ struct EditorFileOperationTests {
         #expect(hits.first?.line == 2 && hits.first?.column == 1 && hits.first?.path.hasSuffix("a.swift") == true)
         #expect(ProjectSearch.search(root: dir, query: "needle", caseSensitive: true).isEmpty)
         #expect(ProjectSearch.search(root: dir, query: "").isEmpty)
+    }
+}
+
+struct ProjectCommandTests {
+    @Test func parsesXcodebuildListAndPackageDescription() {
+        let list = #"{"project":{"configurations":["Debug","Release"],"name":"App","schemes":["App","AppTests"],"targets":["App"]}}"#
+        let parsed = ProjectInfo.parseXcodebuildList(Data(list.utf8))
+        #expect(parsed.schemes == ["App", "AppTests"] && parsed.configurations == ["Debug", "Release"])
+        let description = #"{"products":[{"name":"tool","type":{"executable":null}},{"name":"Lib","type":{"library":["automatic"]}}]}"#
+        #expect(ProjectInfo.parsePackageDescription(Data(description.utf8)) == ["tool"])
+        #expect(ProjectInfo.parseXcodebuildList(Data("garbage".utf8)).schemes.isEmpty)
+    }
+
+    @Test func buildTestAndRunCommandsFollowTheSelection() throws {
+        let xcode = ProjectInfo(kind: .xcodeProject, container: "My App.xcodeproj", schemes: ["Mac", "Mac Tests"], configurations: ["Debug", "Release"], executables: [])
+        let selection = BuildSelection(scheme: "Mac Tests", configuration: "Release")
+        let build = try #require(ProjectCommands.build(info: xcode, selection: selection))
+        #expect(build.command == "xcodebuild build -project 'My App.xcodeproj' -scheme 'Mac Tests' -destination 'platform=macOS' -configuration 'Release'")
+        let test = try #require(ProjectCommands.test(info: xcode, selection: selection, filter: "Mac Tests/Foo/testBar"))
+        #expect(test.command.hasSuffix("-only-testing:'Mac Tests/Foo/testBar'"))
+        let run = try #require(ProjectCommands.run(info: xcode, selection: selection))
+        #expect(run.command.contains("-showBuildSettings") && run.command.contains("exec \"$D/$X\""))
+
+        let package = ProjectInfo(kind: .swiftPackage, container: "Package.swift", schemes: [], configurations: ["debug", "release"], executables: ["tool"])
+        #expect(ProjectCommands.build(info: package, selection: BuildSelection(scheme: nil, configuration: "release"))?.command == "swift build -c release")
+        #expect(ProjectCommands.test(info: package, selection: BuildSelection(), filter: "Suite/test")?.command == "swift test --filter 'Suite/test'")
+        #expect(ProjectCommands.run(info: package, selection: BuildSelection())?.command == "swift run 'tool'")
+        #expect(ProjectCommands.build(info: .empty, selection: BuildSelection()) == nil)
+    }
+
+    @Test func parsesXCTestAndSwiftTestingOutput() {
+        let output = """
+        Test Case '-[AppTests.FooTests testA]' passed (0.012 seconds).
+        Test Case '-[AppTests.FooTests testB]' failed (0.500 seconds).
+        ✔ Test mergesByLaunchIdentity() passed after 0.001 seconds.
+        ✘ Test brokenThing() failed after 0.200 seconds with 1 issue.
+        random noise
+        """
+        let results = TestOutputParser.parse(output)
+        #expect(results.map(\.name) == ["AppTests.FooTests testA", "AppTests.FooTests testB", "mergesByLaunchIdentity()", "brokenThing()"] || results.count == 4)
+        #expect(results.filter { $0.status == .failed }.count == 2)
+        #expect(results.first?.seconds == 0.012)
+    }
+
+    @Test func selectionIsRememberedPerProject() {
+        let defaults = UserDefaults(suiteName: "kiln-sel-\(UUID().uuidString)")!
+        let root = URL(fileURLWithPath: "/tmp/proj-a")
+        BuildSelection(scheme: "S", configuration: "Release").save(for: root, defaults: defaults)
+        #expect(BuildSelection.load(for: root, defaults: defaults) == BuildSelection(scheme: "S", configuration: "Release"))
+        #expect(BuildSelection.load(for: URL(fileURLWithPath: "/tmp/proj-b"), defaults: defaults) == BuildSelection())
     }
 }

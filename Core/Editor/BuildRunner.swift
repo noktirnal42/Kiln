@@ -48,6 +48,13 @@ public final class BuildRunner {
     public private(set) var output = ""
     public private(set) var diagnostics: [Diagnostic] = []
     public private(set) var isRunning = false
+    /// What the current run is doing, so the UI can label it and the tests panel can read its output.
+    public private(set) var currentKind: RunKind = .build
+    public enum RunKind: String, Sendable { case build, test, run }
+    public private(set) var testResults: [TestResult] = []
+    public private(set) var info: ProjectInfo = .empty
+    public var selection = BuildSelection()
+    private var infoRoot: URL?
     public private(set) var lastExitStatus: Int32?
     public var customCommand = ""
 
@@ -77,8 +84,32 @@ public final class BuildRunner {
     }
 
     /// Runs `command` through a login shell so Homebrew, nvm and Xcode's tools are on PATH as in Terminal.
-    public func run(command: String, in root: URL) {
+    /// Asks the toolchain what the folder contains (schemes, configurations, executables) and restores the saved selection.
+    public func loadProject(at root: URL) async {
+        guard infoRoot != root else { return }
+        infoRoot = root
+        let loaded = await Task.detached(priority: .userInitiated) { ProjectInfo.load(in: root) }.value
+        info = loaded
+        var chosen = BuildSelection.load(for: root)
+        if let scheme = chosen.scheme, !loaded.schemes.contains(scheme) { chosen.scheme = nil }
+        if let configuration = chosen.configuration, !loaded.configurations.contains(configuration) { chosen.configuration = nil }
+        selection = chosen
+    }
+
+    public func reloadProject(at root: URL) async {
+        infoRoot = nil
+        await loadProject(at: root)
+    }
+
+    public func select(scheme: String?, configuration: String?, root: URL) {
+        selection = BuildSelection(scheme: scheme, configuration: configuration)
+        selection.save(for: root)
+    }
+
+    public func run(command: String, in root: URL, kind: RunKind = .build) {
         guard !isRunning else { return }
+        currentKind = kind
+        testResults = []
         output = ""
         diagnostics = []
         lastExitStatus = nil
@@ -140,6 +171,7 @@ public final class BuildRunner {
 
     private func finish(status: Int32) {
         lastExitStatus = status
+        if currentKind == .test { testResults = TestOutputParser.parse(output) }
         isRunning = false
         process = nil
         carry = ""

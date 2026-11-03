@@ -20,6 +20,8 @@ struct EditorView: View {
     @State private var fileAction: FileAction?
     @State private var fileActionName = ""
     @State private var fileError: String?
+    @State private var showSettings = false
+    private var settings: EditorSettings { EditorSettings.shared }
 
     enum NavigatorMode: String, CaseIterable { case files = "Files", search = "Find" }
 
@@ -73,8 +75,12 @@ struct EditorView: View {
             editor.setRoot(app.chatSession?.workspaceRoot)
             editor.startWatching()
             editor.refreshRecoverable()
+            if let root = editor.root { Task { await builder.loadProject(at: root) } }
         }
-        .onChange(of: app.chatSession?.workspaceRoot) { _, root in editor.setRoot(root) }
+        .onChange(of: app.chatSession?.workspaceRoot) { _, root in
+            editor.setRoot(root)
+            if let url = editor.root { Task { await builder.loadProject(at: url) } }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in editor.writeRecovery() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in editor.tick() }
     }
@@ -94,6 +100,13 @@ struct EditorView: View {
                 Label(builder.isRunning ? "Building…" : buildTitle, systemImage: "hammer")
             }
             .disabled(builder.isRunning || editor.root == nil || buildCommand == nil)
+            targetPickers
+            Button { runTests() } label: { Label("Test", systemImage: "checkmark.diamond") }
+                .disabled(builder.isRunning || ProjectCommands.test(info: builder.info, selection: builder.selection) == nil)
+                .help("Run the project's tests (⌘U)")
+            Button { runApp() } label: { Label("Run", systemImage: "play.fill") }
+                .disabled(builder.isRunning || ProjectCommands.run(info: builder.info, selection: builder.selection) == nil)
+                .help("Build and run (⌘R)")
             if builder.isRunning {
                 Button { builder.cancel() } label: { Label("Stop", systemImage: "stop.fill") }
             }
@@ -104,10 +117,17 @@ struct EditorView: View {
             if builder.isRunning {
                 ProgressView().controlSize(.small)
             } else if let status = builder.lastExitStatus {
-                Label(status == 0 ? "Build succeeded" : "Build failed",
+                Label(status == 0 ? "\(builder.currentKind == .build ? "Build" : builder.currentKind == .test ? "Tests" : "Run") succeeded"
+                                  : "\(builder.currentKind == .build ? "Build" : builder.currentKind == .test ? "Tests" : "Run") failed",
                       systemImage: status == 0 ? "checkmark.circle.fill" : "xmark.octagon.fill")
                     .foregroundStyle(status == 0 ? SSColor.success : SSColor.danger)
                     .font(SSTypography.caption())
+            }
+            Button { showSettings.toggle() } label: { Image(systemName: "slider.horizontal.3") }
+                .help("Editor settings")
+                .popover(isPresented: $showSettings) { settingsPanel }
+            if editor.secondary != nil {
+                Button { editor.closeSplit() } label: { Label("Unsplit", systemImage: "rectangle") }
             }
             Toggle("Hidden files", isOn: Binding(get: { editor.showHidden }, set: { editor.showHidden = $0; treeVersion += 1 }))
                 .toggleStyle(.checkbox).font(SSTypography.caption())
@@ -117,21 +137,75 @@ struct EditorView: View {
         .padding(.vertical, SSSpacing.xs)
     }
 
-    private var buildCommand: String? {
-        if !builder.customCommand.trimmingCharacters(in: .whitespaces).isEmpty { return builder.customCommand }
-        return editor.root.flatMap { BuildRunner.detectPlan(in: $0)?.command }
+    private var settingsPanel: some View {
+        @Bindable var settings = EditorSettings.shared
+        return Form {
+            Stepper("Font size: \(Int(settings.fontSize)) pt", value: $settings.fontSize, in: 9...32)
+            Picker("Tab width", selection: $settings.tabWidth) { ForEach([2, 3, 4, 8], id: \.self) { Text("\($0)").tag($0) } }
+            Toggle("Insert spaces for Tab", isOn: $settings.insertSpaces)
+            Toggle("Wrap long lines", isOn: $settings.softWrap)
+            Toggle("Line numbers", isOn: $settings.showLineNumbers)
+        }
+        .padding(SSSpacing.m).frame(width: 280)
     }
 
+    private var buildPlan: BuildRunner.Plan? {
+        if !builder.customCommand.trimmingCharacters(in: .whitespaces).isEmpty {
+            return BuildRunner.Plan(title: "Custom", command: builder.customCommand)
+        }
+        if let plan = ProjectCommands.build(info: builder.info, selection: builder.selection) { return plan }
+        return editor.root.flatMap { BuildRunner.detectPlan(in: $0) }
+    }
+
+    private var buildCommand: String? { buildPlan?.command }
+
     private var buildTitle: String {
-        if !builder.customCommand.trimmingCharacters(in: .whitespaces).isEmpty { return "Run" }
-        return editor.root.flatMap { BuildRunner.detectPlan(in: $0)?.title }.map { "Build (\($0))" } ?? "Build"
+        if !builder.customCommand.trimmingCharacters(in: .whitespaces).isEmpty { return "Run custom" }
+        return buildPlan.map { "Build (\($0.title))" } ?? "Build"
     }
 
     private func runBuild() {
         guard let root = editor.root, let command = buildCommand else { return }
         editor.saveAll()
-        builder.run(command: command, in: root)
+        builder.run(command: command, in: root, kind: .build)
         showProblems = true
+    }
+
+    private func runTests(filter: String? = nil) {
+        guard let root = editor.root, let plan = ProjectCommands.test(info: builder.info, selection: builder.selection, filter: filter) else { return }
+        editor.saveAll()
+        builder.run(command: plan.command, in: root, kind: .test)
+        showProblems = true
+    }
+
+    private func runApp() {
+        guard let root = editor.root, let plan = ProjectCommands.run(info: builder.info, selection: builder.selection) else { return }
+        editor.saveAll()
+        builder.run(command: plan.command, in: root, kind: .run)
+        showProblems = true
+    }
+
+    /// Scheme and configuration pickers, shown when the toolchain reported choices.
+    @ViewBuilder
+    private var targetPickers: some View {
+        if let root = editor.root {
+            if builder.info.schemes.count > 0 {
+                Picker("Scheme", selection: Binding(
+                    get: { builder.selection.scheme ?? builder.info.schemes.first ?? "" },
+                    set: { builder.select(scheme: $0, configuration: builder.selection.configuration, root: root) })) {
+                    ForEach(builder.info.schemes, id: \.self) { Text($0).tag($0) }
+                }
+                .labelsHidden().frame(maxWidth: 150).help("Scheme")
+            }
+            if builder.info.configurations.count > 1 {
+                Picker("Configuration", selection: Binding(
+                    get: { builder.selection.configuration ?? builder.info.configurations.first ?? "" },
+                    set: { builder.select(scheme: builder.selection.scheme, configuration: $0, root: root) })) {
+                    ForEach(builder.info.configurations, id: \.self) { Text($0).tag($0) }
+                }
+                .labelsHidden().frame(maxWidth: 110).help("Configuration")
+            }
+        }
     }
 
     /// Invisible buttons that carry the keyboard shortcuts while the editor is on screen.
@@ -141,6 +215,8 @@ struct EditorView: View {
             Button("") { editor.saveAll() }.keyboardShortcut("s", modifiers: [.command, .shift])
             Button("") { showQuickOpen = true }.keyboardShortcut("p", modifiers: .command)
             Button("") { runBuild() }.keyboardShortcut("b", modifiers: .command)
+            Button("") { runTests() }.keyboardShortcut("u", modifiers: .command)
+            Button("") { runApp() }.keyboardShortcut("r", modifiers: .command)
             Button("") { requestClose(editor.active) }.keyboardShortcut("w", modifiers: .command)
             Button("") { showGoToLine = true }.keyboardShortcut("l", modifiers: .command)
         }
@@ -296,6 +372,11 @@ struct EditorView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .contentShape(Rectangle())
                     .onTapGesture { editor.activeID = document.id }
+                    .contextMenu {
+                        Button("Open in Split") { editor.openInSplit(document) }
+                        Button("Close") { requestClose(document) }
+                        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([document.url]) }
+                    }
                     .help(editor.displayPath(document.url))
                 }
             }
@@ -341,27 +422,47 @@ struct EditorView: View {
     @ViewBuilder
     private var editorArea: some View {
         if let document = editor.active {
-            switch document.status {
-            case .editable:
-                CodeTextView(
-                    document: document,
-                    language: SyntaxHighlighter.language(for: document.url),
-                    jump: editor.pendingLine.flatMap { $0.id == document.id ? ($0.line, $0.column) : nil },
-                    onJumpDone: { editor.pendingLine = nil },
-                    onCaretMove: { caret = ($0, $1) }
-                )
-                .id(document.id)
-            case .binary:
-                unavailable(document, "Binary file", "This file is not text, so it cannot be edited here.")
-            case .tooLarge(let bytes):
-                unavailable(document, "File is too large",
-                            "\(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) is over the \(ByteCountFormatter.string(fromByteCount: Int64(EditorDocument.maxBytes), countStyle: .file)) editor limit.")
-            case .unreadable(let reason):
-                unavailable(document, "Cannot open this file", reason)
+            if let other = editor.secondary {
+                HSplitView {
+                    pane(for: document, tracksCaret: true)
+                    VStack(spacing: 0) {
+                        HStack {
+                            Text(other.name).font(SSTypography.caption()).lineLimit(1)
+                            Spacer()
+                            Button { editor.closeSplit() } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, SSSpacing.s).padding(.vertical, 3).background(Color.primary.opacity(0.06))
+                        pane(for: other, tracksCaret: false)
+                    }
+                }
+            } else {
+                pane(for: document, tracksCaret: true)
             }
         } else {
             SSEmptyState(symbol: "doc.text", title: "No file open",
                          message: "Pick a file in the navigator, or press ⌘P to open one by name.")
+        }
+    }
+
+    @ViewBuilder
+    private func pane(for document: EditorDocument, tracksCaret: Bool) -> some View {
+        switch document.status {
+        case .editable:
+            CodeTextView(
+                document: document,
+                language: SyntaxHighlighter.language(for: document.url),
+                jump: editor.pendingLine.flatMap { $0.id == document.id ? ($0.line, $0.column) : nil },
+                onJumpDone: { editor.pendingLine = nil },
+                onCaretMove: { if tracksCaret { caret = ($0, $1) } }
+            )
+            .id(document.id)
+        case .binary:
+            unavailable(document, "Binary file", "This file is not text, so it cannot be edited here.")
+        case .tooLarge(let bytes):
+            unavailable(document, "File is too large",
+                        "\(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)) is over the \(ByteCountFormatter.string(fromByteCount: Int64(EditorDocument.maxBytes), countStyle: .file)) editor limit.")
+        case .unreadable(let reason):
+            unavailable(document, "Cannot open this file", reason)
         }
     }
 
@@ -431,6 +532,20 @@ struct EditorView: View {
                     }
                     }
                     .frame(minWidth: 200)
+                    if !builder.testResults.isEmpty {
+                        List(builder.testResults) { result in
+                            HStack(spacing: 6) {
+                                Image(systemName: result.status == .passed ? "checkmark.circle.fill" : result.status == .failed ? "xmark.circle.fill" : "minus.circle")
+                                    .foregroundStyle(result.status == .passed ? SSColor.success : result.status == .failed ? SSColor.danger : .secondary)
+                                Text(result.name).font(SSTypography.caption()).lineLimit(2)
+                                Spacer()
+                                if let seconds = result.seconds { Text(String(format: "%.2fs", seconds)).font(SSTypography.mono(10)).foregroundStyle(.secondary) }
+                            }
+                            .contentShape(Rectangle())
+                            .contextMenu { Button("Run only this test") { runTests(filter: result.name) } }
+                        }
+                        .frame(minWidth: 200)
+                    }
                     ScrollView {
                         Text(builder.output).font(SSTypography.mono(10)).textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(SSSpacing.xs)

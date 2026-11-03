@@ -5,6 +5,7 @@ import SwiftUI
 /// a line-number gutter, auto-indent and regex syntax colouring.
 struct CodeTextView: NSViewRepresentable {
     @Bindable var document: EditorDocument
+    var settings: EditorSettings = .shared
     var language: SyntaxHighlighter.Language
     /// Line and column to move to, once.
     var jump: (line: Int, column: Int)?
@@ -39,7 +40,7 @@ struct CodeTextView: NSViewRepresentable {
         textView.isContinuousSpellCheckingEnabled = false
         textView.isGrammarCheckingEnabled = false
         textView.smartInsertDeleteEnabled = false
-        textView.font = Coordinator.font
+        textView.font = NSFont.monospacedSystemFont(ofSize: settings.fontSize, weight: .regular)
         textView.textColor = .labelColor
         textView.backgroundColor = .textBackgroundColor
         textView.insertionPointColor = .controlAccentColor
@@ -70,6 +71,7 @@ struct CodeTextView: NSViewRepresentable {
             textView.setSelectedRange(NSRange(location: min(selected.location, (document.text as NSString).length), length: 0))
             coordinator.rehighlight(immediately: true)
         }
+        coordinator.applySettings(settings, to: textView, scroll: scroll)
         if coordinator.lastLanguage != language {
             coordinator.lastLanguage = language
             coordinator.rehighlight(immediately: true)
@@ -82,7 +84,43 @@ struct CodeTextView: NSViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
-        static let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        private var appliedFontSize: Double = 0
+        private var appliedWrap: Bool?
+        private var appliedLineNumbers: Bool?
+
+        /// Applies live preference changes: font size, soft wrap and the line-number gutter.
+        func applySettings(_ settings: EditorSettings, to textView: NSTextView, scroll: NSScrollView) {
+            if appliedFontSize != settings.fontSize {
+                appliedFontSize = settings.fontSize
+                textView.font = NSFont.monospacedSystemFont(ofSize: settings.fontSize, weight: .regular)
+                rehighlight(immediately: true)
+            }
+            if appliedWrap != settings.softWrap {
+                appliedWrap = settings.softWrap
+                scroll.hasHorizontalScroller = !settings.softWrap
+                textView.isHorizontallyResizable = !settings.softWrap
+                textView.textContainer?.widthTracksTextView = settings.softWrap
+                textView.textContainer?.containerSize = NSSize(
+                    width: settings.softWrap ? scroll.contentSize.width : CGFloat.greatestFiniteMagnitude,
+                    height: CGFloat.greatestFiniteMagnitude)
+                textView.autoresizingMask = [.width]
+            }
+            if appliedLineNumbers != settings.showLineNumbers {
+                appliedLineNumbers = settings.showLineNumbers
+                scroll.rulersVisible = settings.showLineNumbers
+            }
+        }
+
+        private func highlightMatchingBracket(in textView: NSTextView) {
+            guard let layout = textView.layoutManager else { return }
+            let full = NSRange(location: 0, length: (textView.string as NSString).length)
+            layout.removeTemporaryAttribute(.backgroundColor, forCharacterRange: full)
+            guard let (a, b) = BracketMatcher.match(in: textView.string, caret: textView.selectedRange().location),
+                  textView.selectedRange().length == 0 else { return }
+            for range in [a, b] {
+                layout.addTemporaryAttribute(.backgroundColor, value: NSColor.controlAccentColor.withAlphaComponent(0.3), forCharacterRange: range)
+            }
+        }
         var parent: CodeTextView
         weak var textView: NSTextView?
         var isUpdatingFromModel = false
@@ -109,10 +147,15 @@ struct CodeTextView: NSViewRepresentable {
             let lastBreak = (prefix as NSString).range(of: "\n", options: .backwards)
             let column = lastBreak.location == NSNotFound ? location + 1 : location - NSMaxRange(lastBreak) + 1
             parent.onCaretMove(line, column)
+            highlightMatchingBracket(in: textView)
         }
 
         /// Keeps the previous line's indentation after Return.
         func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            if selector == #selector(NSResponder.insertTab(_:)) {
+                textView.insertText(parent.settings.indentUnit, replacementRange: textView.selectedRange())
+                return true
+            }
             guard selector == #selector(NSResponder.insertNewline(_:)) else { return false }
             let text = textView.string as NSString
             let caret = textView.selectedRange().location
