@@ -7,3 +7,7 @@ This is one foreground voice round trip using the integration candidate. It does
 ## Internet relay check
 
 A Cloudflare Worker was deployed for the development account. A separate protocol client completed an authenticated, encrypted handshake with the running Mac through that Worker. The user reported a Saturn question and reply on the physical iPhone after switching Wi-Fi off; the matching exchange appeared in the Mac conversation. Its actual network route was not independently confirmed. After the Mac restarted, the phone logged a relay connection attempt that timed out before its handshake. The Mac remote card reported its relay connected. Phone-to-Mac relay operation, reconnect and background behavior remain under test. The Worker is an operator-managed deployment, not a default hosted service for all Kiln users.
+
+## Physical iPhone approvals
+
+On the instrumented Mac build, the iPhone denied `echo kiln-deny-1103-a`. The same request was submitted again and allowed once; the Mac log recorded both decisions as remote, and the second run produced the echo output. Neither created a standing grant. Earlier unexpected standing grants from different tests predate decision-source logging; their origin remains unresolved. Watch approval actions are not yet verified.
