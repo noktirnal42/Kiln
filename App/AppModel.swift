@@ -120,6 +120,7 @@ public final class AppModel {
             AuditChain(directory: $0.appendingPathComponent("Audit", isDirectory: true), headDirectory: $0)
         }
         self.auditChain = auditChain
+        approvalCenter.modeLog = { [auditChain] note in Task { _ = try? await auditChain?.append(type: "approval.mode", payload: ["note": .string(note)]) } }
         self.orchestrator = AgentOrchestrator(
             approvalCenter: approvalCenter,
             services: ToolServices(

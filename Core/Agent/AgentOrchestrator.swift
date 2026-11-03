@@ -763,7 +763,8 @@ public final class AgentOrchestrator: Sendable {
                 preview: preview,
                 consequences: consequences,
                 grantValue: grantValue.value,
-                grantKind: grantValue.kind
+                grantKind: grantValue.kind,
+                policyFlag: approvalKindFromPolicy
             )
             yield(.awaitingApproval(request))
             let decision = await approvalCenter.requestApproval(request, conversationID: profile.id)
@@ -771,6 +772,7 @@ public final class AgentOrchestrator: Sendable {
             audit?.record("approval.decision", [
                 "request_id": .string(request.id.uuidString),
                 "decision": .string(decision.auditName),
+                "mode": .string(await MainActor.run { approvalCenter.mode.rawValue }),
             ])
             yield(.approvalResolved(id: request.id, approved: decision.isApproval))
             guard decision.isApproval else {

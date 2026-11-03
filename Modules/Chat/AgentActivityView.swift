@@ -93,6 +93,62 @@ private struct ToolCallRow: View {
 
 /// The controls that sit with the message box, as in the apps this is modelled on: which model, plain chat or
 /// agent, and which agent. The project is the sidebar's job; this only says when there isn't one.
+/// Ask / Auto / Bypass: who answers the agent's approval questions. Bypass is red and asks to be confirmed.
+struct PermissionModeMenu: View {
+    @ObservedObject var center: ApprovalCenter
+    @State private var confirmBypass = false
+
+    private var tint: Color {
+        switch center.mode {
+        case .ask: return .secondary
+        case .auto: return SSColor.accent
+        case .bypass: return SSColor.danger
+        }
+    }
+
+    private var symbol: String {
+        switch center.mode {
+        case .ask: return "hand.raised"
+        case .auto: return "bolt.shield"
+        case .bypass: return "exclamationmark.shield.fill"
+        }
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(ApprovalMode.allCases) { mode in
+                Button {
+                    if mode == .bypass { confirmBypass = true } else { center.setMode(mode) }
+                } label: {
+                    if center.mode == mode { Label("\(mode.displayName): \(mode.summary)", systemImage: "checkmark") }
+                    else { Text("\(mode.displayName): \(mode.summary)") }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: symbol).font(.system(size: 10))
+                Text(center.mode.displayName).font(SSTypography.caption())
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+            }
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(tint.opacity(0.14), in: Capsule())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Permissions: \(center.mode.summary)")
+        .accessibilityLabel("Permission mode: \(center.mode.displayName)")
+        .accessibilityHint(center.mode.summary)
+        .confirmationDialog("Bypass permissions?", isPresented: $confirmBypass, titleVisibility: .visible) {
+            Button("Bypass permissions", role: .destructive) { center.setMode(.bypass) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The agent will run commands, change files and use the network without asking, including destructive ones. Hard blocks and behavior-monitor holds still apply. This turns off when Kiln quits.")
+        }
+    }
+}
+
 struct AgentModeBar: View {
     @Bindable var session: ChatSession
     @State private var showModelPicker = false
@@ -125,6 +181,7 @@ struct AgentModeBar: View {
                     }
                 }
                 .labelsHidden().controlSize(.small).frame(maxWidth: 150)
+                PermissionModeMenu(center: ApprovalCenter.shared)
                 if session.workspaceRoot == nil {
                     Label("No project — pick one in the sidebar", systemImage: "folder.badge.questionmark")
                         .font(SSTypography.caption()).foregroundStyle(SSColor.warning)

@@ -120,6 +120,8 @@ final class RemoteSession {
     func open(_ id: String) { link?.send(.openConversation(id: id)) }
     func newConversation() { link?.send(.newConversation) }
     func stopReply() { link?.send(.stop) }
+    /// A recording from the Apple Watch: the Mac transcribes it and sends it as a spoken message.
+    func sendAudio(_ data: Data, format: String) { link?.send(.sendAudio(data: data, format: format)) }
 
     func send(_ text: String, spoken: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -310,6 +312,8 @@ final class RemoteSession {
             if !on { activity = nil }
         case .error(let message):
             lastError = message
+        case .transcript:
+            break   // shown on the watch that sent the recording
         case .pong:
             if case .reconnecting = status { status = .connected }
         }

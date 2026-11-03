@@ -187,6 +187,52 @@ public final class ApprovalLogStore: @unchecked Sendable {
     }
 }
 
+// MARK: - Approval modes
+
+/// How the approval gate answers when a tool call needs a human. A mode only answers on the person's behalf; it never
+/// creates a standing grant, never answers a behavior-monitor hold, and never lifts a hard policy block (those refuse the
+/// call before any approval is asked). It resets to `ask` whenever Kiln starts.
+public enum ApprovalMode: String, CaseIterable, Identifiable, Sendable {
+    /// Every call that needs approval waits for you.
+    case ask
+    /// Routine work is approved for you: reads, edits and commands that are not destructive, not outside the project,
+    /// and not flagged by the policy. Anything risky still asks.
+    case auto
+    /// Everything that is not hard-blocked is approved without asking, including destructive and outside-the-project work.
+    case bypass
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .ask: return "Ask"
+        case .auto: return "Auto"
+        case .bypass: return "Bypass"
+        }
+    }
+
+    public var summary: String {
+        switch self {
+        case .ask: return "Ask before every write, command and network call."
+        case .auto: return "Approve routine work automatically; still ask for anything destructive, outside the project, new to the network, or flagged risky."
+        case .bypass: return "Approve everything without asking. Hard blocks (like rm -rf /) and behavior-monitor holds still apply. Resets when Kiln quits."
+        }
+    }
+
+    /// The audit label for decisions this mode made.
+    public var auditVia: String { rawValue + "-mode" }
+
+    /// Whether this mode answers `request` itself. Monitor reviews are always asked.
+    public func approves(_ request: ApprovalRequest) -> Bool {
+        guard !request.isMonitorReview else { return false }
+        switch self {
+        case .ask: return false
+        case .bypass: return true
+        case .auto: return !request.isDestructive && request.permission != .admin && request.policyFlag == nil
+        }
+    }
+}
+
 // MARK: - The center (GATE B)
 
 /// The bridge between a tool call awaiting approval (running on a background
@@ -214,6 +260,17 @@ public final class ApprovalCenter: ObservableObject {
 
     public let grants: GrantStore
     public let log: ApprovalLogStore
+
+    /// The current approval mode. Not saved: Kiln always starts in `ask`.
+    @Published public private(set) var mode: ApprovalMode = .ask
+
+    public func setMode(_ newMode: ApprovalMode) {
+        guard newMode != mode else { return }
+        mode = newMode
+        modeLog?("approval mode set to \(newMode.rawValue)")
+    }
+    /// Receives a line whenever the mode changes (the app writes it to the audit chain).
+    public var modeLog: ((String) -> Void)?
 
     public init(
         grants: GrantStore = GrantStore(fileURL: AgentPaths.makeDefault().appendingPathComponent("agent-grants.json")),
@@ -245,6 +302,12 @@ public final class ApprovalCenter: ObservableObject {
         if isApprovedForSession(conversationID: conversationID, toolName: request.toolName) {
             log.record(request: request, decision: .approveForSession, conversationID: conversationID)
             return .approveForSession
+        }
+
+        if mode.approves(request) {
+            // Answered by the mode, once: no grant, no session approval.
+            log.record(request: request, decision: .approveOnce, conversationID: conversationID, via: mode.auditVia, waitedMs: 0)
+            return .approveOnce
         }
 
         pending.append(request)

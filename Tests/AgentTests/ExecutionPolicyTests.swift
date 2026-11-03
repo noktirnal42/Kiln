@@ -252,3 +252,52 @@ struct ExecutionPolicyTests {
         #expect(uncapped.checkBudget(costUSD: 1_000, tokens: .max, minutes: 10_000).allowed)
     }
 }
+
+@Suite("Approval modes")
+struct ApprovalModeTests {
+    private func request(_ permission: ToolPermissionLevel = .write, destructive: Bool = false, flag: ApprovalKind? = nil, review: Bool = false) -> ApprovalRequest {
+        ApprovalRequest(toolName: "t", toolSummary: "", argumentsJSON: "{}", permission: permission, isDestructive: destructive,
+                        isMonitorReview: review, policyFlag: flag)
+    }
+
+    @Test("ask never answers for the person") func ask() {
+        #expect(!ApprovalMode.ask.approves(request(.read)))
+    }
+
+    @Test("auto approves routine work but not destructive, admin or policy-flagged calls") func auto() {
+        #expect(ApprovalMode.auto.approves(request(.write)))
+        #expect(ApprovalMode.auto.approves(request(.execute)))
+        #expect(!ApprovalMode.auto.approves(request(.write, destructive: true)))
+        #expect(!ApprovalMode.auto.approves(request(.admin)))
+        #expect(!ApprovalMode.auto.approves(request(.execute, flag: .riskyShell)))
+        #expect(!ApprovalMode.auto.approves(request(.write, flag: .writeOutsideScope)))
+        #expect(!ApprovalMode.auto.approves(request(.execute, flag: .networkNewDomain)))
+    }
+
+    @Test("bypass approves everything except a behavior-monitor hold") func bypass() {
+        #expect(ApprovalMode.bypass.approves(request(.admin, destructive: true, flag: .riskyShell)))
+        #expect(!ApprovalMode.bypass.approves(request(.execute, review: true)))
+        #expect(!ApprovalMode.auto.approves(request(.read, review: true)))
+    }
+
+    @MainActor
+    @Test("a mode answers once, logs how, and never creates a standing grant") func integration() async {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-modes-\(UUID().uuidString)")
+        let center = ApprovalCenter(grants: GrantStore(fileURL: dir.appendingPathComponent("g.json")),
+                                    log: ApprovalLogStore(fileURL: dir.appendingPathComponent("a.jsonl")))
+        var lines: [String] = []
+        center.modeLog = { lines.append($0) }
+        #expect(center.mode == .ask)
+        center.setMode(.auto)
+        let routine = request(.write)
+        let decision = await center.requestApproval(routine, conversationID: UUID())
+        #expect(decision == .approveOnce)
+        #expect(center.pending.isEmpty)
+        #expect(center.grants.all().isEmpty)
+        let entry = center.log.readAll().last
+        #expect(entry?.via == "auto-mode" && entry?.decision == "approveOnce")
+        #expect(lines == ["approval mode set to auto"])
+        center.setMode(.ask)
+        #expect(center.mode == .ask)
+    }
+}

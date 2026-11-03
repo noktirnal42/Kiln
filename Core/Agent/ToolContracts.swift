@@ -305,6 +305,9 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
     /// A behavior-monitor hold, not a permission question. Always asked, never satisfied by an
     /// earlier "approve for session" or standing grant, and never creates one.
     public var isMonitorReview: Bool
+    /// Why the execution policy wanted a human for this call (risky shell, write outside scope, new network host, spend);
+    /// nil when it asked only because the permission level asks every time.
+    public var policyFlag: ApprovalKind?
 
     public init(
         id: UUID = UUID(),
@@ -319,7 +322,8 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
         grantKind: AgentGrant.Kind? = nil,
         fileDiff: FileDiff? = nil,
         createdAt: Date = Date(),
-        isMonitorReview: Bool = false
+        isMonitorReview: Bool = false,
+        policyFlag: ApprovalKind? = nil
     ) {
         self.id = id
         self.toolName = toolName
@@ -334,6 +338,7 @@ public struct ApprovalRequest: Identifiable, Equatable, Sendable {
         self.fileDiff = fileDiff
         self.createdAt = createdAt
         self.isMonitorReview = isMonitorReview
+        self.policyFlag = policyFlag
     }
 }
 

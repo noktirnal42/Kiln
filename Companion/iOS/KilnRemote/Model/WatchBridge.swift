@@ -54,6 +54,7 @@ final class WatchBridge {
         case .newConversation: session.newConversation()
         case .send(let text, let spoken): session.send(text, spoken: spoken)
         case .stop: session.stopReply()
+        case .sendAudio(let data, let format): session.sendAudio(data, format: format)
         case .decide(let approvalID, let decision):
             if let approval = session.approvals.first(where: { $0.id == approvalID }) { session.decide(approval, decision) }
             else { emit(.approvalResolved(approvalID: approvalID)) }
