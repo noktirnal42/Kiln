@@ -301,7 +301,7 @@ struct WatchBridgeTests {
         #expect(session.approvals.isEmpty)
     }
 
-    @Test func commandsWhileDisconnectedAreHeldAndRunOnReconnect() async throws {
+    @Test func commandsWhileDisconnectedAreNotReplayedOnReconnect() async throws {
         let server = FakeMacServer()
         try await server.start()
         defer { server.stop() }
@@ -313,13 +313,14 @@ struct WatchBridgeTests {
         bridge.sink = { events.append($0) }
         bridge.attach(session)
 
-        // Not started yet, so not connected: the command is held and the watch is told.
+        // A disconnected phone asks the watch to retry; it must not replay an old command.
         bridge.receive(try RemoteCoding.encode(RemoteCommand.send(text: "held until online", spoken: false)))
         #expect(events.contains { if case .error = $0 { true } else { false } })
         #expect(!server.receivedCommands.contains(.send(text: "held until online", spoken: false)))
         session.start()
         let deadline = ContinuousClock.now + .seconds(5)
-        while !server.receivedCommands.contains(.send(text: "held until online", spoken: false)), ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
-        #expect(server.receivedCommands.contains(.send(text: "held until online", spoken: false)))
+        while !session.isConnected, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(session.isConnected)
+        #expect(!server.receivedCommands.contains(.send(text: "held until online", spoken: false)))
     }
 }

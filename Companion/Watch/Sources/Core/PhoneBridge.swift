@@ -33,7 +33,7 @@ struct WCMessenger: BridgeMessenger {
 /// encryption). Keys:
 /// - watch → phone `["kilnBridge": "open"]` (message, reply expected): phone answers `["kilnBridge": "ready", "host": <Mac name>]`
 ///   once its own Mac connection is up, or `["kilnBridge": "error", "reason": <text>]`.
-/// - watch → phone `["kilnBridgeCommand": <RemoteCommand JSON>]` (message when reachable, else transferUserInfo).
+/// - watch → phone `["kilnBridgeCommand": <RemoteCommand JSON>]` (message while reachable; otherwise rejected).
 /// - watch → phone `["kilnBridge": "close"]`.
 /// - phone → watch `["kilnBridgeEvent": <RemoteEvent JSON>]` for every event from the Mac (message when reachable, else userInfo).
 final class PhoneBridge: RemoteChannel, @unchecked Sendable {
@@ -81,7 +81,10 @@ final class PhoneBridge: RemoteChannel, @unchecked Sendable {
         let json = String(decoding: try RemoteCoding.encode(command), as: UTF8.self)
         let message = [Self.commandKey: json]
         guard messenger.isReachable else { throw RemoteError.bridge("iPhone not reachable") }
-        messenger.send(message, reply: nil, failure: { _ in })
+        messenger.send(message, reply: nil, failure: { [weak self] _ in
+            guard let self else { return }
+            _ = self.lock.withLock { self.continuation }?.yield(.error("Could not reach your iPhone. Please try again."))
+        })
     }
 
     func close() async {

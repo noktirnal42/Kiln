@@ -34,6 +34,23 @@ final class SessionTests: XCTestCase {
         return (session, store)
     }
 
+    func testPhoneReachableRestartsAnInFlightNetworkSearch() async throws {
+        let attempts = AttemptCounter()
+        let store = InMemoryPairingStore(PairingPayload(hostName: "Fake Mac", serviceName: "Fake", key: key))
+        let url = server.url
+        let session = RemoteSession(store: store, connector: { pairing, _ in
+            if await attempts.next() == 1 { try await Task.sleep(for: .seconds(30)) }
+            let transport = NWTransport(url: url)
+            try await transport.start()
+            return RemoteClient(transport: transport, pairingKey: pairing.key, deviceName: "Test Watch")
+        }, transcriber: StubTranscriber(text: nil), speaker: speaker, haptics: haptics)
+        session.connect()
+        try await Task.sleep(for: .milliseconds(100))
+        session.phoneBecameReachable()
+        let connected = await waitUntil { session.isConnected }
+        XCTAssertTrue(connected)
+    }
+
     func testConnectsOpensConversationAndReportsHost() async throws {
         let (session, _) = makeSession()
         session.connect()
@@ -86,7 +103,8 @@ final class SessionTests: XCTestCase {
         session.decide(approval, .allowOnce)
         let sent = await waitUntil { self.server.received.contains(.decide(approvalID: "a1", decision: .allowOnce)) }
         XCTAssertTrue(sent)
-        XCTAssertTrue(session.pendingApprovals.isEmpty)
+        let cleared = await waitUntil { session.pendingApprovals.isEmpty }
+        XCTAssertTrue(cleared)
         XCTAssertNil(session.reviewing)
     }
 
@@ -129,4 +147,9 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(session.talk, .idle)
         XCTAssertEqual(speaker.stopped, 1)
     }
+}
+
+private actor AttemptCounter {
+    private var count = 0
+    func next() -> Int { count += 1; return count }
 }

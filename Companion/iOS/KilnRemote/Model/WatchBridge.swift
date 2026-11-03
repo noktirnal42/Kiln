@@ -3,13 +3,9 @@ import KilnRemoteKit
 import Observation
 import WatchConnectivity
 
-/// Lets the Apple Watch use this iPhone's connection to the Mac (the watch cannot open LAN sockets itself).
-///
-/// Watch → phone: `RemoteCoding`-encoded `RemoteCommand` as `sendMessageData` (reachable) or as `transferUserInfo`
-/// `["kilnCommand": Data]` (queued). Phone → watch: `RemoteCoding`-encoded `RemoteEvent` as `sendMessageData`, with
-/// approvals and finished messages also queued as `transferUserInfo` `["kilnEvent": Data]` when the watch is not
-/// reachable. A watch `hello` is answered with a snapshot (welcome, conversations, open conversation, pending
-/// approvals); `ping` is answered locally; everything else is forwarded to the Mac.
+/// Relays watch commands through the iPhone's Mac connection using WatchConnectivity.
+/// Commands received while the Mac is disconnected are rejected so they cannot execute later unexpectedly.
+/// Events use the kilnBridgeEvent message key; selected events may also be delivered as queued user info.
 @MainActor
 @Observable
 final class WatchBridge {
@@ -20,7 +16,6 @@ final class WatchBridge {
     private(set) var commandsForwarded = 0
 
     @ObservationIgnored private var session: RemoteSession?
-    @ObservationIgnored private var pending: [(command: RemoteCommand, queuedAt: Date)] = []
     @ObservationIgnored private var sendData: @MainActor (Data) -> Void = { WatchBridge.transmit($0) }
 
     func attach(_ session: RemoteSession) {
@@ -45,9 +40,8 @@ final class WatchBridge {
             if session.isConnected {
                 apply(command, on: session)
             } else {
-                pending.append((command, Date()))
-                session.resume()   // the app was probably woken by the watch: bring the Mac connection back
-                emit(.error("Your iPhone is reconnecting to your Mac…"))
+                session.resume()
+                emit(.error("Your iPhone is reconnecting to your Mac. Please try again."))
             }
         }
     }
@@ -70,12 +64,6 @@ final class WatchBridge {
     // MARK: phone → watch
 
     private func forward(_ event: RemoteEvent) {
-        if case .welcome = event, let session {
-            // Back online: run what the watch asked for while we were reconnecting, and refresh its view.
-            let fresh = pending.filter { Date().timeIntervalSince($0.queuedAt) < 30 }
-            pending = []
-            for item in fresh { apply(item.command, on: session) }
-        }
         emit(event)
     }
 

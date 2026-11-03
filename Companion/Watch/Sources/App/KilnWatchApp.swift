@@ -29,7 +29,7 @@ struct KilnWatchApp: App {
         }
         #endif
         _session = State(initialValue: session)
-        phoneLink = PhoneLink(onChange: { [session] payload in session.pairingChanged(payload) }, onStatus: { [session] text in session.phoneStatus = text }, bridge: bridge, onReachable: { [session] in if !session.isConnected { session.connect() } })
+        phoneLink = PhoneLink(onChange: { [session] payload in session.pairingChanged(payload) }, onStatus: { [session] text in session.phoneStatus = text }, bridge: bridge, onReachable: { [session] in session.phoneBecameReachable() })
         phoneLink.activate()
     }
 

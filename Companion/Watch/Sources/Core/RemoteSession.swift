@@ -39,6 +39,7 @@ final class RemoteSession {
     private let deviceName: String
     private var client: RemoteChannel?
     private var eventsTask: Task<Void, Never>?
+    private var connectionGeneration = 0
     private var awaitingSpokenReply = false
     private var conversationOpen = false
     private var buffer = ""
@@ -81,14 +82,24 @@ final class RemoteSession {
         link = .connecting
         stage = "Paired. Looking for your Mac…"
         pairingLog.notice("connect: paired, looking for Mac")
+        connectionGeneration += 1
+        let generation = connectionGeneration
         eventsTask = Task { [weak self] in
             guard let self else { return }
-            await self.run(pairing)
-            self.eventsTask = nil
+            await self.run(pairing, generation: generation)
+            if self.connectionGeneration == generation { self.eventsTask = nil }
         }
     }
 
+    /// Prefer the phone as soon as it becomes reachable, even during a direct-network attempt.
+    func phoneBecameReachable() {
+        guard !isConnected, store.load() != nil else { return }
+        disconnect()
+        connect()
+    }
+
     func disconnect() {
+        connectionGeneration += 1
         eventsTask?.cancel()
         eventsTask = nil
         let old = client
@@ -98,11 +109,15 @@ final class RemoteSession {
         if store.load() != nil { link = .offline("Not connected") }
     }
 
-    private func run(_ pairing: PairingPayload) async {
+    private func run(_ pairing: PairingPayload, generation: Int) async {
         do {
             let client = try await connector(pairing) { [weak self] text in
                 self?.stage = text
                 pairingLog.notice("stage: \(text)")
+            }
+            guard !Task.isCancelled, generation == connectionGeneration else {
+                await client.close()
+                return
             }
             route = client.route
             self.client = client
@@ -115,6 +130,7 @@ final class RemoteSession {
                 link = .offline(Self.describe(error))
             }
         }
+        guard generation == connectionGeneration else { return }
         client = nil
         conversationOpen = false
         if talk == .thinking { talk = .idle }
@@ -224,13 +240,14 @@ final class RemoteSession {
 
     func decide(_ approval: RemoteApproval, _ decision: RemoteApprovalDecision) {
         send(.decide(approvalID: approval.id, decision: decision))
-        haptics.play(.success)
-        resolve(approval.id)
     }
 
     private func send(_ command: RemoteCommand) {
         guard let client else { return }
-        Task { try? await client.send(command) }
+        Task {
+            do { try await client.send(command) }
+            catch { handle(.error("Could not send to your iPhone or Mac. Please try again.")) }
+        }
     }
 
     // MARK: Demo
