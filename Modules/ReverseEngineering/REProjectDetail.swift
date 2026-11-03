@@ -11,6 +11,7 @@ struct REProjectDetail: View {
 
     @State private var selectedAddress: String?
     @State private var tab: REFindingsTab?
+    @State private var analysisError: String?
 
     private var selectedFunction: FunctionRecord? {
         guard let selectedAddress else { return nil }
@@ -19,6 +20,21 @@ struct REProjectDetail: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text(module.ghidraStatus).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                Spacer(minLength: 0)
+                if module.isGhidraAnalysisRunning { ProgressView().controlSize(.small) }
+                Button("Analyze with Ghidra", systemImage: "bolt") {
+                    Task {
+                        do { _ = try await module.analyzeWithGhidra(projectID: project.id) }
+                        catch { analysisError = error.localizedDescription }
+                    }
+                }
+                .disabled(!module.isGhidraAvailable || module.isGhidraAnalysisRunning)
+                .help("Recover functions, pseudocode and references. Runs the analysis engine without executing this binary.")
+            }
+            .padding(8)
+            Divider()
             ScrollView(.horizontal) {
                 Picker("View", selection: $tab) {
                     Text("Functions").tag(REFindingsTab?.none)
@@ -39,6 +55,9 @@ struct REProjectDetail: View {
                 functionsBody
             }
         }
+        .alert("Ghidra analysis failed", isPresented: Binding(get: { analysisError != nil }, set: { if !$0 { analysisError = nil } })) {
+            Button("OK") { analysisError = nil }
+        } message: { Text(analysisError ?? "") }
     }
 
     private var functionsBody: some View {

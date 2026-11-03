@@ -45,6 +45,21 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
     /// otool inspection still works.
     public var ghidraHome: URL?
     public var ghidraScriptURL: URL?
+    public private(set) var isGhidraAnalysisRunning = false
+
+    public var isGhidraAvailable: Bool {
+        guard let home = ghidraHome, let script = ghidraScriptURL else { return false }
+        return GhidraInstallation.isValid(home)
+            && FileManager.default.fileExists(atPath: script.appendingPathComponent("AxiomExport.java").path)
+    }
+
+    public var ghidraStatus: String {
+        guard let home = ghidraHome else {
+            return "Ghidra not found. Place an installed Ghidra 11 or newer folder in ~/Applications or /Applications, or set GHIDRA_HOME before launching Kiln."
+        }
+        guard isGhidraAvailable else { return "Ghidra's launcher or Kiln's bundled export script is missing." }
+        return "Ghidra: \(home.lastPathComponent)"
+    }
 
     private var context: ModuleContext?
     private var projectsRoot: URL = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -66,6 +81,7 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
             try? FileManager.default.createDirectory(at: self.projectsRoot, withIntermediateDirectories: true)
             self.deviceBench = REDeviceBench(
                 auditLog: support.appendingPathComponent("ReverseEngineering/bench-sessions.jsonl"))
+            self.configureDiscoveredGhidra()
         }
         await reloadProjectList()
         context.logger.info("Reverse Engineering module ready (\(projects.count) projects)")
@@ -123,17 +139,27 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
         ghidraScriptURL = script
     }
 
+    public func configureDiscoveredGhidra() {
+        ghidraHome = GhidraInstallation.discover()
+        ghidraScriptURL = GhidraInstallation.exporter()
+    }
+
     /// Runs the full Ghidra headless pipeline over an existing project. Requires a
     /// configured Ghidra home and export script; throws a specific reason otherwise.
     public func analyzeWithGhidra(projectID: String) async throws -> Analysis {
-        guard let home = ghidraHome, let script = ghidraScriptURL else {
+        guard isGhidraAvailable, let home = ghidraHome, let script = ghidraScriptURL else {
             throw REError.ghidraNotConfigured
         }
+        guard !isGhidraAnalysisRunning else { throw REError.analysisInProgress }
+        isGhidraAnalysisRunning = true
+        defer { isGhidraAnalysisRunning = false }
         let project = try await MainActor.run { try self.projectFolder(id: projectID) }
         let analysis = try await Task.detached(priority: .userInitiated) {
-            _ = try Analyzer.analyzeProject(project.binaryURL.path, project: project.folder.path,
-                                        home: home.path, scriptPath: script.path, arch: nil)
-            return try ProjectStore.load(project.folder.path)
+            let existing = try ProjectStore.load(project.folder.path)
+            let result = try Analyzer.ghidra(project.binaryURL.path, home: home.path, scriptPath: script.path,
+                                            workspace: Analyzer.engineWorkspace(projectPath: project.folder.path, projectID: existing.id))
+            return try ProjectStore.replace(result, to: project.folder.path, expectedID: existing.id,
+                                            expectedRevision: existing.revision, preserveAnnotations: true)
         }.value
         await MainActor.run { self.replace(projectID: projectID, with: analysis) }
         return analysis
@@ -528,6 +554,7 @@ public enum REError: LocalizedError {
     case unknownFunction
     case noDecompilation(String)
     case ghidraNotConfigured
+    case analysisInProgress
     case scriptTimedOut(Int)
 
     public var errorDescription: String? {
@@ -541,8 +568,9 @@ public enum REError: LocalizedError {
         case .unknownFunction: "Function not found in this project."
         case .noDecompilation(let detail): detail
         case .ghidraNotConfigured:
-            "Ghidra is not configured. Set the Ghidra install home and the AxiomExport.java " +
-            "script path in Settings → Reverse Engineering, then re-run analysis."
+            "Ghidra is unavailable. Kiln needs an installed Ghidra 11 or newer in ~/Applications or /Applications " +
+            "(or GHIDRA_HOME) and its bundled AxiomExport.java script. Restart Kiln after configuring the installation."
+        case .analysisInProgress: "Another Ghidra analysis is already running. Wait for it to finish."
         }
     }
 }

@@ -83,6 +83,11 @@ targets:
       - path: Modules
       - path: UI
       - path: Resources
+        excludes:
+          - Ghidra
+      - path: Resources/Ghidra
+        type: folder
+        buildPhase: resources
       - path: ModuleManifests
         type: folder
         buildPhase: resources

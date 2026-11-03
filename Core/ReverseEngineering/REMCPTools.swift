@@ -56,6 +56,17 @@ public enum REMCPTools {
             readOnly: false
         ),
         REMCPToolDefinition(
+            name: "analyze_binary",
+            description: "Run installed Ghidra over an imported project and save recovered functions, pseudocode and references. Launches the analysis engine, never the target binary. Bounded to 240 seconds; one analysis at a time.",
+            inputSchema: [
+                "type": "object",
+                "properties": ["project_id": ["type": "string"]],
+                "required": ["project_id"],
+                "additionalProperties": false
+            ],
+            readOnly: false
+        ),
+        REMCPToolDefinition(
             name: "analyze_function",
             description: "Return the function record (name, signature, callers, callees, analysis status) for one address or name in a project.",
             inputSchema: [
@@ -198,6 +209,10 @@ public enum REMCPTools {
             }
             let analysis = try await service.importBinary(at: URL(fileURLWithPath: path))
             let projectID = await MainActor.run { service.projects.first { $0.analysis?.id == analysis.id }?.id }
+            return try text(JSONSerialization.data(withJSONObject: summary(analysis, projectID: projectID)))
+        case "analyze_binary":
+            let projectID = try projectArgument(arguments)
+            let analysis = try await service.analyzeWithGhidra(projectID: projectID)
             return try text(JSONSerialization.data(withJSONObject: summary(analysis, projectID: projectID)))
         case "analyze_function":
             let (projectID, address, name) = try functionArguments(arguments)

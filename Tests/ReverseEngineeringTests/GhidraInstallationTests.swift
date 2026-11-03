@@ -1,0 +1,88 @@
+import Foundation
+import Testing
+import AxiomCore
+@testable import Kiln
+
+struct GhidraInstallationTests {
+    private func fixture(_ root: URL, _ name: String, version: String, release: String = "PUBLIC", executable: Bool = true) throws -> URL {
+        let home = root.appendingPathComponent(name)
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("support"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("Ghidra"), withIntermediateDirectories: true)
+        let launcher = home.appendingPathComponent("support/analyzeHeadless")
+        try "#!/bin/sh\nexit 1\n".write(to: launcher, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: executable ? 0o755 : 0o644], ofItemAtPath: launcher.path)
+        try "application.version=\(version)\napplication.release.name=\(release)\n".write(to: home.appendingPathComponent("Ghidra/application.properties"), atomically: true, encoding: .utf8)
+        return home
+    }
+
+    @Test func prefersTheHighestStableVersionOverDevelopmentBuilds() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-ghidra-discovery-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        _ = try fixture(root, "ghidra_12.2_DEV", version: "12.2", release: "DEV")
+        _ = try fixture(root, "ghidra_12.1.9_PUBLIC", version: "12.1.9")
+        let expected = try fixture(root, "ghidra_12.1.10_PUBLIC", version: "12.1.10")
+        #expect(GhidraInstallation.discover(environment: [:], applicationDirectories: [root]) == expected)
+    }
+
+    @Test func validEnvironmentHomeWinsAndInvalidHomeFallsBack() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-ghidra-discovery-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let release = try fixture(root, "ghidra_12.1.4_PUBLIC", version: "12.1.4")
+        let explicit = try fixture(root, "ghidra_custom", version: "11.3.2")
+        #expect(GhidraInstallation.discover(environment: ["GHIDRA_HOME": explicit.path], applicationDirectories: [root]) == explicit)
+        #expect(GhidraInstallation.discover(environment: ["GHIDRA_HOME": root.appendingPathComponent("missing").path], applicationDirectories: [root]) == release)
+    }
+
+    @Test func ignoresNonExecutableAndUnsupportedInstallations() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-ghidra-discovery-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        _ = try fixture(root, "ghidra_12_PUBLIC", version: "12", executable: false)
+        _ = try fixture(root, "ghidra_10_PUBLIC", version: "10.4")
+        #expect(GhidraInstallation.discover(environment: [:], applicationDirectories: [root]) == nil)
+    }
+
+    @Test func exporterIsBundledWithTheApp() throws {
+        let script = try #require(GhidraInstallation.exporter())
+        #expect(FileManager.default.fileExists(atPath: script.appendingPathComponent("AxiomExport.java").path))
+    }
+}
+
+@MainActor
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["KILN_LIVE_GHIDRA"] == "1"), .serialized)
+struct LiveGhidraTests {
+    @Test func configuredEngineProducesPersistedPseudocodeThroughTheAgentTool() async throws {
+        let module = REModule()
+        module.configureDiscoveredGhidra()
+        #expect(module.isGhidraAvailable, "\(module.ghidraStatus)")
+        _ = try await module.importBinary(at: URL(fileURLWithPath: "/usr/bin/true"))
+        let project = try #require(module.selected)
+        defer { try? FileManager.default.removeItem(at: project.folder) }
+        let initial = try await module.analysis(projectID: project.id)
+        let annotated = try await module.editProject(projectID: project.id, expectedRevision: initial.revision,
+            operations: [.addressNote(address: "100000000", comment: "Keep this analyst note", label: "QA binary")])
+        let tool = REAgentTool(definition: try #require(REMCPTools.definitions.first { $0.name == "analyze_binary" }), module: module)
+        #expect(tool.spec.permission == .execute)
+        let context = ToolExecutionContext(workspaceRoot: nil, conversationID: UUID(), redactSecrets: true, services: ToolServices())
+        let arguments = try JSONSerialization.data(withJSONObject: ["project_id": project.id])
+        let run = Task { try await tool.execute(argumentsJSON: String(decoding: arguments, as: UTF8.self), context: context) }
+        for _ in 0..<100 where !module.isGhidraAnalysisRunning { try await Task.sleep(nanoseconds: 10_000_000) }
+        #expect(module.isGhidraAnalysisRunning)
+        do {
+            _ = try await module.analyzeWithGhidra(projectID: project.id)
+            Issue.record("Concurrent analysis must be rejected")
+        } catch REError.analysisInProgress {} catch { Issue.record("Unexpected duplicate-run error: \(error)") }
+        _ = try await run.value
+        let analysis = try await module.analysis(projectID: project.id)
+        let persisted = try ProjectStore.load(project.folder.path)
+        #expect(persisted.id == initial.id && persisted.revision == annotated.revision + 1)
+        #expect(persisted.addressComments == annotated.addressComments && persisted.addressLabels == annotated.addressLabels)
+        #expect(analysis.sha256 == initial.sha256 && analysis.binaryPath == project.binaryURL.path)
+        #expect(analysis.engine.hasPrefix("Ghidra"))
+        let function = try #require(analysis.functions.first { !$0.code.isEmpty })
+        #expect(!function.assembly.isEmpty)
+        let code = try await module.decompilation(projectID: project.id, address: function.address)
+        #expect(code == function.code)
+        #expect(!module.isGhidraAnalysisRunning)
+        print("GHIDRA_QA engine=\(analysis.engine) functions=\(analysis.functions.count) pseudocode=\(code.prefix(180))")
+    }
+}

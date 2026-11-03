@@ -20,7 +20,7 @@ public struct REAgentTool: ToolExecuting {
             detail: "Reverse Engineering Console tool `\(definition.name)`. "
                 + (definition.readOnly ? "Read-only." : "May change project state."),
             parameters: Self.parameters(from: definition.inputSchema),
-            permission: definition.readOnly ? .read : .write,
+            permission: definition.name == "analyze_binary" ? .execute : (definition.readOnly ? .read : .write),
             isDestructive: false
         )
     }
