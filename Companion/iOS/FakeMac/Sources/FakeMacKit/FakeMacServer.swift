@@ -180,6 +180,13 @@ public final class FakeMacServer: @unchecked Sendable {
                 } else {
                     reply(to: text, n: n)
                 }
+            case .sendAudio:
+                counter += 1
+                let n = counter
+                send(.transcript("run the tests"))
+                send(.message(RemoteMessage(id: "u\(n)", role: .user, text: "run the tests", createdAt: Date())))
+                send(.streaming(true))
+                reply(to: "run the tests", n: n)
             case .decide(let id, let decision):
                 send(.approvalResolved(approvalID: id))
                 send(.activity(tool: "shell", status: decision == .allowOnce ? "running" : "denied"))
