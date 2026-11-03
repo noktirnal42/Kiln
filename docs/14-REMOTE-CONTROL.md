@@ -86,3 +86,27 @@ The iOS simulator connected directly to a real Mac. An integration candidate com
   A raw `NWConnection` does not get that proxying, which is why direct LAN sockets time out on a real watch. Order of
   attempts on the watch: relay, iPhone bridge (WatchConnectivity), direct address, Bonjour.
 - **Port.** The Mac listens on 47900 when free and on any free port otherwise (a busy 47900 used to make the listener fail).
+
+## Approval alerts when the app is closed (Apple push)
+
+An iPhone app that is closed or suspended cannot hold a connection, so the Mac asks Apple to alert it. Flow: the phone
+registers its push token with the Mac over the encrypted link (`registerPush`); when an approval has been waiting about
+4 seconds, the Mac asks the relay (`POST /v1/push/<room>`, same room password as the sockets) to push to the phones it
+names; the relay signs an Apple token with a push key it keeps as a secret and sends the alert. The alert carries the tool,
+its access level and, unless switched off in the Remote control card, the first 80 characters of the command, so that text
+passes through Apple's servers. Allow once and Deny buttons on the notification answer the approval (reconnecting first when
+needed); the Apple Watch shows the same notification when it mirrors the phone's. The relay stores no device tokens.
+
+Setup (once): create an APNs Auth Key in the Apple Developer account (Certificates, Identifiers & Profiles → Keys → +,
+tick Apple Push Notifications service, environment Sandbox & Production, team scoped), download the `.p8` (Apple allows
+this once), then:
+
+```sh
+cd Relay && npx wrangler login && npx wrangler deploy
+npx wrangler secret put APNS_KEY < ~/Downloads/AuthKey_<KEYID>.p8
+echo -n <KEYID> | npx wrangler secret put APNS_KEY_ID
+echo -n <TEAMID> | npx wrangler secret put APNS_TEAM_ID
+```
+
+Keep a backup of the `.p8`. The phone app needs the Push Notifications capability (`aps-environment` entitlement, in
+`Companion/iOS/project.yml`); Debug builds installed from Xcode use Apple's sandbox, release builds production.

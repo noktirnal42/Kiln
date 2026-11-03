@@ -244,6 +244,7 @@ public final class FakeMacServer: @unchecked Sendable {
                 } else {
                     reply(to: text, n: n)
                 }
+            case .registerPush: break
             case .sendAudio:
                 counter += 1
                 let n = counter

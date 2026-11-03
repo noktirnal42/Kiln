@@ -16,6 +16,11 @@ struct RemoteProtocolTests {
         #expect(try RemoteCoding.decode(RemoteEvent.self, from: RemoteCoding.encode(opened)) == opened)
     }
 
+    @Test("a push registration survives a round trip") func push() throws {
+        let command = RemoteCommand.registerPush(token: "ab12cd", environment: "sandbox", topic: "com.kiln.remote")
+        #expect(try RemoteCoding.decode(RemoteCommand.self, from: RemoteCoding.encode(command)) == command)
+    }
+
     @Test("audio commands and transcripts survive a round trip") func audio() throws {
         let command = RemoteCommand.sendAudio(data: Data([1, 2, 3, 255]), format: "m4a")
         #expect(try RemoteCoding.decode(RemoteCommand.self, from: RemoteCoding.encode(command)) == command)

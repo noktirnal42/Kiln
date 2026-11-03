@@ -177,6 +177,11 @@ struct RemoteControlCard: View {
                          : server.relayURL == nil ? "No internet relay set: devices can only connect on this network or over a VPN."
                          : "Internet relay set but not connected" + (server.relayError.map { " (\($0))" } ?? "") + ".")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    Text(server.push.status.isEmpty ? "Phone alerts: no phone registered yet. Open Kiln Remote on your iPhone and allow notifications." : "Phone alerts: " + server.push.status)
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    Toggle("Include the start of the command in phone alerts (it passes through Apple's servers)", isOn: Binding(
+                        get: { server.push.includesPreview }, set: { server.push.includesPreview = $0 }))
+                        .font(SSTypography.caption())
                     HStack {
                         TextField("Internet relay, e.g. wss://kiln-relay.example.workers.dev", text: $relayText)
                             .textFieldStyle(.roundedBorder).font(SSTypography.caption())

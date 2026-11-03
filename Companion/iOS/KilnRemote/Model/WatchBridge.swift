@@ -58,6 +58,7 @@ final class WatchBridge {
         case .decide(let approvalID, let decision):
             if let approval = session.approvals.first(where: { $0.id == approvalID }) { session.decide(approval, decision) }
             else { emit(.approvalResolved(approvalID: approvalID)) }
+        case .registerPush: break   // push alerts are for the phone; the watch gets them mirrored
         case .hello, .ping: break
         }
     }

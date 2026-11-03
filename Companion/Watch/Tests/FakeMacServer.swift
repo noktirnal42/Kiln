@@ -133,6 +133,7 @@ final class FakeConnection: @unchecked Sendable {
             send(.delta(text: "Working"))
             send(.message(RemoteMessage(id: "a", role: .assistant, text: server.reply(text), createdAt: now)))
             send(.streaming(false))
+        case .registerPush: break
         case .sendAudio:
             send(.transcript("run the tests"))
             send(.message(RemoteMessage(id: "u", role: .user, text: "run the tests", createdAt: now)))

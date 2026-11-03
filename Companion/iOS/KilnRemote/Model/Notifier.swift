@@ -1,5 +1,6 @@
 import Foundation
 import KilnRemoteKit
+import UIKit
 import UserNotifications
 
 /// Local notifications for approvals that arrive while the app is not in front. Works as long as the app is still
@@ -15,7 +16,9 @@ final class Notifier {
         let allow = UNNotificationAction(identifier: Self.allowAction, title: "Allow once", options: [.authenticationRequired])
         let deny = UNNotificationAction(identifier: Self.denyAction, title: "Deny", options: [.destructive])
         center.setNotificationCategories([UNNotificationCategory(identifier: Self.category, actions: [allow, deny], intentIdentifiers: [])])
-        _ = try? await center.requestAuthorization(options: [.alert, .sound])
+        let granted = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+        // Registers for Apple push so an approval can alert this phone (and its watch) while the app is closed.
+        if granted { UIApplication.shared.registerForRemoteNotifications() }
     }
 
     func notify(_ approval: RemoteApproval) {

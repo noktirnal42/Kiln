@@ -35,6 +35,10 @@ public final class RemoteBridge {
     private var pollTask: Task<Void, Never>?
     /// Receives every pushed event; the server fans it out to connected devices.
     public var emit: (RemoteEvent) -> Void = { _ in }
+    /// A device registered for Apple push alerts.
+    public var onRegisterPush: (_ token: String, _ environment: String, _ topic: String) -> Void = { _, _, _ in }
+    /// Whether an approval is still waiting for an answer (the server checks before alerting a phone).
+    public func isPending(_ approvalID: String) -> Bool { backend.pendingApprovals.contains { $0.id == approvalID } }
 
     public init(backend: any RemoteBackend) { self.backend = backend }
 
@@ -86,6 +90,9 @@ public final class RemoteBridge {
             }
             backend.send(text)
             return [.transcript(text)]
+        case .registerPush(let token, let environment, let topic):
+            onRegisterPush(token, environment, topic)
+            return []
         case .stop:
             backend.stop()
             return []

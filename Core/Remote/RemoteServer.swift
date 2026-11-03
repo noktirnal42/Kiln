@@ -12,7 +12,8 @@ public final class RemoteServer {
     public private(set) var port: UInt16?
     public private(set) var lastError: String?
     public private(set) var deviceCount = 0
-    public private(set) var pairing: PairingPayload
+    public private(set) var pairing: PairingPayload { didSet { pairingBox?.value = pairing } }
+    @ObservationIgnored private var pairingBox: PairingBox?
     /// The relay that lets devices reach this Mac over the internet (nil: local network only).
     public private(set) var relayURL: URL?
     public private(set) var relayConnected = false
@@ -23,6 +24,8 @@ public final class RemoteServer {
     @ObservationIgnored private var listener: NWListener?
     @ObservationIgnored private var connections: [ObjectIdentifier: RemoteConnection] = [:]
     @ObservationIgnored private let hostName: String
+    /// Apple push alerts for approvals nobody answered quickly.
+    public let push: RemotePushNotifier
     @ObservationIgnored private var relayClient: RemoteRelayClient?
     /// Keeps the Mac awake while remote control is on, so a phone away from home can still reach it.
     @ObservationIgnored private var awakeActivity: NSObjectProtocol?
@@ -45,8 +48,14 @@ public final class RemoteServer {
         let saved = store.load()
         let relay = defaults.string(forKey: Self.relayDefaultsKey).flatMap(URL.init(string:))
         relayURL = relay
-        pairing = PairingPayload(hostName: hostName, serviceName: saved.serviceName, key: saved.key, relay: relay)
+        let initial = PairingPayload(hostName: hostName, serviceName: saved.serviceName, key: saved.key, relay: relay)
+        let box = PairingBox(initial)
+        pairing = initial
+        pairingBox = box
+        push = RemotePushNotifier(store: RemotePushStore(directory: store.directory), defaults: defaults,
+                                  relay: { [weak box] in box?.value.relay }, pairingKey: { [weak box] in box?.value.key ?? Data() })
         bridge.emit = { [weak self] event in self?.broadcast(event) }
+        bridge.onRegisterPush = { [weak self] token, environment, topic in self?.push.register(token: token, environment: environment, topic: topic) }
     }
 
     @ObservationIgnored private var advertising = true
@@ -136,6 +145,7 @@ public final class RemoteServer {
     public func unpairAll() {
         let wasRunning = isRunning
         stop()
+        push.forgetAll()
         let fresh = store.rotate()
         pairing = PairingPayload(hostName: hostName, serviceName: fresh.serviceName, key: fresh.key, relay: relayURL, direct: pairing.direct)
         if wasRunning { start() }
@@ -184,6 +194,13 @@ public final class RemoteServer {
     }
 
     private func broadcast(_ event: RemoteEvent) {
+        switch event {
+        case .approvalRequested(let approval):
+            push.approvalRaised(approval) { [weak self] in self?.bridge.isPending(approval.id) ?? false }
+        case .approvalResolved(let id):
+            push.approvalResolved(id)
+        default: break
+        }
         for connection in connections.values where connection.isAuthenticated { connection.send(event) }
     }
 }
@@ -219,4 +236,12 @@ final class NetworkTransport: FrameTransport, @unchecked Sendable {
             self.receive()
         }
     }
+}
+
+
+/// Lets the push notifier read the current pairing (key and relay) without owning the server.
+@MainActor
+final class PairingBox {
+    var value: PairingPayload
+    init(_ value: PairingPayload) { self.value = value }
 }

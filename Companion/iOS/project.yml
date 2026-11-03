@@ -27,6 +27,10 @@ targets:
       - package: KilnRemoteKit
       - target: KilnWatch
         embed: true
+    entitlements:
+      path: KilnRemote/KilnRemote.entitlements
+      properties:
+        aps-environment: development
     info:
       path: KilnRemote/Info.plist
       properties:

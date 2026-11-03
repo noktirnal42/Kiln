@@ -5,6 +5,8 @@ import KilnRemoteKit
 public struct RemotePairingStore: Sendable {
     private struct Stored: Codable { var key: Data; var serviceName: String }
     private let url: URL
+    /// The folder the pairing (and the push registrations beside it) lives in.
+    public var directory: URL { url.deletingLastPathComponent() }
 
     public init(directory: URL) { url = directory.appendingPathComponent("remote-pairing.json") }
 

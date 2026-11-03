@@ -65,6 +65,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return true
     }
 
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        Task { @MainActor in Self.session?.pushToken = token }
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NSLog("KilnRemote: push registration failed: %@", error.localizedDescription)
+    }
+
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         []   // in the foreground the approval card is already on screen
     }
@@ -73,9 +82,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         guard let id = response.notification.request.content.userInfo["approvalID"] as? String else { return }
         let action = response.actionIdentifier
         await MainActor.run {
-            guard let session = Self.session, let approval = session.approvals.first(where: { $0.id == id }) else { return }
-            if action == Notifier.allowAction { session.decide(approval, .allowOnce) }
-            else if action == Notifier.denyAction { session.decide(approval, .deny) }
+            guard let session = Self.session else { return }
+            let decision: RemoteApprovalDecision? = action == Notifier.allowAction ? .allowOnce : action == Notifier.denyAction ? .deny : nil
+            guard let decision else { return }
+            // Keep the app running long enough to reconnect and answer when it was woken just for this tap.
+            var task = UIBackgroundTaskIdentifier.invalid
+            task = UIApplication.shared.beginBackgroundTask(withName: "kiln-approval-answer") { UIApplication.shared.endBackgroundTask(task) }
+            session.decideFromNotification(id, decision)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 20) { UIApplication.shared.endBackgroundTask(task) }
         }
     }
 }

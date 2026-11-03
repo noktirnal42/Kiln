@@ -45,6 +45,9 @@ public enum RemoteCommand: Codable, Equatable, Sendable {
     /// Sends a message into the open conversation, as if typed at the Mac (`spoken` marks it as dictated).
     case send(text: String, spoken: Bool)
     case stop
+    /// The phone's Apple push token, so the Mac can raise an approval alert when no app is open. `environment` is "sandbox"
+    /// for development builds and "production" otherwise; `topic` is the app's bundle identifier.
+    case registerPush(token: String, environment: String, topic: String)
     /// A short recording to transcribe on the Mac and send as a spoken message. The watch has no speech recogniser, and
     /// recording starts the instant the button is tapped instead of opening the system dictation sheet.
     case sendAudio(data: Data, format: String)

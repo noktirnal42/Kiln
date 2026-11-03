@@ -123,6 +123,37 @@ final class RemoteSession {
     /// A recording from the Apple Watch: the Mac transcribes it and sends it as a spoken message.
     func sendAudio(_ data: Data, format: String) { link?.send(.sendAudio(data: data, format: format)) }
 
+    // MARK: Apple push
+
+    /// This phone's push token, once Apple has issued it.
+    @ObservationIgnored var pushToken: String? { didSet { sendPushRegistration() } }
+    /// Allow/Deny answers from a notification that arrived before the connection was up; sent as soon as it is.
+    @ObservationIgnored private(set) var pendingDecisions: [(approvalID: String, decision: RemoteApprovalDecision)] = []
+
+    /// Tells the Mac where to alert this phone. Sent on every connect, so a changed token or a reinstalled Mac is covered.
+    func sendPushRegistration() {
+        guard isConnected, let pushToken else { return }
+        #if DEBUG
+        let environment = "sandbox"
+        #else
+        let environment = "production"
+        #endif
+        link?.send(.registerPush(token: pushToken, environment: environment, topic: Bundle.main.bundleIdentifier ?? "com.kiln.remote"))
+    }
+
+    /// An Allow/Deny tapped on a notification. Works with the connection down: it reconnects, then answers.
+    func decideFromNotification(_ approvalID: String, _ decision: RemoteApprovalDecision) {
+        if isConnected { link?.send(.decide(approvalID: approvalID, decision: decision)); return }
+        pendingDecisions.append((approvalID, decision))
+        resume()
+    }
+
+    private func flushPendingDecisions() {
+        let queued = pendingDecisions
+        pendingDecisions = []
+        for item in queued { link?.send(.decide(approvalID: item.approvalID, decision: item.decision)) }
+    }
+
     func send(_ text: String, spoken: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -284,6 +315,8 @@ final class RemoteSession {
             lastError = nil
             if version != kilnRemoteProtocolVersion { lastError = "This Kiln speaks protocol \(version); update Kiln Remote." }
             status = .connected
+            sendPushRegistration()
+            flushPendingDecisions()
         case .conversations(let list):
             conversations = list.sorted { $0.updatedAt > $1.updatedAt }
         case .opened(let conversation, let history, let streaming):

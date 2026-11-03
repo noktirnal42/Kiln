@@ -323,3 +323,113 @@ struct NetworkAddressTests {
         #expect(!NetworkAddresses.isTailscale("192.168.1.20") && !NetworkAddresses.isTailscale("10.0.0.5"))
     }
 }
+
+/// A relay stand-in: records what the Mac asks it to push and answers with a canned reply.
+final class StubRelayProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var requests: [URLRequest] = []
+    nonisolated(unsafe) static var reply: (Int, String) = (200, #"{"results":[]}"#)
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        var request = self.request
+        if request.httpBody == nil, let stream = request.httpBodyStream {
+            stream.open(); var data = Data(); var buffer = [UInt8](repeating: 0, count: 4096)
+            while stream.hasBytesAvailable { let n = stream.read(&buffer, maxLength: buffer.count); if n <= 0 { break }; data.append(buffer, count: n) }
+            request.httpBody = data
+        }
+        Self.requests.append(request)
+        let response = HTTPURLResponse(url: request.url!, statusCode: Self.reply.0, httpVersion: nil, headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(Self.reply.1.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@MainActor
+@Suite("Approval push alerts", .serialized)
+struct RemotePushTests {
+    private let key = Data(repeating: 9, count: 32)
+    private let approval = RemoteApproval(id: "A-1", tool: "run_command", permission: "execute", preview: "swift test --filter Login\nand more")
+    private let token = String(repeating: "ab", count: 32)
+
+    private func makeNotifier(relay: URL? = URL(string: "wss://relay.example.dev")) -> RemotePushNotifier {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-push-\(UUID().uuidString)")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubRelayProtocol.self]
+        StubRelayProtocol.requests = []
+        StubRelayProtocol.reply = (200, #"{"results":[]}"#)
+        let defaults = UserDefaults(suiteName: "kiln.push.test.\(UUID().uuidString)")!
+        let notifier = RemotePushNotifier(store: RemotePushStore(directory: dir), defaults: defaults, session: URLSession(configuration: configuration),
+                                          relay: { relay }, pairingKey: { Data(repeating: 9, count: 32) })
+        notifier.delay = .milliseconds(30)
+        return notifier
+    }
+
+    @Test("the relay request carries the room, the password, the phones and a short alert") func request() throws {
+        let device = PushDevice(token: token, environment: "sandbox", topic: "com.kiln.remote", addedAt: Date())
+        let request = try #require(RemotePushNotifier.request(relay: URL(string: "wss://relay.example.dev/")!, pairingKey: key, devices: [device], approval: approval, includePreview: true))
+        #expect(request.url?.absoluteString == "https://relay.example.dev/v1/push/\(RelayAddress.roomID(pairingKey: key))")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == RelayAddress.authorizationHeader(pairingKey: key))
+        let body = try #require(JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any])
+        #expect(body["approvalID"] as? String == "A-1")
+        #expect((body["body"] as? String) == "run_command (execute): swift test --filter Login and more")
+        let without = try #require(RemotePushNotifier.request(relay: URL(string: "ws://127.0.0.1:8787")!, pairingKey: key, devices: [device], approval: approval, includePreview: false))
+        #expect(without.url?.scheme == "http")
+        #expect((try JSONSerialization.jsonObject(with: without.httpBody ?? Data()) as? [String: Any])?["body"] as? String == "run_command (execute)")
+    }
+
+    @Test("only well-formed phones register, and duplicates replace each other") func register() {
+        let notifier = makeNotifier()
+        notifier.register(token: "not hex", environment: "sandbox", topic: "com.kiln.remote")
+        notifier.register(token: token, environment: "elsewhere", topic: "com.kiln.remote")
+        notifier.register(token: token, environment: "sandbox", topic: "")
+        #expect(notifier.devices.isEmpty)
+        notifier.register(token: token, environment: "sandbox", topic: "com.kiln.remote")
+        notifier.register(token: token, environment: "production", topic: "com.kiln.remote")
+        #expect(notifier.devices.count == 1 && notifier.devices[0].environment == "production")
+    }
+
+    @Test("an approval still waiting is pushed; one answered in time is not") func flow() async throws {
+        let notifier = makeNotifier()
+        notifier.register(token: token, environment: "sandbox", topic: "com.kiln.remote")
+        StubRelayProtocol.reply = (200, #"{"results":[{"token":"\#(token)","ok":true}]}"#)
+        notifier.approvalRaised(approval) { true }
+        for _ in 0..<60 where StubRelayProtocol.requests.isEmpty { try await Task.sleep(for: .milliseconds(25)) }
+        #expect(StubRelayProtocol.requests.count == 1)
+        for _ in 0..<40 where !notifier.status.contains("sent") { try await Task.sleep(for: .milliseconds(25)) }
+        #expect(notifier.status == "Alert sent to 1 phone")
+
+        StubRelayProtocol.requests = []
+        let quick = RemoteApproval(id: "A-2", tool: "x", permission: "write", preview: "")
+        notifier.approvalRaised(quick) { false }          // answered before the delay ended
+        let cancelled = RemoteApproval(id: "A-3", tool: "x", permission: "write", preview: "")
+        notifier.approvalRaised(cancelled) { true }
+        notifier.approvalResolved("A-3")                   // resolved at the Mac
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(StubRelayProtocol.requests.isEmpty)
+    }
+
+    @Test("a token Apple says is dead is forgotten, and a relay without a key is reported") func dead() async throws {
+        let notifier = makeNotifier()
+        notifier.register(token: token, environment: "sandbox", topic: "com.kiln.remote")
+        StubRelayProtocol.reply = (200, #"{"results":[{"token":"\#(token)","ok":false,"reason":"Unregistered"}]}"#)
+        notifier.approvalRaised(approval) { true }
+        for _ in 0..<80 where !notifier.devices.isEmpty { try await Task.sleep(for: .milliseconds(25)) }
+        #expect(notifier.devices.isEmpty)
+        notifier.register(token: token, environment: "sandbox", topic: "com.kiln.remote")
+        StubRelayProtocol.reply = (501, #"{"error":"push not configured on this relay"}"#)
+        notifier.approvalRaised(RemoteApproval(id: "A-9", tool: "x", permission: "write", preview: "")) { true }
+        for _ in 0..<80 where !notifier.status.contains("no Apple push key") { try await Task.sleep(for: .milliseconds(25)) }
+        #expect(notifier.status == "The relay has no Apple push key set up")
+    }
+
+    @Test("the bridge hands a push registration to the server") func bridge() async {
+        let backend = FakeBackend()
+        let bridge = RemoteBridge(backend: backend)
+        var got: [String] = []
+        bridge.onRegisterPush = { token, environment, topic in got = [token, environment, topic] }
+        _ = await bridge.handle(.registerPush(token: token, environment: "sandbox", topic: "com.kiln.remote"))
+        #expect(got == [token, "sandbox", "com.kiln.remote"])
+    }
+}
