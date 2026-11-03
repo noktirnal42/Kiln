@@ -13,20 +13,23 @@ Kiln is an open-source Swift and SwiftUI workstation exploring what happens when
 - **Bring your models.** Local and hosted providers share a native conversation interface. Use the services and hardware that suit your work.
 - **Move across disciplines.** Terminal, Git, workspace search, reverse engineering, and Model Lab live within the same app.
 - **Give agents real tools.** File, shell, Git, RE, and selected Lab actions use shared services with policy checks, approvals, and audit records. A loopback MCP server lets external clients use supported actions too.
+- **Talk to it, and take it with you.** Dictate to the model, hear replies read aloud, or hold a hands-free spoken conversation. Pair an iPhone or Apple Watch to read the conversation, speak to the agent and approve its tool calls from across the room.
 - **Build in the open.** Read the specifications, inspect the implementation, reproduce the tests, and help shape the roadmap. MIT licensed.
 
 ## What exists today
 
-> Current state (2026-11-01): see [`docs/11-CURRENT-STATE.md`](docs/11-CURRENT-STATE.md) for what was verified, how to
+> Current state (2026-11-03): see [`docs/11-CURRENT-STATE.md`](docs/11-CURRENT-STATE.md) for what was verified, how to
 > build/sign/notarize, and what is still open. The full suite (538 tests) passes.
 
 | Area | Working foundation | Important limits |
 |---|---|---|
 | Chat | Local/hosted providers, streaming, conversation history, Markdown, artifacts | Provider and model behavior varies; visible streaming/latency QA continues |
 | Agent & swarm | Tool orchestration, role-based workers, dependencies, approvals, audit chain | Small-model tool use can fail; task correctness requires evidence |
-| Develop | Real terminal, Git, filename search, MCP tools | No full source editor, language-service or debugger workflow yet |
+| Develop | Source editor with Swift/C language server, build/test/run, LLDB launch debugger, folding, multi-cursor, Git gutter, terminal, search, MCP tools | Not Xcode: no previews, debugger attach or other language servers |
 | Analyze | Binary import, strings, native Mach-O inspection/disassembly, analysis tools | Ghidra recovery requires setup; cipher classifier is a placeholder |
-| Model Lab | Datasets/models, experiments, Create ML and MLX engines, evaluation, LoRA | Full GUI lifecycle/export compatibility coverage remains open |
+| Model Lab | Datasets/models, experiments, Create ML and MLX engines, evaluation, LoRA and distillation (also as agent tools) | Full GUI lifecycle/export compatibility coverage remains open |
+| Voice | Dictation, spoken replies, hands-free conversation mode | Not yet tried with a real microphone in QA; replies are spoken after they finish |
+| Remote control | Encrypted local-network link; iPhone and Apple Watch companions can chat, speak and approve tool calls (`Companion/`) | Physical-device end-to-end testing is still open; one shared pairing key |
 
 **Real QA examples:** the app’s chat layer received correct live responses across five configured providers; a hosted agent created and ran a program; a researcher → implementer → reviewer swarm produced a real summary artifact; MLX from-scratch and LoRA smoke runs saved artifacts. These establish specific workflows, not universal reliability. See the [verification record](docs/12-USER-QA-2026-11-01.md) and [current state](docs/11-CURRENT-STATE.md) for evidence and limits.
 
@@ -76,7 +79,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before a pull request. Reports, designs,
 
 - [Support and troubleshooting](SUPPORT.md) · [ask a question](https://github.com/noktirnal42/Kiln/discussions)
 - [Known issues](docs/KNOWN-ISSUES.md) · [work-item index](docs/ISSUE-INDEX.md) · [public issue tracker](https://github.com/noktirnal42/Kiln/issues)
-- [Agent capability matrix](docs/13-AGENT-CAPABILITY-MATRIX.md)
+- [Agent capability matrix](docs/13-AGENT-CAPABILITY-MATRIX.md) · [Remote control and companion apps](docs/14-REMOTE-CONTROL.md)
 - [Product vision](docs/00-MASTER-SPEC.md) · [architecture](docs/10-LAYERED-ARCHITECTURE.md) · [roadmap](docs/08-ROADMAP.md)
 - [Specification index](docs/README.md) · [implementation history](docs/IMPLEMENTATION-HISTORY.md)
 - [Security reporting](SECURITY.md) · [code of conduct](CODE_OF_CONDUCT.md)
