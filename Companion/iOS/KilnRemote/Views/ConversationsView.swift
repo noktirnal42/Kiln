@@ -1,0 +1,96 @@
+import KilnRemoteKit
+import SwiftUI
+
+struct ConversationsView: View {
+    @Environment(RemoteSession.self) private var session
+    @Environment(VoiceController.self) private var voice
+    @State private var path: [String] = []
+    @State private var showSettings = false
+
+    var body: some View {
+        @Bindable var session = session
+        NavigationStack(path: $path) {
+            List {
+                StatusBanner().listRowSeparator(.hidden)
+                if !session.approvals.isEmpty {
+                    Section("Waiting for you") {
+                        ForEach(session.approvals) { ApprovalCard(approval: $0) }
+                    }
+                }
+                Section("Conversations") {
+                    if session.conversations.isEmpty {
+                        Text(session.isConnected ? "No conversations yet. Tap + to start one." : "Conversations will appear when your Mac connects.")
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(session.conversations) { conversation in
+                        Button {
+                            session.open(conversation.id)
+                            path.append(conversation.id)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(conversation.title).font(.headline).lineLimit(2)
+                                Text(conversation.updatedAt, format: .relative(presentation: .named)).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityHint("Opens this conversation")
+                    }
+                }
+            }
+            .navigationTitle(session.hostName ?? "Kiln")
+            .navigationBarTitleDisplayMode(.large)
+            .navigationDestination(for: String.self) { _ in ConversationView() }
+            .refreshable { session.refreshConversations() }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showSettings = true } label: { Image(systemName: "gearshape") }.accessibilityLabel("Settings")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        session.newConversation()
+                        path.append("new")
+                    } label: { Image(systemName: "square.and.pencil") }
+                        .disabled(!session.isConnected)
+                        .accessibilityLabel("New conversation")
+                }
+            }
+            .sheet(isPresented: $showSettings) { SettingsView() }
+        }
+    }
+}
+
+struct SettingsView: View {
+    @Environment(RemoteSession.self) private var session
+    @Environment(VoiceController.self) private var voice
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        @Bindable var voice = voice
+        NavigationStack {
+            Form {
+                Section("Paired Mac") {
+                    LabeledContent("Name", value: session.mac?.hostName ?? "None")
+                    LabeledContent("Status", value: statusText)
+                    Button("Unpair this Mac", role: .destructive) { session.unpair(); dismiss() }
+                        .accessibilityHint("Deletes the saved key; scan the code on your Mac to pair again")
+                }
+                Section("Voice") {
+                    Toggle("Read replies aloud", isOn: $voice.readRepliesAloud)
+                }
+                if let error = session.lastError { Section("Last problem") { Text(error) } }
+            }
+            .navigationTitle("Settings")
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+
+    private var statusText: String {
+        switch session.status {
+        case .connected: "Connected"
+        case .connecting: "Connecting"
+        case .reconnecting: "Reconnecting"
+        case .needsRepairing: "Needs pairing again"
+        case .unpaired: "Not paired"
+        }
+    }
+}
