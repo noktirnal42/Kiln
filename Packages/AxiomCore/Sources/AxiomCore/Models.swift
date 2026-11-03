@@ -131,9 +131,13 @@ public enum ProjectStore {
                 let previous = Dictionary(current.functions.map { (normalizedAddress($0.address), $0) }, uniquingKeysWith: { first, _ in first })
                 for index in result.functions.indices {
                     result.functions[index].engineName = result.functions[index].name
+                    result.functions[index].engineSignature = result.functions[index].signature
                     if let old = previous[normalizedAddress(result.functions[index].address)] {
                         result.functions[index].comment = old.comment
                         if old.engineName == nil || old.name != old.engineName { result.functions[index].name = old.name }
+                        if let baseline = old.engineSignature, old.signature != baseline {
+                            result.functions[index].signature = old.signature
+                        }
                     }
                 }
             }

@@ -25,6 +25,52 @@ final class AxiomCoreTests: XCTestCase {
         XCTAssertThrowsError(try ProjectStore.edit(path, expectedRevision: p.revision, address: "00001000", signature: "a\nb"))
     }
 
+    func testReanalysisPreservesAnAnalystSignatureAndAdvancesTheEngineBaseline() throws {
+        let path = try tempDir().appendingPathComponent("p.axiom").path
+        var original = sample()
+        original.functions = [FunctionRecord(address: "00001000", name: "f", signature: "int f(int value)")]
+        try ProjectStore.create(original, to: path)
+        var current = try ProjectStore.edit(path, expectedRevision: original.revision, address: "1000", signature: "long f(long count)")
+        var fresh = sample()
+        fresh.functions = [FunctionRecord(address: "1000", name: "f", signature: "unsigned f(unsigned value)")]
+        current = try ProjectStore.replace(fresh, to: path, expectedID: original.id, expectedRevision: current.revision, preserveAnnotations: true)
+        var persisted = try ProjectStore.load(path)
+        XCTAssertEqual(persisted.functions[0].signature, "long f(long count)")
+        XCTAssertEqual(persisted.functions[0].engineSignature, "unsigned f(unsigned value)")
+        XCTAssertEqual(persisted.edits, current.edits)
+
+        // A second analysis must still recognize the analyst's override against the new baseline.
+        fresh.functions[0].signature = "double f(double value)"
+        current = try ProjectStore.replace(fresh, to: path, expectedID: original.id, expectedRevision: current.revision, preserveAnnotations: true)
+        persisted = try ProjectStore.load(path)
+        XCTAssertEqual(persisted.functions[0].signature, "long f(long count)")
+        XCTAssertEqual(persisted.functions[0].engineSignature, "double f(double value)")
+
+        // Choosing the recovered signature removes the override; later engine improvements should appear.
+        current = try ProjectStore.edit(path, expectedRevision: current.revision, address: "1000", signature: "double f(double value)")
+        fresh.functions[0].signature = "float f(float value)"
+        _ = try ProjectStore.replace(fresh, to: path, expectedID: original.id, expectedRevision: current.revision, preserveAnnotations: true)
+        persisted = try ProjectStore.load(path)
+        XCTAssertEqual(persisted.functions[0].signature, "float f(float value)")
+        XCTAssertEqual(persisted.functions[0].engineSignature, "float f(float value)")
+    }
+
+    func testReanalysisUsesRecoveredSignaturesWhenThereIsNoKnownAnalystOverride() throws {
+        for legacy in [false, true] {
+            let path = try tempDir().appendingPathComponent("p.axiom").path
+            var original = sample()
+            original.functions = [FunctionRecord(address: "00001000", name: "f", signature: "int f(int value)")]
+            if legacy { original.functions[0].engineSignature = nil }
+            try ProjectStore.create(original, to: path)
+            var fresh = sample()
+            fresh.functions = [FunctionRecord(address: "1000", name: "f", signature: "long f(long value)")]
+            _ = try ProjectStore.replace(fresh, to: path, expectedID: original.id, expectedRevision: original.revision, preserveAnnotations: true)
+            let persisted = try ProjectStore.load(path)
+            XCTAssertEqual(persisted.functions[0].signature, "long f(long value)")
+            XCTAssertEqual(persisted.functions[0].engineSignature, "long f(long value)")
+        }
+    }
+
     func testAddressCommentsAndLabelsAreLoggedUndoableAndRemovable() throws {
         let path = try tempDir().appendingPathComponent("p.axiom").path
         try ProjectStore.create(sample(), to: path)
