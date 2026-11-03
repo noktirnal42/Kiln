@@ -149,6 +149,7 @@ in Settings; none are read or printed by the tests.
   on the same network can list and open conversations, send text or dictated messages, stop a reply, and allow once or deny
   an approval. It cannot grant standing access or change settings. Frames are ChaCha20-Poly1305 encrypted with a pairing key shared with paired companions; replay, reordering and tampering are rejected. Protocol and threat model:
   `docs/14-REMOTE-CONTROL.md`; shared code: `Packages/KilnRemoteKit`; Mac side: `Core/Remote`.
+- **Approval alerts through Apple push (verified 2026-11-03).** A phone registers its push token with the Mac; an approval unanswered for about 4 seconds is pushed through the relay (which holds the APNs key as a Cloudflare secret) to the phone, and the notification mirrors to the watch. A real Ask-mode approval was answered from the notification with the phone locked: the approvals log recorded `via: remote` after a 39 s wait. See `docs/14-REMOTE-CONTROL.md` for the one-time key and secrets setup.
 - **Companion apps** live in `Companion/iOS` and `Companion/Watch` (own XcodeGen projects, see their READMEs).
 - **Verified:** the wire contract and Mac bridge by unit tests, the Mac server over a real local socket (right key works,
   wrong key is dropped before reaching the chat), and the iOS app in the simulator against the real notarized Kiln

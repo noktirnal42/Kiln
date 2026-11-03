@@ -110,3 +110,7 @@ echo -n <TEAMID> | npx wrangler secret put APNS_TEAM_ID
 
 Keep a backup of the `.p8`. The phone app needs the Push Notifications capability (`aps-environment` entitlement, in
 `Companion/iOS/project.yml`); Debug builds installed from Xcode use Apple's sandbox, release builds production.
+
+Verified 2026-11-03 on a physical iPhone 16 Pro Max: the relay's push to Apple was accepted, a test alert displayed, and an Ask-mode
+approval raised at the Mac was answered from the alert (`approvals.jsonl`: `via: remote`, `waitedMs` 39336) with the app closed.
+Not verified: delivery latency over many alerts, the watch's own action buttons when the phone is far away, production-environment tokens.
