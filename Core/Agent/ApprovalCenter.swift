@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 // MARK: - Persisted grants
@@ -110,6 +111,11 @@ public struct ApprovalLogEntry: Codable, Identifiable, Sendable {
     public var decision: String
     public var preview: String
     public var decidedAt: Date
+    /// How the answer arrived: "mouse", "keyboard", "programmatic" (an accessibility or scripted press: no real click or
+    /// key event), "remote" (a paired device), or nil for a decision made without asking (standing grant, session approval).
+    public var via: String?
+    /// How long the question was open before it was answered, in milliseconds.
+    public var waitedMs: Int?
 
     public init(
         id: UUID = UUID(),
@@ -118,7 +124,9 @@ public struct ApprovalLogEntry: Codable, Identifiable, Sendable {
         permission: ToolPermissionLevel,
         decision: String,
         preview: String,
-        decidedAt: Date = Date()
+        decidedAt: Date = Date(),
+        via: String? = nil,
+        waitedMs: Int? = nil
     ) {
         self.id = id
         self.conversationID = conversationID
@@ -127,6 +135,8 @@ public struct ApprovalLogEntry: Codable, Identifiable, Sendable {
         self.decision = decision
         self.preview = preview
         self.decidedAt = decidedAt
+        self.via = via
+        self.waitedMs = waitedMs
     }
 }
 
@@ -140,13 +150,15 @@ public final class ApprovalLogStore: @unchecked Sendable {
         self.fileURL = fileURL
     }
 
-    public func record(request: ApprovalRequest, decision: ApprovalDecision, conversationID: UUID) {
+    public func record(request: ApprovalRequest, decision: ApprovalDecision, conversationID: UUID, via: String? = nil, waitedMs: Int? = nil) {
         let entry = ApprovalLogEntry(
             conversationID: conversationID,
             toolName: request.toolName,
             permission: request.permission,
             decision: decision.auditName,
-            preview: request.preview
+            preview: request.preview,
+            via: via,
+            waitedMs: waitedMs
         )
         guard let data = try? JSONEncoder().encode(entry),
               let line = String(data: data, encoding: .utf8) else { return }
@@ -193,6 +205,8 @@ public final class ApprovalCenter: ObservableObject {
 
     @Published public private(set) var pending: [ApprovalRequest] = []
     private var continuations: [UUID: CheckedContinuation<ApprovalDecision, Never>] = [:]
+    private var askedAt: [UUID: Date] = [:]
+    private var answeredVia: [UUID: String] = [:]
 
     /// "Ask once per chat" answers, keyed by conversation so they do not
     /// leak across chats.
@@ -234,9 +248,12 @@ public final class ApprovalCenter: ObservableObject {
         }
 
         pending.append(request)
+        askedAt[request.id] = Date()
         let decision = await withCheckedContinuation { (continuation: CheckedContinuation<ApprovalDecision, Never>) in
             continuations[request.id] = continuation
         }
+        let via = answeredVia.removeValue(forKey: request.id)
+        let waited = askedAt.removeValue(forKey: request.id).map { Int(Date().timeIntervalSince($0) * 1000) }
         switch decision {
         case .approveForSession:
             sessionApprovals[conversationID, default: []].insert(request.toolName)
@@ -249,7 +266,7 @@ public final class ApprovalCenter: ObservableObject {
         case .approveOnce, .deny:
             break
         }
-        log.record(request: request, decision: decision, conversationID: conversationID)
+        log.record(request: request, decision: decision, conversationID: conversationID, via: via, waitedMs: waited)
         return decision
     }
 
@@ -271,9 +288,20 @@ public final class ApprovalCenter: ObservableObject {
     }
 
     /// The UI calls this with the human's answer.
-    public func resolve(_ requestID: UUID, decision: ApprovalDecision) {
+    public func resolve(_ requestID: UUID, decision: ApprovalDecision, via: String = ApprovalCenter.currentInputKind()) {
+        answeredVia[requestID] = via
         pending.removeAll { $0.id == requestID }
         continuations.removeValue(forKey: requestID)?.resume(returning: decision)
+    }
+
+    /// What kind of event is being handled right now: a real click or key, or neither (an accessibility press or a script).
+    public static func currentInputKind() -> String {
+        switch NSApp.currentEvent?.type {
+        case .leftMouseUp, .leftMouseDown, .rightMouseUp, .rightMouseDown: return "mouse"
+        case .keyDown, .keyUp: return "keyboard"
+        case nil: return "programmatic"
+        default: return "other"
+        }
     }
 
     /// Deny everything still outstanding (used when a run is cancelled).
