@@ -33,7 +33,7 @@ final class WatchHandoff: NSObject {
     /// `nil` revokes the watch's pairing.
     func publish(_ mac: PairedMac?) {
         hasPairing = mac != nil
-        link = mac.map { PairingPayload(hostName: $0.hostName, serviceName: $0.serviceName, key: $0.key).url.absoluteString } ?? ""
+        link = mac.map { PairingPayload(hostName: $0.hostName, serviceName: $0.serviceName, key: $0.key, relay: $0.relay).url.absoluteString } ?? ""
         send()
     }
 

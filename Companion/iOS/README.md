@@ -37,8 +37,11 @@ advertises over Bonjour and answers the real protocol. Typing "approve" in a mes
 
 ## Known gaps
 
-- Local network only. Off the home network needs Tailscale (a "Mac address" field is planned; the Mac must offer a fixed
-  port) or a relay with push (planned). Until then approvals only reach the phone while the app is open or briefly
-  backgrounded: iOS suspends the app, and the local notification needs the socket alive.
+- Off the home network: Settings has a "Mac address" field (host:port, e.g. a Tailscale address) that skips Bonjour, and a
+  pairing link carrying `relay=` makes the app fall back to the Kiln relay when the Mac is not found on the network
+  (`RelayAddress` in KilnRemoteKit). The typed-address path is unit tested against the fake Mac; the relay path is only
+  tested for URL/header construction, not against a running relay. Needs the KilnRemoteKit relay changes from main.
+- No push yet: approvals only reach the phone while the app is open or briefly backgrounded (iOS suspends the app and the
+  local notification needs the socket alive). Push needs an Apple push key and a server.
 - Bonjour is looked up per connect (10 s); the first lookup after a cold launch can miss and the app retries by itself.
 - Hands-free declares the `audio` background mode so a conversation can continue with the screen off.

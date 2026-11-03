@@ -63,6 +63,7 @@ struct SettingsView: View {
     @Environment(RemoteSession.self) private var session
     @Environment(VoiceController.self) private var voice
     @Environment(\.dismiss) private var dismiss
+    @State private var address = ""
 
     var body: some View {
         @Bindable var voice = voice
@@ -71,6 +72,12 @@ struct SettingsView: View {
                 Section("Paired Mac") {
                     LabeledContent("Name", value: session.mac?.hostName ?? "None")
                     LabeledContent("Status", value: statusText)
+                    LabeledContent("Internet relay", value: session.mac?.relay?.host ?? "Not set up")
+                    TextField("Mac address, e.g. 100.101.102.103:47900", text: $address)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                        .onSubmit { session.setManualAddress(address) }
+                        .accessibilityLabel("Mac address")
+                        .accessibilityHint("Optional. A Tailscale or direct host and port, used instead of finding the Mac on this network")
                     Button("Unpair this Mac", role: .destructive) { session.unpair(); dismiss() }
                         .accessibilityHint("Deletes the saved key; scan the code on your Mac to pair again")
                 }
@@ -80,6 +87,7 @@ struct SettingsView: View {
                 }
                 if let error = session.lastError { Section("Last problem") { Text(error) } }
             }
+            .onAppear { address = session.mac?.address ?? "" }
             .navigationTitle("Settings")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }

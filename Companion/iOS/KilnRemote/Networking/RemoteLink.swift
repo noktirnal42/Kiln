@@ -52,8 +52,16 @@ final class RemoteLink: @unchecked Sendable {
         var hostText = host
         if hostText.contains(":"), !hostText.hasPrefix("[") { hostText = "[\(hostText.replacingOccurrences(of: "%", with: "%25"))]" }
         guard let url = URL(string: "ws://\(hostText):\(port)") else { throw LinkError.badURL }
-        let parameters = NWParameters.tcp
-        parameters.defaultProtocolStack.applicationProtocols.insert(NWProtocolWebSocket.Options(), at: 0)
+        try connect(url: url, headers: [])
+    }
+
+    /// Any ws:// or wss:// URL; `headers` is for the relay's `Authorization`.
+    func connect(url: URL, headers: [(String, String)]) throws {
+        guard let scheme = url.scheme, scheme == "ws" || scheme == "wss" else { throw LinkError.badURL }
+        let parameters = scheme == "wss" ? NWParameters(tls: NWProtocolTLS.Options(), tcp: NWProtocolTCP.Options()) : NWParameters.tcp
+        let websocket = NWProtocolWebSocket.Options()
+        if !headers.isEmpty { websocket.setAdditionalHeaders(headers) }
+        parameters.defaultProtocolStack.applicationProtocols.insert(websocket, at: 0)
         let connection = NWConnection(to: .url(url), using: parameters)
         queue.async { [self] in
             self.connection = connection
