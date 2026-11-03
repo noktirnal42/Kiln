@@ -78,6 +78,8 @@ struct ProviderSettingsView: View {
     @Environment(\.openURL) private var openURL
     @State private var model = ProviderSettingsModel()
     @AppStorage("computerUse.enabled") private var computerUseEnabled = false
+    /// Live: macOS can say "Kiln: on" for another copy of Kiln while this copy is not trusted, so show what this copy sees.
+    @State private var accessibilityTrusted = AXIsProcessTrusted()
 
     var body: some View {
         ScrollView {
@@ -94,6 +96,17 @@ struct ProviderSettingsView: View {
                     Toggle("Computer use", isOn: $computerUseEnabled)
                     Text("Allow the agent to inspect and interact with running apps. Each action asks for approval and macOS Accessibility permission is required.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Image(systemName: accessibilityTrusted ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                            .foregroundStyle(accessibilityTrusted ? SSColor.success : SSColor.danger)
+                        Text(accessibilityTrusted ? "Accessibility is granted to this copy of Kiln." : "Accessibility is NOT granted to this copy of Kiln.")
+                            .font(SSTypography.caption())
+                    }
+                    Text(Bundle.main.bundlePath).font(SSTypography.caption()).foregroundStyle(.secondary).textSelection(.enabled)
+                    if !accessibilityTrusted {
+                        Text("If Kiln already shows as ON in System Settings, that entry belongs to a different build (for example an earlier or development copy). Select Kiln in the list, press the minus button to remove it, press plus, choose the Kiln above, switch it on, then relaunch Kiln.")
+                            .font(SSTypography.caption()).foregroundStyle(SSColor.warning)
+                    }
                     HStack {
                         Button("Request Accessibility access") {
                             let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
@@ -102,6 +115,7 @@ struct ProviderSettingsView: View {
                         Button("Open Accessibility settings") {
                             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") { NSWorkspace.shared.open(url) }
                         }
+                        Button("Relaunch Kiln") { Self.relaunch() }
                     }
                 }
                 ModelStoreCard()
@@ -110,6 +124,13 @@ struct ProviderSettingsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(width: 560, height: 700)
+        .task {
+            // Re-check while Settings is open, so granting it in System Settings shows up without reopening this window.
+            while !Task.isCancelled {
+                accessibilityTrusted = AXIsProcessTrusted()
+                try? await Task.sleep(for: .seconds(1.5))
+            }
+        }
         .background(SSColor.canvas)
         .task { model.baseURL = await app.settings.get("providers.custom.baseURL", as: String.self, fallback: "") }
     }
@@ -262,5 +283,18 @@ struct ModelStoreCard: View {
             message = "No language models were found there. Pick the folder that directly contains the models--org--repo folders."
         }
         if reload { await app.reloadProviders() }
+    }
+}
+
+
+extension ProviderSettingsView {
+    /// Opens a fresh copy of this app and quits this one, so a newly granted permission is picked up.
+    @MainActor static func relaunch() {
+        let url = Bundle.main.bundleURL
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
     }
 }

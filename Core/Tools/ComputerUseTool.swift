@@ -19,7 +19,7 @@ final class ComputerUseService {
                 return "\(name) (\(item.bundleIdentifier ?? "no bundle ID"))"
             }.sorted().joined(separator: "\n")
         }
-        guard AXIsProcessTrusted() else { return "Kiln needs macOS Accessibility access. Enable Kiln in System Settings → Privacy & Security → Accessibility, then retry." }
+        guard AXIsProcessTrusted() else { return "This copy of Kiln (\(Bundle.main.bundlePath)) is not trusted for Accessibility. Open Kiln Settings and press Request Accessibility access. If System Settings already lists Kiln as ON, that entry belongs to a different build of Kiln (an earlier or development copy): remove it with the minus button, add this copy with the plus button, switch it on, and relaunch Kiln. Then retry." }
         guard let name = app, !name.isEmpty else { return "Specify a running application name or bundle ID." }
         if action == "open_app" {
             // Launching an app is how a person would start reading their messages; it does not click anything inside it.
