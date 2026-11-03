@@ -162,6 +162,18 @@ in Settings; none are read or printed by the tests.
 - **Editor:** code folding (gutter chevrons, ⌘⌥[ and ⌘⌥], checked in the running app), ⌘D multi-cursor, drag-reorder tabs,
   and VoiceOver access to the gutter (breakpoints, folds, diff and execution markers).
 
+## Approval modes: Ask, Auto, Bypass (2026-11-03)
+
+The composer's mode bar has a **Permissions** menu. **Ask** (default) waits for you on every approval. **Auto** approves
+routine calls for you (non-destructive, inside the project, not flagged by the execution policy, not admin tier); anything
+destructive, outside scope, new to the network, risky-shell or admin still asks. **Bypass** (red, confirmed first) approves
+everything except hard policy blocks and behavior-monitor holds. A mode answers once: it never creates a standing grant,
+never answers a monitor hold, and resets to Ask whenever Kiln launches. Each decision it makes is written to
+`approvals.jsonl` with `via: auto-mode` or `bypass-mode`, mode changes go to the audit chain, and every human answer now
+records `via` (mouse, keyboard, programmatic, remote) and how long it waited. Unit-tested policy and logging; not yet
+exercised by a real agent run end to end. This is separate from macOS permissions (Accessibility, microphone), which a mode
+cannot grant. Codex's `codex/kiln-computer-use` branch changes the same approval code and is not merged.
+
 ## Known limits and ideas
 
 - **Kiln is no longer sandboxed (decided 2026-11-02).** The agent must be able to run real git, package managers and

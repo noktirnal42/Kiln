@@ -72,3 +72,17 @@ The Mac is kept awake while remote control is on.
 ## Verification status (2026-11-03)
 
 The iOS simulator connected directly to a real Mac. An integration candidate completed a physical watch voice round trip via an iPhone and Mac. A physical iPhone and Apple Watch each sent Deny and Allow once decisions, recorded by the Mac as remote answers. A Cloudflare relay deployed for the developer completed an encrypted handshake with the real Mac using the companion's Network.framework client on a computer. A relay-only physical iPhone build subsequently carried a watch message to the Mac through that Worker. An earlier phone relay reconnect timed out, so connection recovery remains under test. Earlier unexpected standing approval decisions remain under investigation. See [the physical QA record](qa/2026-11-03-companion-voice.md).
+
+## Watch voice and staying connected (2026-11-03)
+
+- **Talk records at once.** The watch's Talk button starts the microphone immediately (no system dictation sheet to choose
+  mic or keyboard). It records a short AAC clip (16 kHz mono), ends when you stop talking, tap again, or after 25 s, and sends
+  it as `RemoteCommand.sendAudio`. The Mac transcribes it with Apple's recogniser (on device when available), replies with
+  `RemoteEvent.transcript` (shown on the watch), and sends the text as a spoken message. Needs Speech Recognition allowed for
+  Kiln on the Mac. Unit tests: Mac bridge, watch session with a stub recorder and fake Mac. Not yet measured on the physical
+  watch: accuracy, the silence cut-off, battery.
+- **Locked phone.** The watch connects to the relay first, over `URLSession` WebSockets. watchOS carries URLSession traffic
+  through the paired iPhone, which does not need to be unlocked, and uses the watch's own Wi-Fi or cellular if it has one.
+  A raw `NWConnection` does not get that proxying, which is why direct LAN sockets time out on a real watch. Order of
+  attempts on the watch: relay, iPhone bridge (WatchConnectivity), direct address, Bonjour.
+- **Port.** The Mac listens on 47900 when free and on any free port otherwise (a busy 47900 used to make the listener fail).

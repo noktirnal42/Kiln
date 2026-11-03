@@ -28,7 +28,8 @@ Kiln is an open-source Swift and SwiftUI workstation exploring what happens when
 | Develop | Source editor with Swift/C language server, build/test/run, LLDB launch debugger, folding, multi-cursor, Git gutter, terminal, search, MCP tools | Not Xcode: no previews, debugger attach or other language servers |
 | Analyze | Binary import, strings, native Mach-O inspection/disassembly, analysis tools | Ghidra recovery requires setup; cipher classifier is a placeholder |
 | Model Lab | Datasets/models, experiments, Create ML and MLX engines, evaluation, LoRA and distillation (also as agent tools) | Full GUI lifecycle/export compatibility coverage remains open |
-| Voice | Dictation, spoken replies, hands-free conversation mode | Not yet tried with a real microphone in QA; replies are spoken after they finish |
+| Permissions | Ask, Auto and Bypass approval modes (reset on launch, audited, never create standing grants) | Not yet exercised by a real agent run end to end |
+| Voice | Dictation, spoken replies, hands-free conversation mode; the Apple Watch records and the Mac transcribes | Not yet tried with a real microphone in QA; replies are spoken after they finish |
 | Remote control | Encrypted remote protocol and iPhone / Apple Watch companion projects (`Companion/`); optional relay software (`Relay/`) | Physical voice, remote approvals and a relay-only watch message tested; reconnect reliability remains open |
 
 **Real QA examples:** the app’s chat layer received correct live responses across five configured providers; a hosted agent created and ran a program; a researcher → implementer → reviewer swarm produced a real summary artifact; MLX from-scratch and LoRA smoke runs saved artifacts. These establish specific workflows, not universal reliability. See the [verification record](docs/12-USER-QA-2026-11-01.md) and [current state](docs/11-CURRENT-STATE.md) for evidence and limits.
