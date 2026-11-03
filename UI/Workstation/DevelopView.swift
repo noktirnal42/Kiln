@@ -168,6 +168,14 @@ struct RemoteControlCard: View {
                         Image(nsImage: image).interpolation(.none).resizable().frame(width: 150, height: 150)
                             .accessibilityLabel("Pairing code for the Kiln Remote app")
                     }
+                    if !server.directAddresses.isEmpty {
+                        Text("Direct address (same network or Tailscale): " + server.directAddresses.joined(separator: " · "))
+                            .font(SSTypography.caption()).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                    Text(server.relayConnected ? "Internet relay connected: devices can reach this Mac from anywhere."
+                         : server.relayURL == nil ? "No internet relay set: devices can only connect on this network or over a VPN."
+                         : "Internet relay set but not connected" + (server.relayError.map { " (\($0))" } ?? "") + ".")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
                     Text("Scan with Kiln Remote on your iPhone. Anyone who sees this code can pair, so do not share your screen with it open.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                     Button("Unpair all devices…") { confirmUnpair = true }

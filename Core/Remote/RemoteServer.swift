@@ -13,19 +13,39 @@ public final class RemoteServer {
     public private(set) var lastError: String?
     public private(set) var deviceCount = 0
     public private(set) var pairing: PairingPayload
+    /// The relay that lets devices reach this Mac over the internet (nil: local network only).
+    public private(set) var relayURL: URL?
+    public private(set) var relayConnected = false
+    public private(set) var relayError: String?
 
     @ObservationIgnored private let bridge: RemoteBridge
     @ObservationIgnored private let store: RemotePairingStore
     @ObservationIgnored private var listener: NWListener?
     @ObservationIgnored private var connections: [ObjectIdentifier: RemoteConnection] = [:]
     @ObservationIgnored private let hostName: String
+    @ObservationIgnored private var relayClient: RemoteRelayClient?
+    /// Keeps the Mac awake while remote control is on, so a phone away from home can still reach it.
+    @ObservationIgnored private var awakeActivity: NSObjectProtocol?
+    @ObservationIgnored private let defaults: UserDefaults
+    static let relayDefaultsKey = "remote.relayURL"
+    /// Tried first on every launch.
+    public static let preferredPort: UInt16 = 47900
 
-    public init(bridge: RemoteBridge, store: RemotePairingStore, hostName: String) {
+    /// Addresses a device can type in to connect directly (same network, or over a VPN such as Tailscale).
+    public var directAddresses: [String] {
+        guard let port else { return [] }
+        return NetworkAddresses.current().map { "\($0.address):\(port)" + ($0.isTailscale ? " (Tailscale)" : "") }
+    }
+
+    public init(bridge: RemoteBridge, store: RemotePairingStore, hostName: String, defaults: UserDefaults = .standard) {
         self.bridge = bridge
         self.store = store
         self.hostName = hostName
+        self.defaults = defaults
         let saved = store.load()
-        pairing = PairingPayload(hostName: hostName, serviceName: saved.serviceName, key: saved.key)
+        let relay = defaults.string(forKey: Self.relayDefaultsKey).flatMap(URL.init(string:))
+        relayURL = relay
+        pairing = PairingPayload(hostName: hostName, serviceName: saved.serviceName, key: saved.key, relay: relay)
         bridge.emit = { [weak self] event in self?.broadcast(event) }
     }
 
@@ -35,7 +55,14 @@ public final class RemoteServer {
         do {
             let parameters = NWParameters.tcp
             parameters.defaultProtocolStack.applicationProtocols.insert(NWProtocolWebSocket.Options(), at: 0)
-            let listener = try NWListener(using: parameters)
+            // A fixed port makes "address:port" usable from a phone over a VPN (Bonjour does not cross one); fall back to
+            // any free port if something else has it.
+            let listener: NWListener
+            if let preferred = NWEndpoint.Port(rawValue: Self.preferredPort), let fixed = try? NWListener(using: parameters, on: preferred) {
+                listener = fixed
+            } else {
+                listener = try NWListener(using: parameters)
+            }
             if advertise { listener.service = NWListener.Service(name: pairing.serviceName, type: kilnRemoteServiceType) }
             listener.newConnectionHandler = { [weak self] connection in
                 Task { @MainActor in self?.accept(connection) }
@@ -46,6 +73,8 @@ public final class RemoteServer {
             listener.start(queue: .global(qos: .userInitiated))
             self.listener = listener
             bridge.start()
+            awakeActivity = ProcessInfo.processInfo.beginActivity(options: [.idleSystemSleepDisabled, .userInitiated], reason: "Kiln remote control")
+            startRelayClient()
         } catch {
             lastError = "Could not start remote control: \(error.localizedDescription)"
         }
@@ -56,7 +85,40 @@ public final class RemoteServer {
         for connection in connections.values { connection.close() }
         connections = [:]
         bridge.stop()
+        relayClient?.stop(); relayClient = nil; relayConnected = false
+        if let awakeActivity { ProcessInfo.processInfo.endActivity(awakeActivity) }
+        awakeActivity = nil
         isRunning = false; port = nil; deviceCount = 0
+    }
+
+    /// Puts the Mac's current addresses in the pairing code so devices can connect without Bonjour.
+    public func refreshDirectAddresses() {
+        guard let port else { return }
+        pairing.direct = NetworkAddresses.current().map { "\($0.address):\(port)" }
+    }
+
+    /// Sets (or clears) the relay address shown in the pairing code. Devices paired earlier without it must scan again.
+    public func setRelay(_ url: URL?) {
+        let accepted = url.flatMap { $0.scheme == "wss" || $0.scheme == "ws" ? $0 : nil }
+        relayURL = accepted
+        defaults.set(accepted?.absoluteString, forKey: Self.relayDefaultsKey)
+        pairing.relay = accepted
+        relayClient?.stop(); relayClient = nil; relayConnected = false
+        if isRunning { startRelayClient() }
+    }
+
+    private func startRelayClient() {
+        guard let relayURL else { return }
+        let client = RemoteRelayClient(relay: relayURL, pairingKey: pairing.key, bridge: bridge)
+        client.onChange = { [weak self, weak client] in
+            guard let self, let client else { return }
+            self.relayConnected = client.isConnected
+            self.relayError = client.lastError
+            self.deviceCount = self.connections.values.filter(\.isAuthenticated).count
+        }
+        client.onDevice = { [weak self] connection in self?.register(connection) }
+        relayClient = client
+        client.start()
     }
 
     /// A new key and name: every paired device has to scan the code again.
@@ -64,7 +126,7 @@ public final class RemoteServer {
         let wasRunning = isRunning
         stop()
         let fresh = store.rotate()
-        pairing = PairingPayload(hostName: hostName, serviceName: fresh.serviceName, key: fresh.key)
+        pairing = PairingPayload(hostName: hostName, serviceName: fresh.serviceName, key: fresh.key, relay: relayURL, direct: pairing.direct)
         if wasRunning { start() }
     }
 
@@ -74,6 +136,7 @@ public final class RemoteServer {
             port = listener?.port?.rawValue
             isRunning = true
             lastError = nil
+            refreshDirectAddresses()
         case .failed(let error):
             lastError = "Remote control failed: \(error.localizedDescription)"
             stop()
@@ -83,7 +146,14 @@ public final class RemoteServer {
 
     private func accept(_ nwConnection: NWConnection) {
         guard connections.count < 8 else { nwConnection.cancel(); return }
-        let connection = RemoteConnection(connection: nwConnection, pairingKey: pairing.key, bridge: bridge)
+        let transport = NetworkTransport(connection: nwConnection)
+        let connection = RemoteConnection(transport: transport, pairingKey: pairing.key, bridge: bridge)
+        transport.owner = connection
+        register(connection)
+        transport.start(queue: DispatchQueue(label: "kiln.remote.socket"))
+    }
+
+    fileprivate func register(_ connection: RemoteConnection) {
         let id = ObjectIdentifier(connection)
         connection.onClose = { [weak self] in Task { @MainActor in self?.dropped(id) } }
         connection.onAuthenticated = { [weak self] in Task { @MainActor in self?.deviceCount = self?.connections.values.filter(\.isAuthenticated).count ?? 0 } }
@@ -101,98 +171,35 @@ public final class RemoteServer {
     }
 }
 
-/// One device. Reads on a private queue; commands are handled in order on the main actor.
-final class RemoteConnection: @unchecked Sendable {
-    private enum State { case awaitingNonce, secure(SecureChannel, authenticated: Bool) }
-
+/// A device on the local network: one WebSocket.
+final class NetworkTransport: FrameTransport, @unchecked Sendable {
     private let connection: NWConnection
-    private let pairingKey: Data
-    private let bridge: RemoteBridge
-    private let queue = DispatchQueue(label: "kiln.remote.connection")
-    private var state = State.awaitingNonce
-    private var commands: AsyncStream<RemoteCommand>.Continuation?
-    var onClose: () -> Void = {}
-    var onAuthenticated: () -> Void = {}
+    weak var owner: RemoteConnection?
 
-    var isAuthenticated: Bool { queue.sync { if case .secure(_, let ok) = state { ok } else { false } } }
+    init(connection: NWConnection) { self.connection = connection }
 
-    init(connection: NWConnection, pairingKey: Data, bridge: RemoteBridge) {
-        self.connection = connection
-        self.pairingKey = pairingKey
-        self.bridge = bridge
-    }
-
-    func start() {
+    func start(queue: DispatchQueue) {
         connection.stateUpdateHandler = { [weak self] state in
-            if case .failed = state { self?.close() }
-            if case .cancelled = state { self?.onClose() }
+            if case .failed = state { self?.connection.cancel() }
+            if case .cancelled = state { self?.owner?.transportClosed() }
         }
         connection.start(queue: queue)
-        let (stream, continuation) = AsyncStream.makeStream(of: RemoteCommand.self)
-        commands = continuation
-        Task { [bridge, weak self] in
-            for await command in stream {
-                let events = await bridge.handle(command)
-                for event in events { self?.send(event) }
-            }
-        }
-        // A device that does not finish the handshake in time is dropped.
-        queue.asyncAfter(deadline: .now() + 10) { [weak self] in
-            guard let self else { return }
-            if case .secure(_, true) = self.state { return }
-            self.close()
-        }
         receive()
     }
 
-    func close() {
-        commands?.finish()
-        connection.cancel()
-    }
-
-    func send(_ event: RemoteEvent) {
-        queue.async { [self] in
-            guard case .secure(var channel, let ok) = state, ok, let plain = try? RemoteCoding.encode(event),
-                  let frame = try? channel.seal(plain) else { return }
-            state = .secure(channel, authenticated: ok)
-            transmit(frame)
-        }
-    }
-
-    private func transmit(_ data: Data) {
+    func send(_ data: Data) {
         let context = NWConnection.ContentContext(identifier: "kiln-frame", metadata: [NWProtocolWebSocket.Metadata(opcode: .binary)])
         connection.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed { _ in })
     }
 
+    func close() { connection.cancel() }
+
     private func receive() {
         connection.receiveMessage { [weak self] data, _, _, error in
             guard let self else { return }
-            guard let data, error == nil else { self.close(); return }
-            self.process(data)
+            guard let data, error == nil else { self.connection.cancel(); return }
+            self.owner?.receive(data)
             self.receive()
-        }
-    }
-
-    private func process(_ data: Data) {
-        switch state {
-        case .awaitingNonce:
-            guard data.count == 16 else { close(); return }
-            let serverNonce = SecureChannel.makeNonce()
-            state = .secure(SecureChannel(pairingKey: pairingKey, clientNonce: data, serverNonce: serverNonce, role: .mac), authenticated: false)
-            transmit(serverNonce)
-        case .secure(var channel, let authenticated):
-            guard let plain = try? channel.open(data), let command = try? RemoteCoding.decode(RemoteCommand.self, from: plain) else {
-                close()   // wrong key, tampering, replay or garbage
-                return
-            }
-            if !authenticated {
-                guard case .hello = command else { close(); return }
-                state = .secure(channel, authenticated: true)
-                onAuthenticated()
-            } else {
-                state = .secure(channel, authenticated: true)
-            }
-            commands?.yield(command)
         }
     }
 }

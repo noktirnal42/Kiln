@@ -1,0 +1,77 @@
+name: KilnRemote
+options:
+  bundleIdPrefix: com.kiln
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+packages:
+  KilnRemoteKit:
+    path: ../../Packages/KilnRemoteKit
+  FakeMac:
+    path: FakeMac
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: LH8KLB9N4F
+
+targets:
+  KilnRemote:
+    type: application
+    platform: iOS
+    sources: [KilnRemote]
+    dependencies:
+      - package: KilnRemoteKit
+    info:
+      path: KilnRemote/Info.plist
+      properties:
+        CFBundleDisplayName: Kiln Remote
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIBackgroundModes: [audio]
+        NSCameraUsageDescription: Kiln Remote scans the pairing code shown on your Mac.
+        NSMicrophoneUsageDescription: Kiln Remote listens when you tap the microphone, to send what you say to Kiln on your Mac.
+        NSSpeechRecognitionUsageDescription: Kiln Remote turns your speech into text, on this device when possible.
+        NSLocalNetworkUsageDescription: Kiln Remote finds and talks to Kiln on your Mac over your local network.
+        NSBonjourServices: [_kiln-remote._tcp]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.kiln.remote.pair
+            CFBundleURLSchemes: [kiln-remote]
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kiln.remote
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+
+  KilnRemoteTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [KilnRemoteTests]
+    dependencies:
+      - target: KilnRemote
+      - package: FakeMac
+        product: FakeMacKit
+      - package: KilnRemoteKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kiln.remote.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  KilnRemote:
+    build:
+      targets:
+        KilnRemote: all
+        KilnRemoteTests: [test]
+    test:
+      targets: [KilnRemoteTests]
