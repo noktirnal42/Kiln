@@ -130,6 +130,28 @@ public enum Tripwires {
         return flags
     }
 
+    /// The folder to offer as a project when a held call targets a path outside the workspace: the path itself for an
+    /// existing directory, otherwise its parent. Nil when the call is not a path tool, the path is inside the workspace,
+    /// or it points at Kiln's own protected files (those are never offered).
+    public static func folderToOffer(tool: String, argumentsJSON: String, workspaceRoot: URL?, protectedPaths: [URL] = []) -> URL? {
+        guard pathTools.contains(tool),
+              let data = argumentsJSON.data(using: .utf8),
+              let arguments = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let raw = arguments["path"] as? String, !raw.isEmpty,
+              isOutside(raw, workspaceRoot: workspaceRoot),
+              protectedRoot(containing: raw, workspaceRoot: workspaceRoot, protectedPaths: protectedPaths) == nil,
+              let canonical = canonicalPath(raw, workspaceRoot: workspaceRoot) else { return nil }
+        guard !matches(credentialHint, canonical + "/") else { return nil }
+        var isDirectory: ObjCBool = false
+        let url = URL(fileURLWithPath: canonical)
+        let folder = FileManager.default.fileExists(atPath: canonical, isDirectory: &isDirectory) && isDirectory.boolValue
+            ? url : url.deletingLastPathComponent()
+        // Never offer the whole disk or the whole home folder as a project.
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
+        guard folder.path != "/", folder.path != home, folder.pathComponents.count > 2 else { return nil }
+        return folder
+    }
+
     public static func worstSeverity(_ flags: [MonitorFlag]) -> Int { flags.map(\.severity).max() ?? 0 }
 
     // MARK: Path logic

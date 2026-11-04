@@ -11,6 +11,8 @@ struct HomeView: View {
     @State private var conversations: [ConversationSummary] = []
     @State private var providers: [(id: String, availability: ProviderAvailability)] = []
     @State private var auditEvents: Int?
+    @AppStorage("kiln.getStarted.dismissed") private var getStartedDismissed = false
+    @Environment(\.openSettings) private var openSettings
 
     private var reModule: REModule? {
         app.records.first { $0.id == REModule.identifier }?.module as? REModule
@@ -20,6 +22,10 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SSSpacing.l) {
                 hero
+                if GetStarted.shows(getStartedState, dismissed: getStartedDismissed) {
+                    GetStartedCard(state: getStartedState, chooseProject: chooseProject, openSettings: { openSettings() },
+                                   runFirstTask: runFirstTask, dismiss: { getStartedDismissed = true })
+                }
                 actions
                 HStack(alignment: .top, spacing: SSSpacing.m) {
                     conversationsPanel
@@ -211,6 +217,27 @@ struct HomeView: View {
     }
 
     // MARK: Actions
+
+    private var getStartedState: GetStarted.State {
+        GetStarted.State(providerReady: providers.contains { $0.availability.isAvailable },
+                         hasProject: app.chatSession?.workspaceRoot != nil,
+                         hasConversation: !conversations.isEmpty)
+    }
+
+    private func chooseProject() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Use Folder"
+        panel.message = "Choose the project folder the agent should work in."
+        if panel.runModal() == .OK, let url = panel.url { app.chatSession?.setWorkspace(url) }
+    }
+
+    private func runFirstTask() {
+        workstation.select(.agent, app: app)
+        Task { await app.chatSession?.send("Look through this project and explain what it does and how it is organised.") }
+    }
 
     private func ask() {
         let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)

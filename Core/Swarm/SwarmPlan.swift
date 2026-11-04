@@ -144,9 +144,19 @@ public enum SwarmPlanner {
     Tasks with no dependency on each other run in parallel. Use researcher for reading, implementer for changes, reviewer for checking.
     """
 
+    /// A goal that forbids changes. A plan for it must never demand an output file, or a correct read-only run
+    /// would be marked blocked for not leaving one behind.
+    public static func isReadOnly(goal: String) -> Bool {
+        let text = goal.lowercased()
+        let markers = ["read-only", "read only", "readonly", "do not write", "don't write", "do not modify", "don't modify",
+                       "do not change", "don't change", "do not create", "don't create", "without writing", "without changing",
+                       "without modifying", "no changes", "make no changes", "without making changes"]
+        return markers.contains { text.contains($0) }
+    }
+
     /// Parses a model's reply. Any problem returns nil so the caller can fall back; a plan is only
     /// ever used if it is a valid graph.
-    public static func parse(_ reply: String) -> SwarmGraph? {
+    public static func parse(_ reply: String, dropExpectations: Bool = false) -> SwarmGraph? {
         guard let start = reply.firstIndex(of: "{"), let end = reply.lastIndex(of: "}"), start < end,
               let object = (try? JSONSerialization.jsonObject(with: Data(reply[start...end].utf8))) as? [String: Any],
               let rows = object["tasks"] as? [[String: Any]] else { return nil }
@@ -157,13 +167,15 @@ public enum SwarmPlanner {
             if row["depends_on"] != nil && !(row["depends_on"] is [String]) { return nil }
             tasks.append(SwarmTask(id: id, title: title, details: row["details"] as? String ?? "", role: role,
                                    dependsOn: row["depends_on"] as? [String] ?? [],
-                                   expects: (row["expects"] as? [String] ?? []).filter { TaskExpectation($0) != nil }))
+                                   expects: dropExpectations ? [] : (row["expects"] as? [String] ?? []).filter { TaskExpectation($0) != nil }))
         }
         return try? SwarmGraph(tasks: tasks)
     }
 
     public static func plan(goal: String, ask: @Sendable (String, String) async throws -> String) async -> (graph: SwarmGraph, usedFallback: Bool) {
-        if let reply = try? await ask(prompt, goal), let graph = parse(reply) { return (graph, false) }
+        let readOnly = isReadOnly(goal: goal)
+        let instructions = readOnly ? prompt + "\nThe user asked for no changes: do not list any \"expects\" and do not plan implementer work that writes files." : prompt
+        if let reply = try? await ask(instructions, goal), let graph = parse(reply, dropExpectations: readOnly) { return (graph, false) }
         return (fallback(goal: goal), true)
     }
 }

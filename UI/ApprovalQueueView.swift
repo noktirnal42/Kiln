@@ -120,6 +120,14 @@ private struct ApprovalRequestRow: View {
     let request: ApprovalRequest
 
     @State private var showFullPreview = false
+    @Environment(AppModel.self) private var app
+
+    /// A held read or write outside the workspace can be allowed and the folder added as a project in one step.
+    private var folderToOffer: URL? {
+        guard request.isMonitorReview else { return nil }
+        let root = app.chatSession?.workspaceRoot.map { URL(fileURLWithPath: $0) }
+        return Tripwires.folderToOffer(tool: request.toolName, argumentsJSON: request.argumentsJSON, workspaceRoot: root)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SSSpacing.s) {
@@ -207,6 +215,18 @@ private struct ApprovalRequestRow: View {
                 }
             }
             .buttonStyle(.bordered)
+
+            if let folder = folderToOffer {
+                Button {
+                    app.chatSession?.setWorkspace(folder)
+                    center.resolve(request.id, decision: .approveOnce)
+                } label: {
+                    Text("Allow and add \(folder.lastPathComponent) as a project").frame(maxWidth: .infinity)
+                }
+                .controlSize(.large)
+                .buttonStyle(.bordered)
+                .help("Allows this call once, then makes \(folder.path) the project folder so later calls there are inside the workspace")
+            }
         }
         .padding(SSSpacing.m)
         .background(SSColor.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
