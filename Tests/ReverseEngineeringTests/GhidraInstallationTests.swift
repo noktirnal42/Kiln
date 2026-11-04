@@ -118,3 +118,36 @@ struct GhidraJavaSelectionTests {
         if let java = env["JAVA_HOME"] { #expect(java.hasPrefix("/")) }   // empty when this Mac has no JDK 21
     }
 }
+
+@MainActor
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["KILN_LIVE_GHIDRA"] == "1"), .serialized)
+struct LiveGhidraCancelTests {
+    @Test func cancellingAnAnalysisEndsTheProcessTreeAndLeavesTheProjectUntouched() async throws {
+        let module = REModule()
+        module.configureDiscoveredGhidra()
+        #expect(module.isGhidraAvailable, "\(module.ghidraStatus)")
+        _ = try await module.importBinary(at: URL(fileURLWithPath: "/usr/bin/true"))
+        let project = try #require(module.selected)
+        defer { try? FileManager.default.removeItem(at: project.folder) }
+        let before = try await module.analysis(projectID: project.id)
+        let run = Task { try await module.analyzeWithGhidra(projectID: project.id) }
+        for _ in 0..<200 where !module.isGhidraAnalysisRunning { try await Task.sleep(nanoseconds: 10_000_000) }
+        #expect(module.isGhidraAnalysisRunning)
+        try await Task.sleep(nanoseconds: 800_000_000)
+        let started = Date()
+        module.cancelGhidraAnalysis()
+        do { _ = try await run.value; Issue.record("A cancelled analysis must not succeed") }
+        catch is OperationCancelled {} catch { Issue.record("Expected cancellation, got \(error)") }
+        #expect(Date().timeIntervalSince(started) < 10, "cancellation should end the analysis promptly")
+        #expect(!module.isGhidraAnalysisRunning)
+        let after = try await module.analysis(projectID: project.id)
+        #expect(after.revision == before.revision && after.functions.count == before.functions.count)
+        // No analyzeHeadless/Ghidra JVM left running for this project.
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+        let ps = Process(); ps.executableURL = URL(fileURLWithPath: "/bin/ps"); ps.arguments = ["-axo", "command="]
+        let pipe = Pipe(); ps.standardOutput = pipe; try ps.run()
+        let listing = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        ps.waitUntilExit()
+        #expect(!listing.contains("engine/\(project.id)"), "a Ghidra process is still running for this project after cancel")
+    }
+}

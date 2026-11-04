@@ -46,6 +46,10 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
     public var ghidraHome: URL?
     public var ghidraScriptURL: URL?
     public private(set) var isGhidraAnalysisRunning = false
+    private var ghidraOperation: OperationContext?
+
+    /// Stops a running Ghidra analysis: ends the headless process tree and leaves the project as it was.
+    public func cancelGhidraAnalysis() { ghidraOperation?.cancel(reason: "cancelled by the analyst") }
 
     public var isGhidraAvailable: Bool {
         guard let home = ghidraHome, let script = ghidraScriptURL else { return false }
@@ -152,14 +156,18 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
         }
         guard !isGhidraAnalysisRunning else { throw REError.analysisInProgress }
         isGhidraAnalysisRunning = true
-        defer { isGhidraAnalysisRunning = false }
+        let operation = OperationContext(tool: "analyze_with_ghidra", transport: "app")
+        ghidraOperation = operation
+        defer { isGhidraAnalysisRunning = false; ghidraOperation = nil }
         let project = try await MainActor.run { try self.projectFolder(id: projectID) }
         let analysis = try await Task.detached(priority: .userInitiated) {
+            try OperationContext.$current.withValue(operation) {
             let existing = try ProjectStore.load(project.folder.path)
             let result = try Analyzer.ghidra(project.binaryURL.path, home: home.path, scriptPath: script.path,
                                             arch: existing.slice, workspace: Analyzer.engineWorkspace(projectPath: project.folder.path, projectID: existing.id))
             return try ProjectStore.replace(result, to: project.folder.path, expectedID: existing.id,
                                             expectedRevision: existing.revision, preserveAnnotations: true)
+            }
         }.value
         await MainActor.run { self.replace(projectID: projectID, with: analysis) }
         return analysis

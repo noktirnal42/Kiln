@@ -23,10 +23,15 @@ struct REProjectDetail: View {
             HStack(spacing: 8) {
                 Text(module.ghidraStatus).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 Spacer(minLength: 0)
-                if module.isGhidraAnalysisRunning { ProgressView().controlSize(.small) }
+                if module.isGhidraAnalysisRunning {
+                    ProgressView().controlSize(.small)
+                    Button("Cancel", systemImage: "xmark.circle") { module.cancelGhidraAnalysis() }
+                        .help("Stop the analysis. Nothing is changed in this project.")
+                }
                 Button("Analyze with Ghidra", systemImage: "bolt") {
                     Task {
                         do { _ = try await module.analyzeWithGhidra(projectID: project.id) }
+                        catch is OperationCancelled { analysisError = nil }
                         catch { analysisError = error.localizedDescription }
                     }
                 }
