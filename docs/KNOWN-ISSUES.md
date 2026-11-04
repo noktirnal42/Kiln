@@ -44,6 +44,8 @@ This is the contributor-facing gap list for Kiln's current development state. Th
 
 **Observed:** native Mach-O import and inspection work, including a labeled linear disassembly fallback for stripped binaries. Linear listings do not recover function boundaries or establish decompiler parity. Ghidra is optional. Kiln now discovers existing stable installations in user/system Applications (or valid `GHIDRA_HOME`), bundles the export script, and exposes GUI and execution-gated agent analysis through the same service. A real installed Ghidra 12.1.4 / Java 21 run imported and decompiled `/usr/bin/true`, persisted pseudocode, preserved annotations and rejected concurrent analysis. The bundled cipher-classifier data is a placeholder, not a trained classifier.
 
+**Verified 2026-11-04 against 11.3.2, 12.1.4 and 12.2 DEV** (import, function recovery, decompilation on the bundled fixture). Ghidra 11 fails to compile its scripts under a newer JDK, and a Finder-launched app gets the newest installed JDK; Kiln now pins JDK 21 for Ghidra 11 when one is installed, and explains the error otherwise. An unusable compiled-script bundle left by an earlier failed run lives in `~/Library/ghidra/<version>/osgi/compiled-bundles` and can be deleted.
+
 **Needed:** broader Ghidra version/architecture and complex-binary fixtures; cancellation UI and explicit installation chooser; honest capability states; a licensed, evaluated model and dataset if cipher classification is pursued. Do not label placeholder classification as working.
 
 ## Export and model compatibility need broader coverage

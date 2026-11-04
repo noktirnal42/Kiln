@@ -2,8 +2,9 @@ import Foundation
 import CryptoKit
 
 public enum ProcessRunner {
-    public static func run(_ executable: String, _ arguments: [String], timeout: TimeInterval = 60) throws -> String {
+    public static func run(_ executable: String, _ arguments: [String], timeout: TimeInterval = 60, environment: [String: String] = [:]) throws -> String {
         let task = Process(); task.executableURL = URL(fileURLWithPath: executable); task.arguments = arguments
+        if !environment.isEmpty { task.environment = ProcessInfo.processInfo.environment.merging(environment) { $1 } }
         let output = Pipe(); task.standardOutput = output; task.standardError = output
         let capture = Capture()
         output.fileHandleForReading.readabilityHandler = { handle in capture.append(handle.availableData) }
@@ -176,6 +177,32 @@ public enum Analyzer {
         return support.appendingPathComponent("AxiomRE/engine/\(projectID)").path
     }
 
+    /// Turns Ghidra's raw log into something actionable. The common case is a Java version the installed Ghidra cannot compile
+    /// its export script with (`osgi.ee=UNKNOWN`), which otherwise reads as an unexplained missing export.
+    public static func ghidraFailureMessage(log: String) -> String {
+        if log.contains("osgi.ee") || log.contains("ClassNotFoundException: AxiomExport") {
+            return "Ghidra could not run Kiln's export script. This usually means the Java on this Mac is newer than the Ghidra you picked supports (Ghidra 11.3 needs JDK 21; JDK 25 and newer need Ghidra 12). Use a newer Ghidra, or launch Kiln with JAVA_HOME set to a JDK your Ghidra supports. Details: \(log.suffix(600))"
+        }
+        return "Ghidra produced no export. \(log.suffix(2000))"
+    }
+
+    /// The Ghidra version from its `application.properties`, or nil.
+    public static func ghidraMajorVersion(home: String) -> Int? {
+        let file = URL(fileURLWithPath: home).appendingPathComponent("Ghidra/application.properties")
+        guard let text = try? String(contentsOf: file, encoding: .utf8),
+              let line = text.split(separator: "\n").first(where: { $0.hasPrefix("application.version=") }) else { return nil }
+        return Int(line.dropFirst("application.version=".count).split(separator: ".").first ?? "")
+    }
+
+    /// Ghidra 11 cannot compile its scripts under a newer JDK (macOS picks the newest installed one for a Finder-launched app,
+    /// which poisons Ghidra's compiled-script cache with an unusable bundle). Pin JDK 21 for it when one is installed.
+    public static func ghidraJavaEnvironment(home: String) -> [String: String] {
+        guard let major = ghidraMajorVersion(home: home), major < 12,
+              let java = try? ProcessRunner.run("/usr/libexec/java_home", ["-v", "21"], timeout: 10)
+                .trimmingCharacters(in: .whitespacesAndNewlines), java.hasPrefix("/") else { return [:] }
+        return ["JAVA_HOME": java]
+    }
+
     public static func ghidra(_ path: String, home: String, scriptPath: String, arch: String? = nil, workspace: String) throws -> Analysis {
         try validateGhidraWorkspace(workspace)
         var base = try inspect(path, arch: arch)
@@ -186,8 +213,8 @@ public enum Analyzer {
         try FileManager.default.createDirectory(atPath: workspace, withIntermediateDirectories: true)
         let output = URL(fileURLWithPath: workspace).appendingPathComponent("export-\(UUID().uuidString).json").path
         let projectName = "Axiom-" + UUID().uuidString
-        let log = try ProcessRunner.run(launcher, [workspace, projectName, "-import", resolution.path, "-scriptPath", scriptPath, "-postScript", "AxiomExport.java", output, "-analysisTimeoutPerFile", "180"], timeout: 240)
-        guard FileManager.default.fileExists(atPath: output) else { throw AxiomError.message("Ghidra produced no export. \(log.suffix(2000))") }
+        let log = try ProcessRunner.run(launcher, [workspace, projectName, "-import", resolution.path, "-scriptPath", scriptPath, "-postScript", "AxiomExport.java", output, "-analysisTimeoutPerFile", "180"], timeout: 240, environment: ghidraJavaEnvironment(home: home))
+        guard FileManager.default.fileExists(atPath: output) else { throw AxiomError.message(ghidraFailureMessage(log: log)) }
         struct Export: Decodable { var functions: [FunctionRecord]; var language: String; var warnings: [String] }
         let attributes = try FileManager.default.attributesOfItem(atPath: output)
         guard (attributes[.size] as? Int ?? 0) <= 64 * 1024 * 1024 else { throw AxiomError.message("Engine export exceeds 64 MiB.") }

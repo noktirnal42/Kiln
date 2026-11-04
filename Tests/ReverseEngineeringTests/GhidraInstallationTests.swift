@@ -86,3 +86,35 @@ struct LiveGhidraTests {
         print("GHIDRA_QA engine=\(analysis.engine) functions=\(analysis.functions.count) pseudocode=\(code.prefix(180))")
     }
 }
+
+@Suite("Ghidra failure messages")
+struct GhidraFailureMessageTests {
+    @Test func aUnsupportedJavaIsExplainedNotShownAsAMissingExport() {
+        let log = "Caused by: java.lang.ClassNotFoundException: AxiomExport ... missing requirement osgi.ee; (osgi.ee=UNKNOWN)"
+        let message = Analyzer.ghidraFailureMessage(log: log)
+        #expect(message.contains("JDK 21") && message.contains("JAVA_HOME"))
+        #expect(!message.hasPrefix("Ghidra produced no export"))
+    }
+    @Test func otherFailuresKeepTheirLog() {
+        #expect(Analyzer.ghidraFailureMessage(log: "some other error").hasPrefix("Ghidra produced no export. some other error"))
+    }
+}
+
+@Suite("Ghidra Java selection")
+struct GhidraJavaSelectionTests {
+    @Test func ghidra12AndNewerUseTheDefaultJava() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("gh-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("Ghidra"), withIntermediateDirectories: true)
+        try "application.version=12.1.4\n".write(to: home.appendingPathComponent("Ghidra/application.properties"), atomically: true, encoding: .utf8)
+        #expect(Analyzer.ghidraMajorVersion(home: home.path) == 12)
+        #expect(Analyzer.ghidraJavaEnvironment(home: home.path).isEmpty)
+    }
+    @Test func ghidra11IsPinnedToJDK21WhenOneIsInstalled() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("gh-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent("Ghidra"), withIntermediateDirectories: true)
+        try "application.version=11.3.2\n".write(to: home.appendingPathComponent("Ghidra/application.properties"), atomically: true, encoding: .utf8)
+        #expect(Analyzer.ghidraMajorVersion(home: home.path) == 11)
+        let env = Analyzer.ghidraJavaEnvironment(home: home.path)
+        if let java = env["JAVA_HOME"] { #expect(java.hasPrefix("/")) }   // empty when this Mac has no JDK 21
+    }
+}
