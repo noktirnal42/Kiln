@@ -47,3 +47,11 @@ What the cut honestly is, so captions and posts must say the same:
 - **The footage is not usable**: `screencapture` records the real desktop, and this Claude session's own window sat on top of Kiln's right-hand agent panel. (The computer-use screenshots hide other apps, so this is only visible in the recording.) The demo cut avoided it by cropping to Kiln's centre pane; Analyze's agent panel is on the right, behind that window. I deleted the raw recording because it shows the session window.
 - To redo it: move or minimise the Claude window (or narrow Kiln's window to under about 740 points so nothing overlaps), re-run the same prompt (the `checksum` project is already imported in Kiln's Analyze list, so the import gate will not appear unless it is removed), and record about 60 s. Full-screen control was not approved when I tried again, so this is stopped until someone is at the machine.
 - Side effect left in the app: a `checksum` project in Kiln's Analyze list. Approval mode is still Ask.
+
+## Clip 3 re-recorded (done): `site/assets/kiln-clip-reverse-engineering.mp4`
+
+29 s, muted, portrait 1080x1920, real screen recording of Kiln 0.1.1 (still `site/assets/shots/clip-re-answer.png`). Prompt typed live in Ask mode with `gemma4:31b`; the agent explained `code_checksum` in a binary I built (FNV-1a with a 5-bit left rotate), correctly, and the last scene shows the Ghidra decompilation in Analyze for checking it. The tool list includes a failed `re_analyze_function` call; the caption says so. Notes:
+- No approval gate appears in this take: the binary was already imported and analysed, and the read-only RE calls did not ask. The earlier take (with the import and analyze gates) is not usable because another window covered Kiln.
+- Method: Window > Move & Resize > Left to tile Kiln so no other window overlaps, then `screencapture`, then `Scripts/make_clip_re.py`. The recording shows the whole desktop, including any other app, so crop to Kiln as the script does and check frames before using any footage.
+- The "Last agent run" card in the first scene is left over from the earlier take.
+- Remaining to record: clip 2 (LoRA from chat) and the real watch/phone alert.
