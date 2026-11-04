@@ -127,6 +127,10 @@ targets:
     platform: macOS
     sources:
       - path: Tests
+        excludes:
+          - "Fixtures/*.c"
+          - "Fixtures/*.cpp"
+          - "Fixtures/*.swift"
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
