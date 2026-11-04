@@ -174,3 +174,6 @@ ol,ul{padding-left:22px}li{padding-left:4px;margin-bottom:10px}
   footer{display:block}footer .links{margin-top:24px}pre{font-size:12px;padding:16px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+
+/* demo video */
+.demo{max-width:980px;margin:0 auto}.demo video{width:100%;height:auto;aspect-ratio:16/9;display:block;border-radius:14px;border:1px solid var(--line-2);box-shadow:0 36px 80px -30px #000;background:#000}.demo figcaption{margin-top:14px;font-size:13.5px;line-height:1.7;color:var(--faint)}
