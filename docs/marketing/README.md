@@ -28,7 +28,7 @@ What the cut honestly is, so captions and posts must say the same:
 
 ## Still to record
 
-- **Apple Watch / real iPhone push alert**: the relay and push registration are live for your real phone (Kiln showed "Internet relay connected" and "1 phone registered for alerts"), so an alert should reach it when an approval waits about 4 s. Needs you: Remote control on, phone locked, Kiln closed on the phone, watch awake, then film the wrist or lock screen while the Mac run is going. I did not touch your phone.
+- **Apple Watch / real iPhone push alert (decision 2026-11-03: skipped for now; the maintainer chose not to film it)**: the relay and push registration are live for your real phone (Kiln showed "Internet relay connected" and "1 phone registered for alerts"), so an alert should reach it when an approval waits about 4 s. Needs you: Remote control on, phone locked, Kiln closed on the phone, watch awake, then film the wrist or lock screen while the Mac run is going. I did not touch your phone.
 - **Clips 2 and 3** (LoRA from chat, reverse-engineering a function): not attempted. Clip 1 is covered by the loop above, minus the watch.
 - A rebuilt cut once a real watch shot exists: `python3 Scripts/make_demo_cut.py MAC.mov PHONE.mov OUT_DIR` (edit the segment table at the top).
 
@@ -66,3 +66,7 @@ What the cut honestly is, so captions and posts must say the same:
 - Side effects in Kiln: a new dataset and a `Qwen3-LoRA-FineTune` experiment with an adapter artifact in Model Lab.
 - Build with `python3 Scripts/make_clip_lora.py RAW.mov OUT.mp4` (Kiln tiled left, same method as clip 3).
 - Remaining: the real watch/phone alert only.
+
+## Watch take: set up, then skipped by the maintainer
+
+Mac was prepared (Remote control on, relay connected, "2 phones registered for alerts", 1 device connected, demo project, Ask mode, prompt typed but not sent), then the maintainer said to skip the alerts. Nothing was sent or recorded. Starting Remote control fired an "alert sent to 2 phones" notice, one of which is probably the stale simulator registration. Restored: Remote control stopped, project back to PolyBot, prompt cleared. `~/KilnDemo/DemoPackage` is reset to the failing-test commit. The published claims stay as they are: simulator phone, no watch.
