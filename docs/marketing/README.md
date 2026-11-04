@@ -4,46 +4,37 @@ Nothing here is posted or published. The maintainer approves all posting. Writte
 
 | File | What |
 |---|---|
-| `VIDEO-SCRIPT.md` | 90 s demo: script, shot list, checklist, ffmpeg assembly |
+| `VIDEO-SCRIPT.md` | 90 s demo: script, shot list, checklist, ffmpeg assembly (the full target version, including the watch) |
 | `CLIPS.md` | Three under-30 s clips, storyboards |
 | `LAUNCH-COPY.md` | Drafts per community, Show HN comment, social thread |
-| `../../Scripts/make_marketing_loop.py` | Builds `site/assets/kiln-approval-loop.mp4` from stills |
+| `../../Scripts/make_demo_cut.py` | Builds the demo cut from raw Mac and simulator recordings |
+| `../../Scripts/make_marketing_loop.py` | Older stills-only placeholder builder (no longer used for the published loop) |
 
 ## Captured for real (2026-11-03)
 
-- `site/assets/shots/audit-chain.png`: a crop of the running Kiln 0.1.1 Audit view (chain event count and head hash). Real app, no agent run behind it.
-- Already existing: `approval-crop.jpg` (real Mac approval queue). `watch-approval.png`, `watch-reply.png`, `iphone-*.png` are **simulator demo data**.
-- `site/assets/kiln-approval-loop.mp4`: an 18 s muted draft slideshow of the three stills above with captions that state which are real and which are simulator. It is a placeholder, **not** the demo video; do not use it as proof of the watch flow. Rebuild with `python3 Scripts/make_marketing_loop.py`.
+One unedited-recording session of the installed Kiln 0.1.1, Ask mode, on a throwaway Swift package with a failing test (`pageCount` used integer division). Model: `gemma4:31b` via Ollama Cloud. The agent ran `swift test --filter PaginationTests`, read the test and source, fixed the bug, re-ran the test and committed.
 
-## Not captured; to record
+- `site/assets/kiln-demo-draft.mp4` (about 100 s, muted, captioned): the draft cut. Mac and iPhone Simulator side by side. Two `run_command` approvals were answered from the iOS Simulator companion, which Kiln logged as **`via: remote`** (26 s and 22 s waits); the `git_commit` gate, with its message, was answered with the mouse (`via: mouse`). Cuts are marked in the video.
+- `site/assets/kiln-approval-loop.mp4` and `.gif` (22 s): the gate on the Mac plus the same approval on the phone.
+- `site/assets/shots/demo-gate-and-phone.png`: still from the cut. `audit-chain.png`: crop of the Audit view.
+- The README hero is the GIF above.
 
-- The 90 s demo and all three clips: needs a real watch and phone, a configured relay and push key, and a hosted tool-capable model. The installed app's agent models today are a free hosted model whose last run stopped without an answer, so a staged take needs a better model first.
-- A real `via: remote` Audit row on screen. The current Audit view has "No agent activity recorded yet" for this session.
-- A README hero GIF from real footage (the ffmpeg commands are in `VIDEO-SCRIPT.md`).
+What the cut honestly is, so captions and posts must say the same:
+- The phone is the **iOS Simulator** paired to the real Mac over the local network. It is not a real iPhone and there is no Apple Watch.
+- The audit scene is a **verbatim excerpt of `approvals.jsonl`**, rendered as text. The Audit tab in Kiln lists events but does not show the `via` field, so the `via: remote` evidence is the log file, not the app UI.
+- `write_file` was **not gated**: a standing grant on this Mac covers it (it shows as `alwaysAllow` in the log with no wait). A clean demo should revoke that grant; I did not touch your grants.
+- The Mac pane is clipped on the right in the recording because another window covered part of Kiln; the gate is readable but "Always Allow" is cut off.
+- The phone list shows a few conversation titles from your QA chats ("New Conversation", "Clean up the build folder: ..."). Review before posting.
 
-## Recording attempt, 2026-11-03 (second pass): what happened
+## Still to record
 
-Everything below was tried against the maintainer's live Kiln 0.1.1 and the iOS simulator. **No usable footage came out of it, so the video is still not cut** and no new media was added.
+- **Apple Watch / real iPhone push alert**: the relay and push registration are live for your real phone (Kiln showed "Internet relay connected" and "1 phone registered for alerts"), so an alert should reach it when an approval waits about 4 s. Needs you: Remote control on, phone locked, Kiln closed on the phone, watch awake, then film the wrist or lock screen while the Mac run is going. I did not touch your phone.
+- **Clips 2 and 3** (LoRA from chat, reverse-engineering a function): not attempted. Clip 1 is covered by the loop above, minus the watch.
+- A rebuilt cut once a real watch shot exists: `python3 Scripts/make_demo_cut.py MAC.mov PHONE.mov OUT_DIR` (edit the segment table at the top).
 
-- Kiln can be driven: switching project (Choose Folder) and setting the mode chip to **Ask** both work. The Mac screen recorded fine with `screencapture -v`.
-- **Blocker 1, no gate appeared.** The installed app has 32 standing grants, including tool-wide `write_file` and `edit_file` and a `swift test ... | tail -60` command grant, so Ask mode did not stop those calls. A clean take needs those revoked first (Approval Queue, Standing grants, Revoke). I did not revoke the maintainer's grants.
-- **Blocker 2, wrong project.** Sending a prompt from "New chat" appended it to the existing PolyBot conversation, and the agent explored PolyBot, not the demo package. I stopped it after read-only calls (`list_directory`, `swift test`, `read_file`, `glob`); nothing was written. One extra user message and a partial run now sit in that old chat. Start from a genuinely new conversation (check the sidebar highlights "New Conversation" before typing).
-- **Blocker 3, model.** The configured free model (nemotron-3.5-super-vl) stopped without an answer earlier and wandered here; a tool-capable model is needed for a clean fix-the-test run.
-- Simulator: KilnRemote built and installed on iPhone 17 Pro, FakeMac started. Pairing by pasted link did not complete in my session (the Pair button was inert after the camera prompt); not diagnosed. Real Mac to simulator pairing was not attempted.
-- Left changed in the app: project restored to PolyBot, mode chip left on **Ask** (it was Auto). The demo package is at `~/KilnDemo/DemoPackage` (git repo, one failing test).
+## How the footage was made (for repeating it)
 
-## Needed from the maintainer (in this order)
-
-1. Revoke the `write_file`, `edit_file` and command standing grants (or confirm I may), set a tool-capable model, and keep Ask mode.
-2. Real watch: Remote control on in Kiln, relay URL set, push key deployed, iPhone locked with Kiln closed, watch awake and mirroring. Then run the 9-shot list in `VIDEO-SCRIPT.md`; the assembly commands are there.
-3. Do not press Always Allow during takes.
-
-## Third pass (same day): iPhone simulator against the real Mac
-
-Still no cut. What now works and what blocks, so the next attempt starts further along:
-
-- **Pairing the simulator works**, with two non-obvious requirements: build KilnRemote with ad-hoc signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM=`); an unsigned build (`CODE_SIGNING_ALLOWED=NO`) silently fails the Keychain write and the Pair button does nothing. The pairing link can be decoded from the QR on screen (CoreImage `CIDetector`); `simctl openurl` did not pair, pasting into the field and pressing return then Pair did.
-- The Kiln Remote card showed "Internet relay connected" and "Phone alerts: 1 phone registered", so the relay and push path are live for the maintainer's real iPhone.
-- **Kiln's New chat is unreliable to drive**: after New chat (and ⌘N) the pane kept showing the old PolyBot transcript, and typing appended to it. Also, the model chip changed from nemotron to `ollama-cloud-gemma4:31b` while I was working, so another session or process is using this app at the same time. A clean recording needs the app to itself.
-- I did not touch the maintainer's real phone (iPhone Mirroring showed a personal app).
-- State restored: Remote control stopped (it was off), project back to PolyBot, simulator app uninstalled. Mode chip is still Ask. The simulator's pairing may still be listed in Kiln's Remote control paired devices; remove it there (do not use "Unpair all devices", which also removes the real phone).
+- Mac: `screencapture -v -x -V <seconds> mac.mov` (it writes the file only when it ends; start it with `nohup ... &` from a background command). Phone: `xcrun simctl io <udid> recordVideo --codec h264 phone.mov`, stopped with SIGINT.
+- Pair the simulator: build KilnRemote with ad-hoc signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM=`); an unsigned build cannot write the Keychain and Pair silently does nothing. The pairing link can be decoded from the Remote control QR with CoreImage `CIDetector`; type it into the "paste the pairing link" field, press return, then Pair. A leftover pairing from an earlier install shows as "Studio Mac": Settings, Unpair, then pair again.
+- Kiln quirks met: New chat sometimes keeps showing the old transcript and typing appends to it, so after quitting and relaunching Kiln start from the fresh "New chat" screen and check the title; the free `nemotron` and `GLM 5.3 Flash` models did not respond in 80 s, `gemma4:31b` did; the Mode chip's menu is not the tooltip you see on hover.
+- State left behind: Remote control stopped, project back to PolyBot, mode chip on **Ask** (was Auto), simulator app uninstalled. The simulator's pairing may still be listed under Kiln's Remote control devices (remove that one entry; "Unpair all devices" would also remove your real phone). The demo package is at `~/KilnDemo/DemoPackage`.

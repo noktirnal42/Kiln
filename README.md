@@ -2,6 +2,7 @@
 <h1 align="center">Kiln</h1>
 <p align="center"><strong>One native Mac workspace. Many ways to make.</strong><br>AI agents · development tools · reverse engineering · model experimentation</p>
 <p align="center"><a href="https://github.com/noktirnal42/Kiln/releases">Download the preview</a> · <a href="https://noktirnal42.github.io/Kiln/">Project website</a> · <a href="https://noktirnal42.github.io/Kiln/docs.html">Get started</a> · <a href="docs/KNOWN-ISSUES.md">Known issues</a> · <a href="https://github.com/noktirnal42/Kiln/issues">Help build it</a></p>
+<p align="center"><img src="site/assets/kiln-approval-loop.gif" width="640" alt="Screen recording: Kiln on the Mac stops at an approval gate for a shell command, and the same approval appears in the iPhone companion (iOS Simulator)"><br><sub>Real Kiln 0.1.1 on the Mac; the phone is the iOS Simulator companion answering a real approval. Preview software.</sub></p>
 <p align="center"><a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-d8b38a"></a> <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-25231e"> <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-e89b61"></p>
 
 Kiln is an open-source Swift and SwiftUI workstation exploring what happens when conversation, tools, binary analysis, and model creation share a common foundation. Move between disciplines while keeping project context, agent activity, approvals, and audit evidence close to the work.
