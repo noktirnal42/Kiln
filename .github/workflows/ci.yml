@@ -19,6 +19,10 @@ jobs:
           ls -d /Applications/Xcode*.app | sort -V | tail -1 | xargs -I{} sudo xcode-select -s "{}/Contents/Developer"
           xcodebuild -version
       - run: brew install xcodegen
+      - name: Install relay dependencies (the relay end-to-end test starts it)
+        run: npm ci --prefix Relay
+      - name: Relay tests
+        run: npm test --prefix Relay
       - run: xcodegen generate
       - name: Build
         run: xcodebuild -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS' -jobs 2 CODE_SIGNING_ALLOWED=NO -skipPackagePluginValidation -skipMacroValidation build
