@@ -275,13 +275,12 @@ struct ComposerView: View {
                     }
                 }
                 .onKeyPress(.return, phases: .down) { press in
-                    if press.modifiers.isDisjoint(with: [.command, .shift, .option]) {
-                        let ready = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        if ready && !session.isStreaming { onSend() }
-                        return .handled
+                    switch ComposerReturn.decide(modifiers: press.modifiers, text: input, isStreaming: session.isStreaming, hasMarkedText: ComposerReturn.focusedViewIsComposing) {
+                    case .send: onSend(); return .handled
+                    case .newline: insertNewline(); return .handled
+                    case .ignore: return .handled
+                    case .passThrough: return .ignored
                     }
-                    insertNewline()
-                    return .handled
                 }
 
             if let voice { voiceControls(voice) }
