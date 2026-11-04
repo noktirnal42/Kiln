@@ -14,9 +14,9 @@ Nothing here is posted or published. The maintainer approves all posting. Writte
 
 One unedited-recording session of the installed Kiln 0.1.1, Ask mode, on a throwaway Swift package with a failing test (`pageCount` used integer division). Model: `gemma4:31b` via Ollama Cloud. The agent ran `swift test --filter PaginationTests`, read the test and source, fixed the bug, re-ran the test and committed.
 
-- `site/assets/kiln-demo-draft.mp4` (about 100 s, muted, captioned): the draft cut. Mac and iPhone Simulator side by side. Two `run_command` approvals were answered from the iOS Simulator companion, which Kiln logged as **`via: remote`** (26 s and 22 s waits); the `git_commit` gate, with its message, was answered with the mouse (`via: mouse`). Cuts are marked in the video.
+- `site/assets/kiln-demo-draft.mp4` (92 s, muted, captioned): the draft cut. Mac and iPhone Simulator side by side. Two `run_command` approvals were answered from the iOS Simulator companion, which Kiln logged as **`via: remote`** (26 s and 22 s waits); the `git_commit` gate, with its message, was answered with the mouse (`via: mouse`). Cuts are marked in the video.
 - `site/assets/kiln-approval-loop.mp4` and `.gif` (22 s): the gate on the Mac plus the same approval on the phone.
-- `site/assets/shots/demo-gate-and-phone.png`: still from the cut. `audit-chain.png`: crop of the Audit view.
+- `site/assets/shots/demo-storyboard.png`: one still per scene of the cut, for reviewing without playing the video. `site/assets/shots/demo-gate-and-phone.png`: still from the cut. `audit-chain.png`: crop of the Audit view.
 - The README hero is the GIF above.
 
 What the cut honestly is, so captions and posts must say the same:
