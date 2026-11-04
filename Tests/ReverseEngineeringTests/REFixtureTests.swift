@@ -114,3 +114,50 @@ struct LiveGhidraFixtureTests {
         #expect(analysis.engine.hasPrefix("Ghidra"))
     }
 }
+
+/// Harder inputs than the plain C sample: a stripped binary (no symbols), C++ (mangled methods) and Swift. Opt-in with a real Ghidra.
+@MainActor
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["KILN_LIVE_GHIDRA"] == "1"), .serialized)
+struct LiveGhidraHarderFixtureTests {
+    private func analyse(_ name: String) async throws -> (Analysis, REModule, REModule.REProject) {
+        let module = REModule()
+        module.configureDiscoveredGhidra()
+        #expect(module.isGhidraAvailable, "\(module.ghidraStatus)")
+        _ = try await module.importBinary(at: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/\(name)"))
+        let project = try #require(module.selected)
+        let analysis = try await module.analyzeWithGhidra(projectID: project.id)
+        return (analysis, module, project)
+    }
+
+    @Test func aStrippedBinaryStillYieldsFunctionsAndPseudocodeWithTheString() async throws {
+        let (analysis, module, project) = try await analyse("re-sample-stripped")
+        defer { try? FileManager.default.removeItem(at: project.folder) }
+        print("HARDER stripped functions=\(analysis.functions.map(\.name))")
+        #expect(analysis.functions.count >= 4)
+        #expect(!analysis.functions.contains { $0.name == "add_numbers" || $0.name == "greet" }, "a stripped binary must not carry source names")
+        var sawString = false
+        for function in analysis.functions where !function.code.isEmpty {
+            if try await module.decompilation(projectID: project.id, address: function.address).contains("KILN-FIXTURE-GREETING") { sawString = true }
+        }
+        #expect(sawString, "no decompiled function references the greeting string")
+    }
+
+    @Test func cppMethodsAreRecoveredWithTheirMangledOrDemangledNames() async throws {
+        let (analysis, _, project) = try await analyse("re-sample-cpp")
+        defer { try? FileManager.default.removeItem(at: project.folder) }
+        let names = analysis.functions.map(\.name)
+        print("HARDER cpp functions=\(names)")
+        #expect(names.contains { $0.contains("describe") })
+        #expect(names.contains { $0.contains("Counter") && $0.contains("add") })
+    }
+
+    @Test func swiftFunctionsAreRecovered() async throws {
+        let (analysis, _, project) = try await analyse("re-sample-swift")
+        defer { try? FileManager.default.removeItem(at: project.folder) }
+        let names = analysis.functions.map(\.name)
+        print("HARDER swift count=\(names.count) sample=\(names.prefix(12))")
+        #expect(names.contains { $0.contains("fibonacci") })
+        #expect(names.contains { $0.contains("greet") || $0.contains("Greeter") })
+    }
+}

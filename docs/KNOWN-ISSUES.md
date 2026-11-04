@@ -46,6 +46,8 @@ This is the contributor-facing gap list for Kiln's current development state. Th
 
 **Verified 2026-11-04 against 11.3.2, 12.1.4 and 12.2 DEV** (import, function recovery, decompilation on the bundled fixture). Ghidra 11 fails to compile its scripts under a newer JDK, and a Finder-launched app gets the newest installed JDK; Kiln now pins JDK 21 for Ghidra 11 when one is installed, and explains the error otherwise. An unusable compiled-script bundle left by an earlier failed run lives in `~/Library/ghidra/<version>/osgi/compiled-bundles` and can be deleted.
 
+**Harder inputs verified 2026-11-04 (Ghidra 12.1.4):** a fully stripped build of the sample (FUN_ names, five functions, the greeting string reached through decompilation), a C++ program (Counter::add/total, describe, mangled names kept) and a Swift program (greet, fibonacci, 30 functions including outlined helpers). Fixtures and sources are in `Tests/Fixtures`; the tests are opt-in (`KILN_LIVE_GHIDRA=1`).
+
 **Needed:** broader Ghidra version/architecture and complex-binary fixtures; cancellation UI and explicit installation chooser; honest capability states; a licensed, evaluated model and dataset if cipher classification is pursued. Do not label placeholder classification as working.
 
 ## Export and model compatibility need broader coverage
