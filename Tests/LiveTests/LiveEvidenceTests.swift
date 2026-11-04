@@ -22,16 +22,33 @@ struct LiveEvidenceTests {
 
     private func targets() -> [Target] {
         let keychain = KeychainService()
-        return [
-            // Small local models are the interesting cases: they chat well and often fail tool use. Edit this list for your machine.
-            Target(label: "ollama/gemma4:e4b", provider: OpenCodeProvider(scope: .local), model: "gemma4:e4b", runtime: "native Ollama"),
-            Target(label: "ollama/gemma3:4b", provider: OpenCodeProvider(scope: .local), model: "gemma3:4b", runtime: "native Ollama"),
-            Target(label: "ollama/SiliconBasedWorld/Qwen2.5-7B-Instruct-1M", provider: OpenCodeProvider(scope: .local),
-                   model: "SiliconBasedWorld/Qwen2.5-7B-Instruct-1M:latest", runtime: "native Ollama"),
+        // Hosted free models by default (no local GPU load, no spend). Set KILN_LIVE_LOCAL=1 to add local Ollama models.
+        let env = ProcessInfo.processInfo.environment
+        let openRouterKey = env["OPENROUTER_API_KEY"] ?? ""
+        let stored = keychain.secretProvider(module: providersKeychainModule, key: "openrouter")
+        let openRouter = OpenRouterProvider(secretProvider: { openRouterKey.isEmpty ? stored() : openRouterKey })
+        var list = [
             Target(label: "ollama-cloud/gemma4:31b",
                    provider: OpenCodeProvider(scope: .cloud, secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "ollama-cloud")),
                    model: "gemma4:31b", runtime: "Ollama Cloud (hosted)"),
         ]
+        for id in ["gpt-oss:20b", "nemotron-3-nano:30b", "glm-5.3-flash", "deepseek-v4.1-flash", "mimo-v2.6-flash"] {
+            list.append(Target(label: "ollama-cloud/\(id)",
+                               provider: OpenCodeProvider(scope: .cloud, secretProvider: keychain.secretProvider(module: providersKeychainModule, key: "ollama-cloud")),
+                               model: id, runtime: "Ollama Cloud (hosted)"))
+        }
+        if env["KILN_LIVE_OPENROUTER"] == "1" {
+            for id in ["google/gemma-4-31b-it:free", "nvidia/nemotron-3.5-lightning:free", "cohere/north-mini-code:free", "liquid/lfm-2.5-2.6b:free"] {
+                list.append(Target(label: "openrouter/\(id)", provider: openRouter, model: id, runtime: "OpenRouter free (hosted)"))
+            }
+        }
+        if env["KILN_LIVE_LOCAL"] == "1" {
+            list += [
+                Target(label: "ollama/gemma3:4b", provider: OpenCodeProvider(scope: .local), model: "gemma3:4b", runtime: "native Ollama"),
+                Target(label: "ollama/gemma4:e4b", provider: OpenCodeProvider(scope: .local), model: "gemma4:e4b", runtime: "native Ollama"),
+            ]
+        }
+        return list
     }
 
     private func run(_ target: Target) async throws -> Row {

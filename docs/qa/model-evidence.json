@@ -1,58 +1,98 @@
 [
   {
-    "build": "0.1.0",
-    "date": "2026-11-03T06:30:54Z",
-    "failureClass": "Provider/transport",
-    "filesWritten": [],
-    "model": "ollama/gemma4:e4b",
-    "note": "The run exceeded its wall-clock timeout.",
-    "runtime": "native Ollama",
-    "status": "blocked",
-    "toolsExecuted": [],
-    "verified": false
-  },
-  {
-    "build": "0.1.0",
-    "date": "2026-11-03T06:50:49Z",
-    "failureClass": "Model limitation",
-    "filesWritten": [],
-    "model": "ollama/gemma3:4b",
-    "note": "Provider returned an invalid response: {\"error\":\"registry.ollama.ai/library/gemma3:4b does not support tools\"}",
-    "runtime": "native Ollama",
-    "status": "blocked",
-    "toolsExecuted": [],
-    "verified": false
-  },
-  {
-    "build": "0.1.0",
-    "date": "2026-11-03T06:50:50Z",
-    "filesWritten": [
+    "build" : "0.1.1",
+    "date" : "2026-11-04T04:21:45Z",
+    "filesWritten" : [
       "release.md"
     ],
-    "model": "ollama/SiliconBasedWorld/Qwen2.5-7B-Instruct-1M",
-    "note": "The release note has been successfully written to `release.md` containing the exact release code from `project.txt`.\n[evidence: tools: read_file, write_file \u00b7 files written: release.md]",
-    "runtime": "native Ollama",
-    "status": "done",
-    "toolsExecuted": [
+    "model" : "ollama-cloud\/gemma4:31b",
+    "note" : "I have read the release code from `project.txt` and written it to `release.md`.\n\nChanged: Created `release.md` with the content `COBALT-731`.\n[evidence: tools: read_file, write_file · files written: release.md]",
+    "runtime" : "Ollama Cloud (hosted)",
+    "status" : "done",
+    "toolsExecuted" : [
       "read_file",
       "write_file"
     ],
-    "verified": true
+    "verified" : true
   },
   {
-    "build": "0.1.0",
-    "date": "2026-11-03T06:53:39Z",
-    "filesWritten": [
+    "build" : "0.1.1",
+    "date" : "2026-11-04T04:21:47Z",
+    "filesWritten" : [
       "release.md"
     ],
-    "model": "ollama-cloud/gemma4:31b",
-    "note": "I have recorded the release code in `release.md`.\n\nChanged: Created `release.md` with the content `COBALT-731`.\n[evidence: tools: read_file, write_file \u00b7 files written: release.md]",
-    "runtime": "Ollama Cloud (hosted)",
-    "status": "done",
-    "toolsExecuted": [
+    "model" : "ollama-cloud\/gpt-oss:20b",
+    "note" : "**What I did**  \n1. Read `project.txt` to locate the release code.  \n2. Created `release.md` containing the release code exactly as specified.\n\n**Result**  \n`release.md` now contains:  \n```\nCOBALT-731\n```\n\n[evidence: tools: read_file, write_file · files written: release.md]",
+    "runtime" : "Ollama Cloud (hosted)",
+    "status" : "done",
+    "toolsExecuted" : [
       "read_file",
       "write_file"
     ],
-    "verified": true
+    "verified" : true
+  },
+  {
+    "build" : "0.1.1",
+    "date" : "2026-11-04T04:21:51Z",
+    "filesWritten" : [
+      "release.md"
+    ],
+    "model" : "ollama-cloud\/nemotron-3-nano:30b",
+    "note" : "The release note has been created in `release.md` with the release code exactly as specified.\n\n**Result:**  \n- File: `release.md`  \n- Content: `# Release Note\\n\\n**Release Code:** COBALT-731`  \n\n**Evidence:**  \nThe file was written and subsequently read back, confirming the release code `COBALT-731`",
+    "runtime" : "Ollama Cloud (hosted)",
+    "status" : "done",
+    "toolsExecuted" : [
+      "read_file×2",
+      "write_file"
+    ],
+    "verified" : true
+  },
+  {
+    "build" : "0.1.1",
+    "date" : "2026-11-04T04:22:07Z",
+    "failureClass" : "Unverified",
+    "filesWritten" : [
+
+    ],
+    "model" : "ollama-cloud\/glm-5.3-flash",
+    "note" : "Payment required: {\"error\":\"this model is not included in your free usage, add usage credits to pay as you go: https:\/\/ollama.com\/settings or upgrade for includ",
+    "runtime" : "Ollama Cloud (hosted)",
+    "status" : "blocked",
+    "toolsExecuted" : [
+
+    ],
+    "verified" : false
+  },
+  {
+    "build" : "0.1.1",
+    "date" : "2026-11-04T04:22:07Z",
+    "failureClass" : "Unverified",
+    "filesWritten" : [
+
+    ],
+    "model" : "ollama-cloud\/deepseek-v4.1-flash",
+    "note" : "Payment required: {\"error\":\"this model is not included in your free usage, add usage credits to pay as you go: https:\/\/ollama.com\/settings or upgrade for includ",
+    "runtime" : "Ollama Cloud (hosted)",
+    "status" : "blocked",
+    "toolsExecuted" : [
+
+    ],
+    "verified" : false
+  },
+  {
+    "build" : "0.1.1",
+    "date" : "2026-11-04T04:22:08Z",
+    "failureClass" : "Unverified",
+    "filesWritten" : [
+
+    ],
+    "model" : "ollama-cloud\/mimo-v2.6-flash",
+    "note" : "Payment required: {\"error\":\"this model is not included in your free usage, add usage credits to pay as you go: https:\/\/ollama.com\/settings or upgrade for includ",
+    "runtime" : "Ollama Cloud (hosted)",
+    "status" : "blocked",
+    "toolsExecuted" : [
+
+    ],
+    "verified" : false
   }
 ]
