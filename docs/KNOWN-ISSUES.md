@@ -74,6 +74,8 @@ Layout fixes have addressed pane navigation, embedded Search placement, model-pi
 
 **Mitigation (2026-11-02):** a 90 s first-chunk watchdog in `OpenAICompatibleTransport.stream` now fails with "No response after 90 s… try again or pick another model" instead of waiting for the 180 s transport timeout.
 
+**Probe 2026-11-04 (LiveNIMTimingTests, `KILN_LIVE_NIM=1`):** `google/gemma-4-31b-it` and `z-ai/glm-5.3-flash` each timed out at 120 s with no response for streaming, non-streaming and streaming with `enable_thinking:false`. Request shape is therefore not the cause; the endpoint is queueing or unavailable for this key. No control model was listed for comparison.
+
 **Still needed:** find out whether this is the provider's queue or a request-shape problem (reasoning fields for NIM), then add a configurable first-token timeout with a clear error and a retry/other-model suggestion.
 
 ## Local model store scan is slow on external drives
