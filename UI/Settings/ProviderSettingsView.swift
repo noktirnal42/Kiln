@@ -78,6 +78,7 @@ struct ProviderSettingsView: View {
     @Environment(\.openURL) private var openURL
     @State private var model = ProviderSettingsModel()
     @AppStorage("computerUse.enabled") private var computerUseEnabled = false
+    @AppStorage("provider.firstChunkTimeout") private var firstChunkTimeout = 90.0
     /// Live: macOS can say "Kiln: on" for another copy of Kiln while this copy is not trusted, so show what this copy sees.
     @State private var accessibilityTrusted = AXIsProcessTrusted()
 
@@ -91,6 +92,13 @@ struct ProviderSettingsView: View {
                 }
                 ForEach(ProviderKeyEntry.all) { entry in
                     row(entry)
+                }
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                    Stepper(value: $firstChunkTimeout, in: 10...600, step: 15) {
+                        Text("Wait for a first reply: \(Int(firstChunkTimeout)) s")
+                    }
+                    Text("Hosted models sometimes queue a request for a minute or more before answering. A request with no reply by then is reported as stalled instead of hanging.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
                     Toggle("Computer use", isOn: $computerUseEnabled)
