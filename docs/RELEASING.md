@@ -51,5 +51,6 @@ Adding Sparkle needs an EdDSA key pair and an appcast host, which are the mainta
 
 ## CI
 
-`.github/workflows/ci.yml` builds and runs the unit suite on a hosted macOS runner, manually triggered. It is not a required check: it has only
-been proven where it can be run (see the issue tracker for the latest run), and the project targets a very recent Xcode.
+`.github/workflows/ci.yml` builds and runs the Mac unit suite, the relay's JS tests and the site checks on a hosted macOS runner. It passed there on 2026-11-04
+(it needs `-skipPackagePluginValidation -skipMacroValidation` for the SwiftTerm plug-in, and `npm ci --prefix Relay` for the relay end-to-end test). It runs on pull
+requests and by hand from the Actions tab. It is not yet a required check; make it one once a few pull requests have gone through it.

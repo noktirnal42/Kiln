@@ -1,7 +1,8 @@
 name: Build and test
-# Manual until a hosted runner with the project's Xcode (see xcodeVersion in project.yml) is confirmed.
-# Run it from the Actions tab; once it passes reliably, add `pull_request:` below.
+# Passed on a hosted macOS runner on 2026-11-04 (build, Mac tests, relay tests, site checks).
+# Runs on pull requests and can still be started by hand from the Actions tab.
 on:
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
