@@ -1,5 +1,251 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Kiln is an open-source native macOS workstation for AI agents, development, reverse engineering, and model experimentation."><meta name="theme-color" content="#171613"><meta property="og:title" content="An open workshop for ambitious work · Kiln"><meta property="og:description" content="One native workspace. Many ways to make."><meta property="og:image" content="https://noktirnal42.github.io/Kiln/assets/kiln-painted.png"><link rel="icon" href="assets/icon.png"><link rel="stylesheet" href="style.css"><title>An open workshop for ambitious work · Kiln</title></head><body><a class="skip" href="#main">Skip to content</a><header><a class="brand" href="index.html"><img src="assets/icon.png" alt="">Kiln<span> / </span></a><nav aria-label="Main navigation"><a href="docs.html">Documentation</a><a href="roadmap.html">Roadmap</a><a href="contribute.html">Contribute</a><a href="support.html">Support</a><a class="source" href="https://github.com/noktirnal42/Kiln">GitHub ↗</a></nav></header><main id="main"><section class="hero"><div class="hero-copy"><p class="eyebrow"><span class="dot"></span> A native Mac app. An open invitation.</p><h1>From a spark.<br>To something<br><em>real.</em></h1><p class="lede">Think with models. Build with agents. Understand binaries. Train something of your own.<br>One shared workshop for the whole process.</p><div class="actions"><a class="button" href="docs.html#start">Build Kiln ↗</a><a class="text-link" href="https://github.com/noktirnal42/Kiln">Explore the source <span>→</span></a></div><p class="fine">macOS · Swift & SwiftUI · Apple silicon recommended<br>Early development. A notarized preview is on <a href="https://github.com/noktirnal42/Kiln/releases">GitHub Releases</a>; no stable release promised.</p></div><figure class="hero-art"><img src="assets/kiln-painted.png" alt="A sculptural ceramic kiln glowing with molten amber light"><figcaption>Many capabilities. One creative core.</figcaption></figure></section>
-<section class="intro"><p class="eyebrow">THE IDEA</p><h2>Your work crosses boundaries.<br>Your workspace should, too.</h2><p>Development, analysis, and model experimentation belong in the same conversation. Kiln is exploring a native environment where an agent can help you move between them—with shared services, visible tool activity, and approvals for consequential actions.</p></section>
-<section class="workshop" aria-labelledby="workshop-title"><div class="section-head"><p class="eyebrow">INSIDE THE WORKSHOP</p><h2 id="workshop-title">Different disciplines.<br>A common foundation.</h2></div><div class="disciplines"><article><span class="number">01 /</span><div><h3>Think & coordinate</h3><p>Stream conversations across local and hosted providers. Give a team a goal, follow its tasks, and review the results.</p><span class="status">Working foundation · model-dependent reliability</span></div></article><article><span class="number">02 /</span><div><h3>Build & inspect</h3><p>Edit with a Swift language server, build, test and debug with LLDB, and keep a real terminal, Git and MCP connections beside the agent.</p><span class="status">Capable editor and debugger · not Xcode parity</span></div></article><article><span class="number">03 /</span><div><h3>Understand what’s inside</h3><p>Import binaries, inspect disassembly and strings, and run analysis tools. Connect Ghidra for deeper recovery.</p><span class="status">Native inspection working · Ghidra setup required</span></div></article><article><span class="number">04 /</span><div><h3>Make models your own</h3><p>Explore datasets and models, track experiments, and work with Create ML and MLX training engines, including LoRA and distillation.</p><span class="status">Real training verified · broader GUI QA ongoing</span></div></article><article><span class="number">05 /</span><div><h3>Talk, and take it with you</h3><p>Dictate to the model and hear it answer. Companion apps aim to bring conversations and tool approvals to iPhone and Apple Watch, with an optional self-hosted relay. Physical-device testing is ongoing.</p><span class="status">Watch voice, approvals and relay path tested · reliability work ongoing</span></div></article></div></section>
-<section class="proof"><p class="eyebrow">EVIDENCE, NOT PROMISES</p><h2>Small proofs.<br>Real work.</h2><div class="proof-grid"><div><strong>5</strong><h3>Provider chat paths</h3><p>Correct live responses through the app’s session layer from Apple Foundation Models, Ollama, Ollama Cloud, NVIDIA NIM, and OpenRouter.</p></div><div><strong>150</strong><h3>Training iterations</h3><p>A small transformer trained from scratch, saved its weights, and generated text. A separate real LoRA smoke run saved an adapter.</p></div><div><strong>3</strong><h3>Workers, one artifact</h3><p>A hosted researcher, implementer, and reviewer completed a real file-summary task with an intact audit chain.</p></div></div><p class="fine">Observed in local QA on November 1, 2026. These examples do not establish production readiness or guarantee every model works. <a href="docs.html#status">Read the verification record →</a></p></section>
-<section class="open-call"><p class="eyebrow">BUILD THE NEXT CHAPTER</p><h2>A workshop gets better<br>with more hands.</h2><p>Bring your Swift experience, your sharpest bug report, your real-world workflow, or your eye for good design. Help turn a promising foundation into a tool people can depend on.</p><div class="actions"><a class="button" href="contribute.html">Find your first contribution →</a><a class="text-link" href="roadmap.html">See what needs work ↗</a></div></section></main><footer><a class="brand" href="index.html">Kiln /</a><p>Built in the open. Made for the Mac.<br><span>Experimental software · MIT licensed · No affiliation with Apple, Anthropic, OpenAI, or Ghidra.</span></p><a href="https://github.com/noktirnal42/Kiln">Explore the source ↗</a></footer><script src="site.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kiln: a native Mac workshop for AI agents you can supervise</title>
+<meta name="description" content="Kiln is an open-source Mac app where AI agents do real work (code, reverse engineering, model training) and every consequential step waits for your approval, at your desk or from your iPhone and Apple Watch.">
+<meta name="theme-color" content="#121110">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Kiln: agents that work, hands that stay on the controls">
+<meta property="og:description" content="A native Mac workshop for AI agents you can supervise. Approve their actions from your iPhone or Apple Watch. Open source, notarized, in preview.">
+<meta property="og:image" content="https://noktirnal42.github.io/Kiln/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header>
+  <div class="bar">
+    <a class="brand" href="index.html"><img src="assets/icon.png" alt="">Kiln<span>/</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#why">Why Kiln</a><a href="#safety">Safety</a><a href="#remote">Remote</a><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a>
+      <a class="source" href="https://github.com/noktirnal42/Kiln">GitHub ↗</a>
+      <a class="cta" href="https://github.com/noktirnal42/Kiln/releases">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" aria-labelledby="hero-title">
+  <div>
+    <p class="eyebrow"><span class="dot"></span>Open source · Native macOS · Preview</p>
+    <h1 id="hero-title">Agents that work.<br>Hands that stay <em>on the controls.</em></h1>
+    <p class="lede">Kiln is a Mac workshop where AI agents do real work (code, reverse engineering, model training) and every consequential step waits for you, at your desk or on your wrist.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="https://github.com/noktirnal42/Kiln/releases">Download for Mac</a>
+      <a class="btn btn-ghost" href="https://github.com/noktirnal42/Kiln">View the source</a>
+    </div>
+    <p class="badges"><span>Notarized by Apple</span><span>MIT licensed</span><span>Apple silicon recommended</span></p>
+    <p class="fine">Version 0.1.1 preview for macOS 15 or later. Early software: read <a href="#status">what works and what does not</a> before you rely on it.</p>
+  </div>
+  <div class="stage">
+    <div class="window main">
+      <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+      <img src="assets/shots/agent.jpg" width="1159" height="868" alt="Kiln's agent view: a question about a project answered in three bullets, with the list of files the agent read shown beneath it.">
+    </div>
+    <div class="phone"><img src="assets/shots/iphone-approval.png" width="760" height="1652" alt="The Kiln Remote iPhone app showing an approval card: the shell wants to run swift test, with Deny and Allow once buttons."></div>
+    <div class="watch"><img src="assets/shots/watch-approval.png" width="416" height="496" alt="The Kiln Apple Watch app asking Approve? for run_command, with Allow once and Deny buttons."></div>
+    <p class="caption">The Mac app, and the iPhone and Apple Watch approval screens. Companion screens are from the simulator with demo data.</p>
+  </div>
+</section>
+
+<div class="strip">
+  <ul aria-label="Facts about Kiln">
+    <li><strong>592</strong><span>automated tests pass on the Mac</span></li>
+    <li><strong>3</strong><span>approval modes: Ask, Auto, Bypass</span></li>
+    <li><strong>5</strong><span>model providers verified in live chat</span></li>
+    <li><strong>MIT</strong><span>source, notarized builds, public issues</span></li>
+    <li><strong>Wrist</strong><span>approvals verified on a real iPhone and Apple Watch</span></li>
+  </ul>
+</div>
+
+<section id="why" aria-labelledby="why-title">
+  <div class="section-head">
+    <p class="eyebrow">Why Kiln</p>
+    <h2 id="why-title">Let an agent do the work.<br><em>Keep the last word.</em></h2>
+    <p>Most agent tools make you choose between watching every step and trusting everything. Kiln is built around a third option: let the agent run, and make every important decision visible, answerable and recorded.</p>
+  </div>
+  <div class="grid-3">
+    <article class="card">
+      <div class="icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+      <h3>Supervision is the product</h3>
+      <p>Commands, file writes and network calls stop at an approval that spells out what will happen. Three modes decide who answers; a few things are blocked in every mode.</p>
+      <ul><li>Consequences in plain language</li><li>Ask, Auto and Bypass</li><li>A tamper-evident audit chain</li></ul>
+    </article>
+    <article class="card">
+      <div class="icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="6" width="10" height="12" rx="3"/><path d="M9 6l1-3h4l1 3M9 18l1 3h4l1-3"/><path d="M12 10v2.5l1.5 1"/></svg></div>
+      <h3>Approve from anywhere</h3>
+      <p>Walk away from the desk. When the agent needs you, your iPhone is alerted and the alert mirrors to your Apple Watch. Tap Allow once or Deny, even with the phone locked.</p>
+      <ul><li>Encrypted end to end</li><li>Works off your home network</li><li>Answers recorded as remote</li></ul>
+    </article>
+    <article class="card">
+      <div class="icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/><path d="M3 17.5l9 5 9-5" opacity=".5"/></svg></div>
+      <h3>One app, three crafts</h3>
+      <p>Write code, take binaries apart and train models in the same place, with the same agent, tools and audit trail. A native app in Swift and SwiftUI, not a browser in a box.</p>
+      <ul><li>Editor, build, test, LLDB</li><li>Ghidra, radare2, Mach-O</li><li>MLX LoRA, distillation, Create ML</li></ul>
+    </article>
+  </div>
+</section>
+
+<section id="safety" aria-labelledby="safety-title">
+  <div class="split">
+    <div>
+      <p class="eyebrow">Safety, shown not claimed</p>
+      <h2 id="safety-title">Every risky step <em>asks first.</em></h2>
+      <p>This is a real approval from Kiln: the agent was asked to clean up a folder, and the command deletes files recursively. Kiln marks it destructive, spells out the consequence and waits.</p>
+      <ul class="checks">
+        <li>Hard blocks no mode can lift<small>Commands like a recursive delete from the root are refused outright.</small></li>
+        <li>Behavior-monitor holds<small>A run that trips a wire is paused for review, whatever mode is on.</small></li>
+        <li>An audit chain you can verify<small>Each decision records how it was answered: mouse, keyboard, remote, or a mode.</small></li>
+      </ul>
+    </div>
+    <figure class="shot" style="margin:0">
+      <img src="assets/shots/approval-crop.jpg" width="546" height="556" alt="Kiln's approval queue showing the shell command mkdir -p build-cache and rm -rf build-cache, flagged Destructive: recursively deletes files without confirmation, with Deny, Approve Once and Always Allow buttons.">
+    </figure>
+  </div>
+  <div class="table-wrap" style="margin-top:56px">
+    <table class="table">
+      <thead><tr><th>Mode</th><th>Who answers</th><th>Good for</th></tr></thead>
+      <tbody>
+        <tr><td>Ask</td><td>You, for every write, command and network call.</td><td>Unfamiliar projects and anything you want to watch closely.</td></tr>
+        <tr><td>Auto</td><td>Kiln approves routine, non-destructive work in your project. Destructive, outside-scope, new-to-the-network and flagged commands still ask.</td><td>Everyday work where you want fewer interruptions.</td></tr>
+        <tr><td>Bypass</td><td>Kiln approves everything that is not hard-blocked. Red, confirmed first, and it resets when Kiln quits.</td><td>Tasks you have decided to trust, such as reading and replying in an app.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="remote" aria-labelledby="remote-title">
+  <div class="split reverse">
+    <div class="devices">
+      <div class="phone-s"><img src="assets/shots/iphone-chat.png" width="760" height="1652" alt="The Kiln Remote iPhone app in a conversation: a question about a flaky login test and the agent's answer."></div>
+      <div class="watch-s"><img src="assets/shots/watch-reply.png" width="416" height="496" alt="The Kiln Apple Watch app showing a green connected status to a Mac, a large microphone button and the latest spoken reply."></div>
+    </div>
+    <div>
+      <p class="eyebrow">Away from the desk</p>
+      <h2 id="remote-title">Start it. Walk away. <em>Answer from your wrist.</em></h2>
+      <p>Kiln Remote puts the conversation and the approvals on your iPhone and Apple Watch. Talk to the agent by voice, hear the reply, and answer an approval without going back to the Mac.</p>
+      <ul class="checks">
+        <li>Voice in, voice out<small>The watch records the moment you tap and the Mac transcribes it. No dictation sheet to wade through.</small></li>
+        <li>Alerts when the app is closed<small>The Mac asks your relay to send an Apple push alert if an approval waits more than a few seconds.</small></li>
+        <li>Private by construction<small>Every message is encrypted with a key only your devices hold; the relay forwards ciphertext and stores nothing.</small></li>
+      </ul>
+      <p class="fine" style="margin-top:20px">Honest setup cost: you host the small relay yourself (a free Cloudflare Worker works) and create an Apple push key. The companion apps are built from source with your own signing team; they are not on the App Store.</p>
+    </div>
+  </div>
+  <svg class="flow" viewBox="0 0 1000 150" role="img" aria-labelledby="flow-t flow-d" style="margin-top:64px">
+    <title id="flow-t">How an approval reaches your wrist</title>
+    <desc id="flow-d">Kiln on your Mac sends an encrypted request to a relay you host. The relay asks Apple's push service to alert your iPhone. The alert mirrors to your Apple Watch. Your answer returns the same way.</desc>
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff9d57"/></marker></defs>
+    <rect class="node" x="10" y="35" width="170" height="80" rx="14"/><text x="95" y="72" text-anchor="middle">Kiln on your Mac</text><text class="sub" x="95" y="94" text-anchor="middle">approval waits 4 s</text>
+    <rect class="node" x="230" y="35" width="170" height="80" rx="14"/><text x="315" y="72" text-anchor="middle">Your relay</text><text class="sub" x="315" y="94" text-anchor="middle">sees ciphertext only</text>
+    <rect class="node" x="450" y="35" width="170" height="80" rx="14"/><text x="535" y="72" text-anchor="middle">Apple push</text><text class="sub" x="535" y="94" text-anchor="middle">tool + short preview</text>
+    <rect class="node" x="670" y="35" width="150" height="80" rx="14"/><text x="745" y="72" text-anchor="middle">iPhone</text><text class="sub" x="745" y="94" text-anchor="middle">Allow once · Deny</text>
+    <rect class="node" x="870" y="35" width="120" height="80" rx="14"/><text x="930" y="72" text-anchor="middle">Watch</text><text class="sub" x="930" y="94" text-anchor="middle">mirrored</text>
+    <path class="edge" d="M180 75H228" marker-end="url(#arr)"/><path class="edge" d="M400 75H448" marker-end="url(#arr)"/><path class="edge" d="M620 75H668" marker-end="url(#arr)"/><path class="edge" d="M820 75H868" marker-end="url(#arr)"/>
+    <text class="lock" x="10" y="20">END-TO-END ENCRYPTED LINK</text>
+  </svg>
+</section>
+
+<section id="work" aria-labelledby="work-title">
+  <div class="section-head">
+    <p class="eyebrow">The workshop</p>
+    <h2 id="work-title">Different crafts.<br><em>One foundation.</em></h2>
+    <p>The same agent, tools, approvals and audit trail follow you across the work. Each area is honest about how far it has come.</p>
+  </div>
+  <div class="grid-3">
+    <article class="card">
+      <span class="chip ok">Working</span><span class="chip">Not Xcode</span>
+      <h3>Build</h3>
+      <p>A source editor with a Swift and C language server, build, test and run, an LLDB launch debugger, code folding, multi-cursor, Git markers and a real terminal.</p>
+      <ul><li>Agent reads, edits, runs tests, commits</li><li>MCP servers and Kiln's own tools</li><li>Swarms with roles and dependencies</li></ul>
+    </article>
+    <article class="card">
+      <span class="chip ok">Native inspection</span><span class="chip early">Ghidra needs setup</span>
+      <h3>Take apart</h3>
+      <p>Import a binary, read strings and disassembly, and let the agent rename and annotate with Ghidra and radare2 engines behind it. Every tool call is listed and audited.</p>
+      <ul><li>Mach-O inspection, native</li><li>Agent edit tools with a change log</li><li>Pointer scan and cross-references</li></ul>
+    </article>
+    <article class="card">
+      <span class="chip ok">Real training verified</span><span class="chip early">GUI QA ongoing</span>
+      <h3>Make models</h3>
+      <p>Import datasets, train with Create ML or MLX, fine-tune a LoRA, or distil one model into another, from the app or by asking the agent. Models must already be on disk unless you say a download is fine.</p>
+      <ul><li>LoRA and distillation as agent tools</li><li>Evaluation and export</li><li>Runs on your Mac's GPU</li></ul>
+    </article>
+  </div>
+  <div class="grid-3" style="margin-top:20px">
+    <article class="card"><h3>Bring any model</h3><p>Local with MLX, Ollama or Apple Foundation Models, or hosted with your own key. Keys live in your Keychain and go only to the provider they belong to.</p></article>
+    <article class="card"><h3>Talk to it</h3><p>Dictate, hear replies read aloud, or hold a hands-free conversation. Speech recognition runs on the Mac when it can.</p></article>
+    <article class="card"><span class="chip early">Experimental</span><h3>Use other Mac apps</h3><p>Opt-in computer use reads and operates other apps through Accessibility, one approved step at a time. It has read Calendar and Messages and sent a reply.</p></article>
+  </div>
+</section>
+
+<section id="status" aria-labelledby="status-title">
+  <div class="split">
+    <div>
+      <p class="eyebrow">Honest status</p>
+      <h2 id="status-title">A preview. <em>Not finished.</em></h2>
+      <p>Kiln is early. It has real, tested capabilities and substantial unfinished areas, and the project says so out loud. Every claim on this page maps to a record in the repository.</p>
+      <div class="actions"><a class="btn btn-ghost" href="https://github.com/noktirnal42/Kiln/blob/main/docs/KNOWN-ISSUES.md">Known issues ↗</a><a class="text-link" href="https://github.com/noktirnal42/Kiln/blob/main/docs/11-CURRENT-STATE.md">What was verified ↗</a></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Not there yet</h3>
+      <ul>
+        <li>It is not a replacement for Xcode, Ghidra or a production model platform.</li>
+        <li>Small local models can fail at tool use; Kiln tells you when a run ended without an answer.</li>
+        <li>Alerts for a closed app need a relay you host and an Apple push key; production-signed builds are untested.</li>
+        <li>Auto mode has had one real agent run; Bypass is for tasks you have decided to trust.</li>
+        <li>Mac only. The iPhone and Watch apps are source you build yourself.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="install" aria-labelledby="install-title">
+  <div class="section-head">
+    <p class="eyebrow">Get started</p>
+    <h2 id="install-title">From download to your first <em>approval</em> in minutes.</h2>
+  </div>
+  <ol class="steps">
+    <li><strong>Download</strong><span>Get the DMG from the Releases page. It is Developer ID signed and notarized by Apple.</span></li>
+    <li><strong>Open</strong><span>Drag Kiln to Applications and open it. Pick a project folder when it asks.</span></li>
+    <li><strong>Choose a model</strong><span>Point it at a local model, or add a provider key in Settings. Keys go in your Keychain.</span></li>
+    <li><strong>Ask for something</strong><span>Try "run the tests and fix what fails". Watch the tool list, and answer the approval.</span></li>
+  </ol>
+  <div class="actions"><a class="btn btn-primary" href="https://github.com/noktirnal42/Kiln/releases">Download the preview</a><a class="btn btn-ghost" href="docs.html#start">Build from source</a></div>
+</section>
+
+<section id="faq" aria-labelledby="faq-title">
+  <div class="section-head"><p class="eyebrow">Questions</p><h2 id="faq-title">Straight <em>answers.</em></h2></div>
+  <div class="faq">
+    <details><summary>Is it safe to let an agent run commands?</summary><p>It is powerful, so Kiln puts the safeguards where you can see them: approvals that spell out the consequence, three explicit modes, hard blocks no mode lifts, monitor holds, and an audit chain. It reduces risk; it does not remove it. Start in Ask mode on a project you can restore.</p></details>
+    <details><summary>Why isn't Kiln sandboxed?</summary><p>To replace a terminal coding agent it has to run real git, package managers and shells in any folder you choose, which a sandboxed app cannot do. Hardened runtime and notarization still apply, and the approval layer is the safety boundary. The trade-off is explained in the current-state document.</p></details>
+    <details><summary>Where does my code go?</summary><p>To the model provider you pick. With a local model nothing leaves your Mac. The relay only forwards encrypted messages and keeps nothing. A push alert carries the tool name and, unless you switch it off, the first 80 characters of the command, and that passes through Apple's servers.</p></details>
+    <details><summary>Do I need an API key?</summary><p>Not for local models. Hosted providers need your own key, stored in the macOS Keychain.</p></details>
+    <details><summary>How is this different from Claude Code, Codex or OpenCode?</summary><p>Those are excellent terminal and editor agents. Kiln is a native Mac app focused on supervising an agent: explicit approval modes, a verifiable audit trail, answering approvals from your iPhone or Apple Watch, and putting coding, reverse engineering and model training in one place. It works with many model providers. It is also much younger, so expect less polish.</p></details>
+    <details><summary>Can I get the iPhone and Apple Watch apps?</summary><p>Their source is in the repository (<code>Companion/</code>). Build them with your own Apple developer signing; they are not on the App Store or TestFlight yet.</p></details>
+    <details><summary>Is it affiliated with Apple, Anthropic, OpenAI or Ghidra?</summary><p>No. Kiln is an independent open-source project and uses those names only to describe compatibility.</p></details>
+  </div>
+</section>
+
+<section class="band" aria-labelledby="band-title">
+  <h2 id="band-title">Build the workshop <em>with us.</em></h2>
+  <p class="lede">Bring your Swift, your sharpest bug report, your reverse-engineering habits or your eye for design. Every issue is public and every claim is checked.</p>
+  <div class="actions"><a class="btn btn-primary" href="contribute.html">Find a first contribution</a><a class="btn btn-ghost" href="https://github.com/noktirnal42/Kiln">Star on GitHub ↗</a></div>
+</section>
+
+</main>
+
+<footer>
+  <div>
+    <a class="brand" href="index.html"><img src="assets/icon.png" alt="">Kiln<span>/</span></a>
+    <p>Built in the open, made for the Mac. Experimental software, MIT licensed. No affiliation with Apple, Anthropic, OpenAI or Ghidra.</p>
+  </div>
+  <div class="links"><a href="docs.html">Documentation</a><a href="roadmap.html">Roadmap</a><a href="contribute.html">Contribute</a><a href="support.html">Support</a><a href="https://github.com/noktirnal42/Kiln/releases">Releases ↗</a><a href="https://github.com/noktirnal42/Kiln">GitHub ↗</a></div>
+</footer>
+<script src="site.js"></script>
+</body>
+</html>

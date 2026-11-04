@@ -6,7 +6,8 @@ setvbuf(stdout, nil, _IOLBF, 0)
 let env = ProcessInfo.processInfo.environment
 let relay = env["FAKEMAC_RELAY"].flatMap(URL.init(string:))
 // FAKEMAC_NO_BONJOUR=1 hides the Mac from the local network, to exercise the relay path.
-let server = FakeMacServer(advertise: env["FAKEMAC_NO_BONJOUR"] == nil)
+// FAKEMAC_NAME sets the Mac's display name (handy for clean screenshots).
+let server = FakeMacServer(hostName: env["FAKEMAC_NAME"] ?? "Fake Mac", advertise: env["FAKEMAC_NO_BONJOUR"] == nil)
 try await server.start()
 print("Fake Kiln listening on port \(server.port), advertising as \"\(server.serviceName)\".")
 if let relay {
