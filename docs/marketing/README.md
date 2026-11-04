@@ -55,3 +55,14 @@ What the cut honestly is, so captions and posts must say the same:
 - Method: Window > Move & Resize > Left to tile Kiln so no other window overlaps, then `screencapture`, then `Scripts/make_clip_re.py`. The recording shows the whole desktop, including any other app, so crop to Kiln as the script does and check frames before using any footage.
 - The "Last agent run" card in the first scene is left over from the earlier take.
 - Remaining to record: clip 2 (LoRA from chat) and the real watch/phone alert.
+
+## Clip 2 (LoRA from chat) done: `site/assets/kiln-clip-lora.mp4`
+
+30 s, muted, portrait, real screen recording of Kiln 0.1.1 (stills: `shots/clip-lora-gate.png`, `shots/clip-lora-modellab.png`). Dataset: 60 lines I wrote (`~/KilnDemo/lora/train.jsonl`, Kiln mode and audit facts). Prompt typed live in Ask mode with `gemma4:31b`: import the file, start `lab_start_lora` on `mlx-community/Qwen3-0.6B-4bit` (cached locally) with 60 iterations and rank 8, check status. Real results: `lab_start_lora` gate shown with its parameters and approved once with the mouse; the run completed in 16.9 s with training loss 1.471 and validation loss 1.552, artifact registered in Model Lab. Caveats the captions or posts must keep:
+- This is a smoke run on a tiny dataset. Loss numbers show it ran, not that the adapter is any good; quality was not evaluated. Do not claim results.
+- `lab_import_dataset` did not ask (a standing grant on this Mac); only the training start was gated.
+- Model Lab's fine-tune form on the right shows editor defaults (rank 16, 200 iterations), not this run's settings; the clip says the run used 60 and 8.
+- There is no loss curve in the UI for this run, only the final training and validation loss; the storyboard's "loss curve" is not shown and should not be promised.
+- Side effects in Kiln: a new dataset and a `Qwen3-LoRA-FineTune` experiment with an adapter artifact in Model Lab.
+- Build with `python3 Scripts/make_clip_lora.py RAW.mov OUT.mp4` (Kiln tiled left, same method as clip 3).
+- Remaining: the real watch/phone alert only.

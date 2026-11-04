@@ -68,7 +68,7 @@ gets Kiln shared beyond Mac developers.
 | Notarized download (DMG, ZIP, checksums) | Done (v0.1.1 pre-release) |
 | Site with real product screenshots and a clear download path | Done (redesign landed) |
 | 90-second demo video: "fix the failing test, approve it from the watch" | Script drafted (`docs/marketing/VIDEO-SCRIPT.md`). A real-footage draft cut exists (`site/assets/kiln-demo-draft.mp4`, Mac plus iOS Simulator, two approvals logged `via: remote`). **Still to record**: the real watch/iPhone alert; see `docs/marketing/README.md` |
-| Three short clips (each under 30 s, no audio needed): approval from watch, LoRA from chat, reverse-engineering a function | Clip 1 (approval): 22 s real-footage loop, simulator phone, no watch. Clip 3 (reverse-engineering): 29 s real footage done. Clip 2 (LoRA from chat) storyboarded (`docs/marketing/CLIPS.md`), not recorded |
+| Three short clips (each under 30 s, no audio needed): approval from watch, LoRA from chat, reverse-engineering a function | Clip 1 (approval): 22 s real-footage loop, simulator phone, no watch. Clip 3 (reverse-engineering): 29 s real footage done. Clip 2 (LoRA from chat): 30 s real footage done (smoke run, quality not evaluated) |
 | README hero image or GIF | Done as a GIF in the README (from the draft cut); replace with a watch shot when recorded |
 | Architecture post: how the audit chain and approval gate work | To write |
 | Architecture post: approving agent actions from an Apple Watch (relay, push, end-to-end encryption) | To write; this is the most shareable technical story |
