@@ -27,6 +27,7 @@ public enum ModelLabAgentTools {
         case evaluate = "evaluate_predictions"
         case exportModel = "export_model"
         case predict = "predict"
+        case predictImages = "predict_images"
         case startSmallLM = "start_small_lm"
         case startLoRA = "start_lora"
         case startDistillation = "start_distillation"
@@ -113,6 +114,13 @@ public enum ModelLabAgentTools {
                          parameters: [
                             ToolParam(name: "artifact_id", description: "Artifact ID from lab_get_experiment (a .mlmodel / .mlpackage)"),
                             ToolParam(name: "texts", type: "array", description: "Input strings, at most 200"),
+                         ], permission: .read)
+            case .predictImages:
+                ToolSpec(name: "lab_predict_images", summary: "Run a trained Create ML image classifier over image files and return the predicted label and confidence for each. Give either image_paths or a folder (its images, one level deep, up to 200). With a folder whose subfolders are named by label, also reports accuracy against those names, which scores a held-out set.",
+                         parameters: [
+                            ToolParam(name: "artifact_id", description: "Artifact ID from lab_get_experiment (an image-classifier .mlmodel / .mlpackage)"),
+                            ToolParam(name: "image_paths", type: "array", description: "Absolute image file paths, at most 200", required: false),
+                            ToolParam(name: "folder", description: "Absolute folder of images; subfolders are treated as true labels", required: false),
                          ], permission: .read)
             case .exportModel:
                 ToolSpec(name: "lab_export_model", summary: "Export a produced model artifact (Create ML .mlmodel/.mlpackage as core_ml, or MLX artifacts as mlx_package) into an existing folder, keeping its file name (a numbered suffix is added rather than overwriting). GGUF is not available.",
@@ -224,6 +232,11 @@ struct ModelLabAgentTool: ToolExecuting {
             guard !texts.isEmpty, texts.count <= 200 else { throw ModelLabToolError.invalid("texts must be a non-empty array of at most 200 strings") }
             let predictions = try await MainActor.run { try module.predict(artifactID: id, texts: texts) }
             return zip(texts, predictions).map { "\($0) → \($1)" }.joined(separator: "\n")
+        case .predictImages:
+            let id = try Self.requiredString(args, "artifact_id")
+            let images = try ImageHoldout.collect(imagePaths: (args["image_paths"] as? [Any])?.map { "\($0)" }, folder: args["folder"] as? String)
+            let results = try await MainActor.run { try module.predictImages(artifactID: id, images: images.map(\.url)) }
+            return ImageHoldout.report(images: images, results: results)
         case .exportModel:
             let id = try Self.requiredString(args, "artifact_id")
             let formatName = try Self.requiredString(args, "format").lowercased()

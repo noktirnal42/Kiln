@@ -128,6 +128,30 @@ extension ModelLabModule {
         return try Self.predict(modelURL: url, texts: texts)
     }
 
+    /// Top label and confidence for each image, in order. An image that cannot be read reports that instead of failing the batch.
+    public static func predictImages(modelURL: URL, images: [URL]) throws -> [(label: String, confidence: Double)?] {
+        let provider = CoreMLClassificationProvider()
+        return images.map { url in
+            guard let scores = try? provider.classifyImage(modelURL: modelURL, imageURL: url),
+                  let top = scores.max(by: { $0.confidence < $1.confidence }) else { return nil }
+            return (top.label, top.confidence)
+        }
+    }
+
+    @MainActor
+    public func predictImages(artifactID id: String, images: [URL]) throws -> [(label: String, confidence: Double)?] {
+        guard let context = mainContext else { throw ModelLabModuleError.storeUnavailable("The Model Lab store is unavailable.") }
+        let descriptor = FetchDescriptor<ModelArtifactRecord>(predicate: #Predicate { $0.id == id })
+        guard let record = try context.fetch(descriptor).first else {
+            throw ModelLabModuleError.invalidTrainingConfiguration("No model artifact with ID \(id).")
+        }
+        let url = ModelLabCore.ArtifactStore().absoluteURL(for: record.localRelativePath, in: .models)
+        guard record.format == .mlmodel || record.format == .mlpackage, FileManager.default.fileExists(atPath: url.path) else {
+            throw ModelLabModuleError.invalidTrainingConfiguration("lab_predict_images runs Core ML classifiers (.mlmodel / .mlpackage) that exist in the model library.")
+        }
+        return try Self.predictImages(modelURL: url, images: images)
+    }
+
     // MARK: Small language model from scratch
 
     /// The job the GUI and the agent tool both build: a character-level transformer over the whole corpus.
