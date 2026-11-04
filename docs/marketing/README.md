@@ -37,3 +37,13 @@ Everything below was tried against the maintainer's live Kiln 0.1.1 and the iOS 
 1. Revoke the `write_file`, `edit_file` and command standing grants (or confirm I may), set a tool-capable model, and keep Ask mode.
 2. Real watch: Remote control on in Kiln, relay URL set, push key deployed, iPhone locked with Kiln closed, watch awake and mirroring. Then run the 9-shot list in `VIDEO-SCRIPT.md`; the assembly commands are there.
 3. Do not press Always Allow during takes.
+
+## Third pass (same day): iPhone simulator against the real Mac
+
+Still no cut. What now works and what blocks, so the next attempt starts further along:
+
+- **Pairing the simulator works**, with two non-obvious requirements: build KilnRemote with ad-hoc signing (`CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM=`); an unsigned build (`CODE_SIGNING_ALLOWED=NO`) silently fails the Keychain write and the Pair button does nothing. The pairing link can be decoded from the QR on screen (CoreImage `CIDetector`); `simctl openurl` did not pair, pasting into the field and pressing return then Pair did.
+- The Kiln Remote card showed "Internet relay connected" and "Phone alerts: 1 phone registered", so the relay and push path are live for the maintainer's real iPhone.
+- **Kiln's New chat is unreliable to drive**: after New chat (and ⌘N) the pane kept showing the old PolyBot transcript, and typing appended to it. Also, the model chip changed from nemotron to `ollama-cloud-gemma4:31b` while I was working, so another session or process is using this app at the same time. A clean recording needs the app to itself.
+- I did not touch the maintainer's real phone (iPhone Mirroring showed a personal app).
+- State restored: Remote control stopped (it was off), project back to PolyBot, simulator app uninstalled. Mode chip is still Ask. The simulator's pairing may still be listed in Kiln's Remote control paired devices; remove it there (do not use "Unpair all devices", which also removes the real phone).
