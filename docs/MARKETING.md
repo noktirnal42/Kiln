@@ -66,14 +66,16 @@ gets Kiln shared beyond Mac developers.
 | Asset | Status |
 |---|---|
 | Notarized download (DMG, ZIP, checksums) | Done (v0.1.1 pre-release) |
-| Site with real product screenshots and a clear download path | Redesign in progress (this change) |
-| 90-second demo video: "fix the failing test, approve it from the watch" | To record: the single most important asset |
-| Three short clips (each under 30 s, no audio needed): approval from watch, LoRA from chat, reverse-engineering a function | To record |
-| README hero image or GIF | To make from the demo video |
+| Site with real product screenshots and a clear download path | Done (redesign landed) |
+| 90-second demo video: "fix the failing test, approve it from the watch" | Script, shot list and checklist drafted (`docs/marketing/VIDEO-SCRIPT.md`); **not recorded**: needs a real watch, relay, push key and a tool-capable model. A labelled 18 s stills loop exists as a placeholder only |
+| Three short clips (each under 30 s, no audio needed): approval from watch, LoRA from chat, reverse-engineering a function | Storyboards drafted (`docs/marketing/CLIPS.md`); none recorded |
+| README hero image or GIF | Blocked on the demo video; GIF commands are in `VIDEO-SCRIPT.md` |
 | Architecture post: how the audit chain and approval gate work | To write |
 | Architecture post: approving agent actions from an Apple Watch (relay, push, end-to-end encryption) | To write; this is the most shareable technical story |
 | Contributor onboarding (good first issues, CONTRIBUTING) | Exists; keep issues labelled |
 | First-run flow (pick a project, one model, one key) | Not built; the biggest conversion gap, see section 9 |
+
+Launch copy drafts for r/swift, r/iOSProgramming, r/LocalLLaMA, r/macapps, Show HN and a Mastodon/Bluesky thread: `docs/marketing/LAUNCH-COPY.md` (nothing posted).
 
 ## 7. Launch sequence
 
