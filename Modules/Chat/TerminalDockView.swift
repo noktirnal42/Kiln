@@ -158,6 +158,7 @@ struct TerminalDockView: View {
                                 .font(SSTypography.caption())
                         }
                         .buttonStyle(.borderless)
+                        .accessibilityLabel("Close terminal tab")
                     }
                 }
                 Button {
@@ -167,6 +168,7 @@ struct TerminalDockView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("New terminal tab")
+                .accessibilityLabel("New terminal tab")
                 Spacer()
                 Button {
                     Task {
@@ -178,6 +180,7 @@ struct TerminalDockView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Command history for this workspace")
+                .accessibilityLabel("Command history")
             }
             .padding(.horizontal, SSSpacing.m)
             .padding(.vertical, SSSpacing.xs)

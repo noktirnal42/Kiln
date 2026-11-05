@@ -169,6 +169,7 @@ struct EditorView: View {
             }
             Button { showSettings.toggle() } label: { Image(systemName: "slider.horizontal.3") }
                 .help("Editor settings")
+                .accessibilityLabel("Editor settings")
                 .popover(isPresented: $showSettings) { settingsPanel }
             if editor.secondary != nil {
                 Button { editor.closeSplit() } label: { Label("Unsplit", systemImage: "rectangle") }
@@ -190,6 +191,10 @@ struct EditorView: View {
         @Bindable var settings = EditorSettings.shared
         return Form {
             Stepper("Font size: \(Int(settings.fontSize)) pt", value: $settings.fontSize, in: 9...32)
+            Picker("Font", selection: $settings.fontFamily) {
+                ForEach(EditorFontFamily.allCases.filter(\.isAvailable), id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            Picker("Theme", selection: $settings.theme) { ForEach(EditorTheme.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
             Picker("Tab width", selection: $settings.tabWidth) { ForEach([2, 3, 4, 8], id: \.self) { Text("\($0)").tag($0) } }
             Toggle("Insert spaces for Tab", isOn: $settings.insertSpaces)
             Toggle("Wrap long lines", isOn: $settings.softWrap)
@@ -358,6 +363,7 @@ struct EditorView: View {
                 Text(changed.isEmpty ? "No uncommitted changes" : "\(changed.count) changed file(s)").font(SSTypography.caption())
                 Spacer()
                 Button { refreshChanges() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless)
+                    .help("Refresh changed files").accessibilityLabel("Refresh changed files")
             }
             .padding(SSSpacing.xs)
             List(changed) { file in
@@ -368,6 +374,9 @@ struct EditorView: View {
                     Text(file.path).font(SSTypography.caption()).lineLimit(1).truncationMode(.head)
                 }
                 .contentShape(Rectangle())
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(file.path), status \(file.statusCode.isEmpty ? "untracked" : file.statusCode)")
+                .accessibilityAddTraits(.isButton)
                 .onTapGesture {
                     if let root = editor.root { Task {
                         let top = await editor.git.topLevel(root.path) ?? root.path
@@ -478,6 +487,7 @@ struct EditorView: View {
                 ForEach(NavigatorMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().padding(SSSpacing.xs)
+            .accessibilityLabel("Navigator view")
             if navigatorMode == .search {
                 projectSearch
             } else if navigatorMode == .changes {
@@ -488,11 +498,11 @@ struct EditorView: View {
                     Text(root.lastPathComponent).font(SSTypography.headline()).lineLimit(1)
                     Spacer()
                     Button { fileActionName = ""; fileAction = FileAction(kind: .newFile, url: root) } label: { Image(systemName: "doc.badge.plus") }
-                        .buttonStyle(.borderless).help("New file in the project root")
+                        .buttonStyle(.borderless).help("New file in the project root").accessibilityLabel("New file in the project root")
                     Button { fileActionName = ""; fileAction = FileAction(kind: .newFolder, url: root) } label: { Image(systemName: "folder.badge.plus") }
-                        .buttonStyle(.borderless).help("New folder in the project root")
+                        .buttonStyle(.borderless).help("New folder in the project root").accessibilityLabel("New folder in the project root")
                     Button { treeVersion += 1 } label: { Image(systemName: "arrow.clockwise") }
-                        .buttonStyle(.borderless).help("Refresh the file list")
+                        .buttonStyle(.borderless).help("Refresh the file list").accessibilityLabel("Refresh the file list")
                 }
                 .padding(SSSpacing.s)
                 Divider()
@@ -525,13 +535,18 @@ struct EditorView: View {
                             .foregroundStyle(document.isDirty ? SSColor.accent : .secondary)
                         Text(document.name).font(SSTypography.caption()).lineLimit(1)
                         Button { requestClose(document) } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)) }
-                            .buttonStyle(.plain).foregroundStyle(.secondary).help("Close (⌘W)")
+                            .buttonStyle(.plain).foregroundStyle(.secondary).help("Close (⌘W)").accessibilityLabel("Close \(document.name)")
                     }
                     .padding(.horizontal, 8).padding(.vertical, 5)
                     .background(document.id == editor.activeID ? Color.primary.opacity(0.1) : Color.clear)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .contentShape(Rectangle())
                     .onTapGesture { editor.activeID = document.id }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(document.name)\(document.isDirty ? ", unsaved changes" : "")")
+                    .accessibilityAddTraits(document.id == editor.activeID ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityAction(named: "Close") { requestClose(document) }
+                    .accessibilityAction(named: "Open in split") { editor.openInSplit(document) }
                     .draggable(document.id.uuidString)
                     .dropDestination(for: String.self) { items, _ in
                         guard let id = items.first.flatMap(UUID.init(uuidString:)) else { return false }
@@ -596,8 +611,14 @@ struct EditorView: View {
                             Text(other.name).font(SSTypography.caption()).lineLimit(1)
                             Spacer()
                             Button { editor.closeSplit() } label: { Image(systemName: "xmark") }.buttonStyle(.plain)
+                                .help("Close the split pane").accessibilityLabel("Close split pane")
                         }
                         .padding(.horizontal, SSSpacing.s).padding(.vertical, 3).background(Color.primary.opacity(0.06))
+                        .dropDestination(for: String.self) { items, _ in
+                            items.first.flatMap(UUID.init(uuidString:)).map { editor.openInSplit(id: $0) } ?? false
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityLabel("Split pane: \(other.name)")
                         pane(for: other, tracksCaret: false)
                     }
                 }
@@ -760,6 +781,7 @@ struct EditorView: View {
                 ForEach(BottomMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 220).padding(SSSpacing.xs)
+            .accessibilityLabel("Bottom panel")
             if bottomMode == .debug {
                 debugPanel
             } else if allDiagnostics.isEmpty && builder.output.isEmpty {
@@ -787,7 +809,11 @@ struct EditorView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("\(diagnostic.severity == .error ? "Error" : "Warning"): \(diagnostic.message)")
+                        .accessibilityValue("\(editor.displayPath(URL(fileURLWithPath: diagnostic.path))), line \(diagnostic.line)")
+                        .accessibilityHint("Opens the file at this line")
                     }
+                    .accessibilityLabel("Problems")
                     }
                     .frame(minWidth: 200)
                     if !builder.testResults.isEmpty {
@@ -800,6 +826,8 @@ struct EditorView: View {
                                 if let seconds = result.seconds { Text(String(format: "%.2fs", seconds)).font(SSTypography.mono(10)).foregroundStyle(.secondary) }
                             }
                             .contentShape(Rectangle())
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(result.name): \(result.status == .passed ? "passed" : result.status == .failed ? "failed" : "skipped")")
                             .contextMenu { Button("Run only this test") { runTests(filter: result.name) } }
                         }
                         .frame(minWidth: 200)
@@ -878,6 +906,11 @@ private struct FileTreeRow: View {
             .padding(.leading, CGFloat(depth) * 12 + 8).padding(.vertical, 3).padding(.trailing, 6)
             .background(isActive ? Color.accentColor.opacity(0.18) : Color.clear)
             .contentShape(Rectangle())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(node.isDirectory ? "\(node.name), folder" : node.name)
+            .accessibilityValue(node.isDirectory ? (expanded ? "expanded" : "collapsed") : "")
+            .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
+            .accessibilityHint(node.isDirectory ? "Expands or collapses the folder" : "Opens the file")
             .onTapGesture {
                 if node.isDirectory { expanded.toggle() } else { editor.open(node.url) }
             }
@@ -936,6 +969,9 @@ private struct QuickOpenView: View {
                 .padding(.vertical, 2)
                 .background(index == selection ? Color.accentColor.opacity(0.2) : Color.clear)
                 .contentShape(Rectangle())
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(url.lastPathComponent), \(editor.displayPath(url.deletingLastPathComponent()))")
+                .accessibilityAddTraits(index == selection ? [.isButton, .isSelected] : .isButton)
                 .onTapGesture { editor.open(url); isPresented = false }
             }
         }

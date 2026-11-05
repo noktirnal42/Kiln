@@ -108,6 +108,7 @@ struct ChatRootView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Regenerate last response")
+                .accessibilityLabel("Regenerate last response")
             }
 
             Button {
@@ -117,6 +118,7 @@ struct ChatRootView: View {
             }
             .buttonStyle(.borderless)
             .help("Artifacts")
+            .accessibilityLabel("Artifacts")
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.vertical, SSSpacing.s)
@@ -290,6 +292,7 @@ struct ComposerView: View {
                     Image(systemName: "stop.circle.fill").font(.title2)
                 }
                 .help("Stop")
+                .accessibilityLabel("Stop generating")
             } else {
                 Button(action: onSend) {
                     Image(systemName: "arrow.up.circle.fill")
@@ -297,6 +300,7 @@ struct ComposerView: View {
                 }
                 .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .help("Send (⏎)")
+                .accessibilityLabel("Send message")
             }
         }
         .padding(.horizontal, SSSpacing.m)

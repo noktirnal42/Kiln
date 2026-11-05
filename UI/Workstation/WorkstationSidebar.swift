@@ -66,6 +66,7 @@ struct WorkstationSidebar: View {
             }
             .buttonStyle(SSIconButtonStyle())
             .help("Search and commands (⌘K)")
+            .accessibilityLabel("Search and commands")
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.top, SSSpacing.m)
@@ -167,6 +168,7 @@ struct WorkstationSidebar: View {
             }
             .buttonStyle(SSIconButtonStyle(selected: workstation.dockVisible))
             .help(workstation.dockVisible ? "Hide the agent panel (⌘⌥A)" : "Show the agent panel (⌘⌥A)")
+            .accessibilityLabel(workstation.dockVisible ? "Hide agent panel" : "Show agent panel")
         }
         .padding(.horizontal, SSSpacing.s).padding(.vertical, SSSpacing.s)
     }

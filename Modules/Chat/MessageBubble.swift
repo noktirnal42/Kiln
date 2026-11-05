@@ -138,6 +138,7 @@ struct MessageBubble: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .help(help)
+        .accessibilityLabel(help)
     }
 
     private func copy() {

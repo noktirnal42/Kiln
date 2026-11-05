@@ -38,11 +38,13 @@ struct AgentDockView: View {
             } label: { Image(systemName: "plus.bubble").frame(width: 24, height: 24) }
                 .buttonStyle(SSIconButtonStyle())
                 .help("New conversation")
+                .accessibilityLabel("New conversation")
             Button { workstation.dockVisible = false } label: {
                 Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).frame(width: 24, height: 24)
             }
             .buttonStyle(SSIconButtonStyle())
             .help("Hide the agent dock (⌘⌥A)")
+            .accessibilityLabel("Hide agent dock")
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.vertical, SSSpacing.s)
