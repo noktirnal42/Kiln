@@ -18,10 +18,47 @@ struct REProjectDetail: View {
         return analysis.functions.first { $0.address == selectedAddress }
     }
 
+    /// Pick which installed Ghidra to run, point Kiln at another folder, or go back to automatic selection.
+    private var ghidraChooser: some View {
+        Menu {
+            ForEach(module.ghidraChoices, id: \.home) { choice in
+                Button {
+                    analysisError = module.chooseGhidra(home: choice.home)
+                } label: {
+                    if choice.home == module.ghidraHome { Label(choice.label, systemImage: "checkmark") } else { Text(choice.label) }
+                }
+            }
+            if module.ghidraChoices.isEmpty { Text("No Ghidra 11+ found in ~/Applications or /Applications") }
+            Divider()
+            Button("Choose Ghidra Folder…") { chooseFolder() }
+            if module.hasExplicitGhidraChoice { Button("Pick Automatically") { module.chooseGhidraAutomatically() } }
+        } label: {
+            Label("Ghidra", systemImage: "externaldrive.badge.checkmark")
+        }
+        .menuStyle(.borderlessButton).fixedSize()
+        .help("Choose which installed Ghidra Kiln runs")
+        .accessibilityLabel("Choose Ghidra installation")
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.message = "Choose the unpacked Ghidra folder (it contains support/analyzeHeadless)"
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        analysisError = module.chooseGhidra(home: url)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Text(module.ghidraStatus).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                Image(systemName: module.isGhidraAvailable ? "checkmark.circle" : "exclamationmark.triangle")
+                    .foregroundStyle(module.isGhidraAvailable ? Color.secondary : Color.orange)
+                    .accessibilityHidden(true)
+                Text(module.ghidraStatus).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                    .accessibilityLabel(module.isGhidraAvailable ? "Ghidra ready. \(module.ghidraStatus)" : "Ghidra unavailable. \(module.ghidraStatus)")
+                ghidraChooser
                 Spacer(minLength: 0)
                 if module.isGhidraAnalysisRunning {
                     ProgressView().controlSize(.small)

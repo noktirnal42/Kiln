@@ -62,7 +62,30 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
             return "Ghidra not found. Place an installed Ghidra 11 or newer folder in ~/Applications or /Applications, or set GHIDRA_HOME before launching Kiln."
         }
         guard isGhidraAvailable else { return "Ghidra's launcher or Kiln's bundled export script is missing." }
-        return "Ghidra: \(home.lastPathComponent)"
+        let version = GhidraInstallation.candidate(home)?.label ?? home.lastPathComponent
+        return "\(version) — \(home.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))"
+    }
+
+    /// Everything Kiln could use, for the chooser.
+    public var ghidraChoices: [(home: URL, label: String)] {
+        GhidraInstallation.installations().map { ($0.home, "\($0.label) — \($0.home.deletingLastPathComponent().path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))") }
+    }
+
+    public var hasExplicitGhidraChoice: Bool { UserDefaults.standard.string(forKey: GhidraInstallation.preferenceKey) != nil }
+
+    /// Uses this Ghidra from now on (and next launch). Returns why it cannot be used, or nil on success.
+    @discardableResult
+    public func chooseGhidra(home: URL) -> String? {
+        if let reason = GhidraInstallation.rejection(for: home) { return reason }
+        UserDefaults.standard.set(home.standardizedFileURL.path, forKey: GhidraInstallation.preferenceKey)
+        configureDiscoveredGhidra()
+        return nil
+    }
+
+    /// Forget the explicit choice and pick the newest stable Ghidra again.
+    public func chooseGhidraAutomatically() {
+        UserDefaults.standard.removeObject(forKey: GhidraInstallation.preferenceKey)
+        configureDiscoveredGhidra()
     }
 
     private var context: ModuleContext?
@@ -144,7 +167,7 @@ public final class REModule: @preconcurrency Module, ModuleDefinition, ModuleUI 
     }
 
     public func configureDiscoveredGhidra() {
-        ghidraHome = GhidraInstallation.discover()
+        ghidraHome = GhidraInstallation.discover(preferred: UserDefaults.standard.string(forKey: GhidraInstallation.preferenceKey).map { URL(fileURLWithPath: $0) })
         ghidraScriptURL = GhidraInstallation.exporter()
     }
 

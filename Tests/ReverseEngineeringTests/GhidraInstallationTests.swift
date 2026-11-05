@@ -41,6 +41,32 @@ struct GhidraInstallationTests {
         #expect(GhidraInstallation.discover(environment: [:], applicationDirectories: [root]) == nil)
     }
 
+    @Test func installationsListsEveryUsableGhidraBestFirstAndAChosenOneWins() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-ghidra-discovery-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let old = try fixture(root, "ghidra_11.3.2_PUBLIC", version: "11.3.2")
+        let stable = try fixture(root, "ghidra_12.1.4_PUBLIC", version: "12.1.4")
+        let dev = try fixture(root, "ghidra_12.2_DEV", version: "12.2", release: "DEV")
+        _ = try fixture(root, "ghidra_10_PUBLIC", version: "10.4")
+        let all = GhidraInstallation.installations(environment: [:], applicationDirectories: [root])
+        #expect(all.map(\.home.path) == [stable.path, old.path, dev.path].map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+        #expect(all.last?.label == "Ghidra 12.2 (development build)")
+        #expect(GhidraInstallation.discover(environment: [:], applicationDirectories: [root], preferred: dev)?.path == dev.standardizedFileURL.path)
+        #expect(GhidraInstallation.discover(environment: [:], applicationDirectories: [root], preferred: root.appendingPathComponent("gone"))?.path == stable.standardizedFileURL.path)
+    }
+
+    @Test func rejectionExplainsWhyAFolderCannotBeUsed() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-ghidra-discovery-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let empty = root.appendingPathComponent("not_ghidra")
+        try FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        let tooOld = try fixture(root, "ghidra_10_PUBLIC", version: "10.4")
+        let good = try fixture(root, "ghidra_12_PUBLIC", version: "12.0")
+        #expect(GhidraInstallation.rejection(for: empty)?.contains("analyzeHeadless") == true)
+        #expect(GhidraInstallation.rejection(for: tooOld)?.contains("older than 11") == true)
+        #expect(GhidraInstallation.rejection(for: good) == nil)
+    }
+
     @Test func exporterIsBundledWithTheApp() throws {
         let script = try #require(GhidraInstallation.exporter())
         #expect(FileManager.default.fileExists(atPath: script.appendingPathComponent("AxiomExport.java").path))
