@@ -49,6 +49,16 @@ State in the notes what was and was not verified (see "Not verified" in `docs/11
 There is no in-app updater. Users download the new notarized build and replace the app; data lives in `~/Library/Application Support/Kiln`, so nothing is lost.
 Adding Sparkle needs an EdDSA key pair and an appcast host, which are the maintainer's decisions; it is intentionally not wired up.
 
+### Update options (for the maintainer to choose; nothing here is implemented)
+
+| Option | What it needs | Trade-offs |
+|---|---|---|
+| **Stay manual** (today) | Nothing beyond GitHub Releases. | Users must notice new versions. Zero infrastructure, no signing keys to protect. |
+| **"Check for updates" button only** | A call to the GitHub Releases API (`/repos/noktirnal42/Kiln/releases/latest`, unauthenticated, rate-limited) comparing `CFBundleShortVersionString`; opens the release page. No download or install in the app. | Small (one view, one network call, needs the sandbox network-client entitlement Kiln already has for providers). Must say clearly that it only checks. Pre-releases must be excluded or opted into. |
+| **Sparkle 2** | An EdDSA key pair (private key in the maintainer's Keychain, public key in Info.plist as `SUPublicEDKey`), an appcast XML host (GitHub Pages already serves the site, so `site/appcast.xml` works), `generate_appcast` run per release, the Sparkle SPM package, and the sandbox XPC services entitlements/`SUEnableInstallerLauncherService`. | Silent background download and install with signature verification. Adds a dependency and a key that must never be lost or leaked; a key change breaks updates for installed copies. Release script would need an extra signing and appcast step. |
+
+Recommendation: keep manual updates until there are users who are not the maintainer; if a nudge is wanted sooner, the check-only button is the cheapest honest step. Sparkle only after the EdDSA key is generated and backed up by the maintainer.
+
 ## CI
 
 `.github/workflows/ci.yml` builds and runs the Mac unit suite, the relay's JS tests and the site checks on a hosted macOS runner. It passed there on 2026-11-04
