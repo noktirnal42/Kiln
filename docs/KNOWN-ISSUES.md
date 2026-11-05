@@ -76,6 +76,8 @@ Layout fixes have addressed pane navigation, embedded Search placement, model-pi
 
 **Probe 2026-11-04 (LiveNIMTimingTests, `KILN_LIVE_NIM=1`):** `google/gemma-4-31b-it` and `z-ai/glm-5.3-flash` each timed out at 120 s with no response for streaming, non-streaming and streaming with `enable_thinking:false`. Request shape is therefore not the cause; the endpoint is queueing or unavailable for this key. No control model was listed for comparison.
 
+**Second probe 2026-11-04 (later the same day, control model added):** `z-ai/glm-5.3-flash` did answer: HTTP 200 after 41 s (streaming), 33 s (non-streaming) and 38 s (thinking off), so it is slow but alive; its streams delivered no `content` delta (likely reasoning-only deltas, not inspected). `google/gemma-4-31b-it` again timed out at 120 s for all three shapes. The control `mistralai/mistral-7b-instruct-v0.3` is listed by `/models` but answers 404 for this key, so listing does not mean callable and no fast control exists yet. Conclusion: latency is per model and provider-side (queueing), not request shape; the configurable first-token timeout is the mitigation.
+
 **Still needed:** find out whether this is the provider's queue or a request-shape problem (reasoning fields for NIM), then add a configurable first-token timeout with a clear error and a retry/other-model suggestion.
 
 ## Local model store scan is slow on external drives

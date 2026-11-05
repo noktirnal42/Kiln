@@ -40,7 +40,10 @@ struct LiveNIMTimingTests {
         let wanted = ids.filter { $0.lowercased().contains("gemma-4-31b") || $0.lowercased().contains("glm-5.3-flash") }
         print("NIM models probed: \(wanted)")
         #expect(!wanted.isEmpty, "none of the issue's models are listed")
-        let control = ids.first { $0.hasSuffix("meta/llama-3.3-70b-instruct") }
+        // A control that is actually listed: prefer small instruct models, which should answer within seconds if the key/queue is healthy.
+        let control = ["meta/llama-3.1-8b-instruct", "meta/llama-3.3-70b-instruct", "meta/llama-3.2-3b-instruct", "mistralai/mistral-7b-instruct-v0.3"]
+            .first { ids.contains($0) } ?? ids.first { $0.hasPrefix("meta/llama") && $0.contains("instruct") }
+        print("NIM control model: \(control ?? "none listed") of \(ids.count) listed")
         for model in wanted + (control.map { [$0] } ?? []) {
             let base: [String: Any] = ["model": model, "messages": [["role": "user", "content": "Reply with the single word: ready"]], "max_tokens": 32]
             print("NIM \(model) | streaming            | " + (await measure(key: key, body: base, stream: true)))
