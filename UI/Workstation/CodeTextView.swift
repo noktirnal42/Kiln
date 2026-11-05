@@ -51,7 +51,9 @@ struct CodeTextView: NSViewRepresentable {
         textView.isContinuousSpellCheckingEnabled = false
         textView.isGrammarCheckingEnabled = false
         textView.smartInsertDeleteEnabled = false
-        textView.font = NSFont.monospacedSystemFont(ofSize: settings.fontSize, weight: .regular)
+        textView.font = settings.fontFamily.font(size: settings.fontSize)
+        textView.appearance = settings.theme.appearance
+        scroll.appearance = settings.theme.appearance
         textView.textColor = .labelColor
         textView.backgroundColor = .textBackgroundColor
         textView.insertionPointColor = .controlAccentColor
@@ -114,14 +116,23 @@ struct CodeTextView: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate, @preconcurrency NSLayoutManagerDelegate {
         private var appliedFontSize: Double = 0
+        private var appliedFamily: EditorFontFamily?
+        private var appliedTheme: EditorTheme?
         private var appliedWrap: Bool?
         private var appliedLineNumbers: Bool?
 
         /// Applies live preference changes: font size, soft wrap and the line-number gutter.
         func applySettings(_ settings: EditorSettings, to textView: NSTextView, scroll: NSScrollView) {
-            if appliedFontSize != settings.fontSize {
+            if appliedFontSize != settings.fontSize || appliedFamily != settings.fontFamily {
                 appliedFontSize = settings.fontSize
-                textView.font = NSFont.monospacedSystemFont(ofSize: settings.fontSize, weight: .regular)
+                appliedFamily = settings.fontFamily
+                textView.font = settings.fontFamily.font(size: settings.fontSize)
+                rehighlight(immediately: true)
+            }
+            if appliedTheme != settings.theme {
+                appliedTheme = settings.theme
+                textView.appearance = settings.theme.appearance
+                scroll.appearance = settings.theme.appearance
                 rehighlight(immediately: true)
             }
             if appliedWrap != settings.softWrap {

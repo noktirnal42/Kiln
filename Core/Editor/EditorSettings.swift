@@ -1,4 +1,37 @@
+import AppKit
 import Foundation
+
+/// Monospaced families offered in the editor. Each falls back to the system monospaced font when not installed.
+public enum EditorFontFamily: String, CaseIterable, Sendable {
+    case system = "System Mono"
+    case menlo = "Menlo"
+    case monaco = "Monaco"
+    case courier = "Courier New"
+    case sfMono = "SF Mono"
+
+    public func font(size: Double) -> NSFont {
+        let fallback = NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        guard self != .system else { return fallback }
+        return NSFont(name: rawValue, size: size) ?? fallback
+    }
+
+    public var isAvailable: Bool { self == .system || NSFont(name: rawValue, size: 12) != nil }
+}
+
+/// The editor's own appearance, independent of the app's: follow the system, or force light or dark.
+public enum EditorTheme: String, CaseIterable, Sendable {
+    case system = "Match system"
+    case light = "Light"
+    case dark = "Dark"
+
+    public var appearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
 
 /// Editor preferences, kept in UserDefaults and applied live to every open editor.
 @MainActor @Observable
@@ -6,6 +39,8 @@ public final class EditorSettings {
     public static let shared = EditorSettings()
 
     public var fontSize: Double { didSet { defaults.set(fontSize, forKey: "editor.fontSize") } }
+    public var fontFamily: EditorFontFamily { didSet { defaults.set(fontFamily.rawValue, forKey: "editor.fontFamily") } }
+    public var theme: EditorTheme { didSet { defaults.set(theme.rawValue, forKey: "editor.theme") } }
     public var tabWidth: Int { didSet { defaults.set(tabWidth, forKey: "editor.tabWidth") } }
     public var insertSpaces: Bool { didSet { defaults.set(insertSpaces, forKey: "editor.insertSpaces") } }
     public var softWrap: Bool { didSet { defaults.set(softWrap, forKey: "editor.softWrap") } }
@@ -17,6 +52,8 @@ public final class EditorSettings {
         self.defaults = defaults
         let size = defaults.double(forKey: "editor.fontSize")
         fontSize = size == 0 ? 13 : min(max(size, 9), 32)
+        fontFamily = defaults.string(forKey: "editor.fontFamily").flatMap(EditorFontFamily.init(rawValue:)) ?? .system
+        theme = defaults.string(forKey: "editor.theme").flatMap(EditorTheme.init(rawValue:)) ?? .system
         let width = defaults.integer(forKey: "editor.tabWidth")
         tabWidth = [2, 3, 4, 8].contains(width) ? width : 4
         insertSpaces = defaults.object(forKey: "editor.insertSpaces") as? Bool ?? true

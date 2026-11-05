@@ -157,6 +157,21 @@ struct EditorSettingsAndSplitTests {
         #expect(c.fontSize == 32 && c.tabWidth == 4)
     }
 
+    @Test func fontFamilyAndThemePersistAndFallBack() {
+        let defaults = UserDefaults(suiteName: "kiln-settings-\(UUID().uuidString)")!
+        let a = EditorSettings(defaults: defaults)
+        #expect(a.fontFamily == .system && a.theme == .system)
+        a.fontFamily = .menlo; a.theme = .dark
+        let b = EditorSettings(defaults: defaults)
+        #expect(b.fontFamily == .menlo && b.theme == .dark)
+        #expect(b.theme.appearance?.name == .darkAqua && EditorTheme.system.appearance == nil)
+        defaults.set("Nonexistent", forKey: "editor.fontFamily"); defaults.set("x", forKey: "editor.theme")
+        let c = EditorSettings(defaults: defaults)
+        #expect(c.fontFamily == .system && c.theme == .system)
+        for family in EditorFontFamily.allCases { #expect(family.font(size: 14).pointSize == 14) }
+        #expect(EditorFontFamily.system.isAvailable)
+    }
+
     @Test func bracketMatcherPairsNestedBracketsBothWays() {
         let text = "f(a[1], {b: (c)})"
         let open = (text as NSString).range(of: "(").location
@@ -165,6 +180,22 @@ struct EditorSettingsAndSplitTests {
         let close = BracketMatcher.match(in: text, caret: (text as NSString).length)
         #expect(close?.1.location == open)
         #expect(BracketMatcher.match(in: "plain text", caret: 3) == nil)
+    }
+
+    @Test func aDroppedTabTakesTheSecondPaneButNotTheActiveOne() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-drop-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let workspace = EditorWorkspace(recovery: EditorRecoveryStore(directory: dir.appendingPathComponent(".r")))
+        let a = try workspace.createFile(named: "a.txt", in: dir)
+        let b = try workspace.createFile(named: "b.txt", in: dir)
+        let docA = try #require(workspace.documents.first { $0.url == a.standardizedFileURL })
+        let docB = try #require(workspace.documents.first { $0.url == b.standardizedFileURL })
+        workspace.activeID = docA.id
+        #expect(!workspace.openInSplit(id: docA.id))
+        #expect(!workspace.openInSplit(id: UUID()))
+        #expect(workspace.openInSplit(id: docB.id))
+        #expect(workspace.secondary?.id == docB.id)
     }
 
     @Test func splitShowsASecondDocumentAndClosesWithIt() throws {

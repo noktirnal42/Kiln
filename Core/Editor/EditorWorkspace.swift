@@ -31,6 +31,14 @@ public final class EditorWorkspace {
         guard document.id != activeID else { return }
         secondaryID = document.id
     }
+    /// Drop target for a tab dragged onto the second pane: that document takes the pane. A tab dragged onto the
+    /// pane that already shows it is ignored, as is an id that is no longer open.
+    @discardableResult
+    public func openInSplit(id: UUID) -> Bool {
+        guard let document = documents.first(where: { $0.id == id }), document.id != activeID else { return false }
+        secondaryID = document.id
+        return true
+    }
     public func closeSplit() { secondaryID = nil }
     /// A line to scroll to the next time the active document is shown (from a diagnostic or go-to-line).
     public var pendingLine: (id: UUID, line: Int, column: Int)?
