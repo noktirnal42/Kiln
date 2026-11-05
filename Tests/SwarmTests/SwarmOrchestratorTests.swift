@@ -7,6 +7,19 @@ struct SwarmGraphTests {
         SwarmTask(id: id, title: id, role: role, dependsOn: after)
     }
 
+    @Test func writtenOutToolCallsAreRecognisedInTheShapesSmallModelsUse() {
+        let shapes = [
+            #"{"name":"write_file","parameters":{"path":"a","content":"b"}}"#,
+            "```json\n{\"tool\":\"read_file\",\"args\":{\"path\":\"a\"}}\n```",
+            #"{"function":{"name":"read_file","arguments":"{\"path\":\"a\"}"}}"#,
+            #"[{"name":"read_file","arguments":{"path":"a"}},{"name":"write_file","arguments":{}}]"#,
+            #"{"tool_calls":[{"id":"1"}]}"#,
+            #"<tool_call>{"name":"read_file","arguments":{}}</tool_call>"#,
+            #"[TOOL_CALLS] [{"name":"read_file","arguments":{}}]"#,
+        ]
+        for shape in shapes { #expect(throws: SwarmBlocked.self, "\(shape)") { try SwarmWorkers.validateSummary(shape) } }
+    }
+
     @Test func invalidPlansAreRejected() {
         #expect(throws: SwarmGraph.Invalid.empty) { try SwarmGraph(tasks: []) }
         #expect(throws: SwarmGraph.Invalid.invalidID("Bad ID")) { try SwarmGraph(tasks: [task("Bad ID")]) }
@@ -232,5 +245,8 @@ struct SwarmResultValidationTests {
     @Test func plainResultsAndDataAreAccepted() throws {
         try SwarmWorkers.validateSummary("12 × 19 + 8 × 23 = 412. Independently checked each subtotal.")
         try SwarmWorkers.validateSummary(#"{"total":412}"#)
+        try SwarmWorkers.validateSummary(#"{"name":"Release notes","items":["a","b"]}"#)
+        try SwarmWorkers.validateSummary("I used write_file to save release.md; arguments were path and content.")
+        try SwarmWorkers.validateSummary(#"[{"file":"a.txt"},{"file":"b.txt"}]"#)
     }
 }

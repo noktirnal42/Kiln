@@ -114,11 +114,43 @@ public enum SwarmWorkers {
     static func validateSummary(_ text: String) throws {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw SwarmBlocked("The worker returned no result.") }
-        let payload = trimmed.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if let data = payload.data(using: .utf8),
-           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           (object["name"] != nil && object["arguments"] != nil) || object["tool_calls"] != nil {
+        if SimulatedToolCall.isSimulated(trimmed) {
             throw SwarmBlocked("The worker returned a simulated tool call instead of a verified result. Try a model with stronger tool support.")
         }
+    }
+}
+
+/// Recognises a whole answer that is only a tool call written out as text, in the shapes small models produce:
+/// `{"name":…,"arguments":…}`, `parameters`/`args`/`input` instead of `arguments`, OpenAI `{"function":{…}}` and
+/// `{"tool_calls":[…]}`, arrays of calls, Hermes/Qwen `<tool_call>` tags and Mistral `[TOOL_CALLS]`. Ordinary JSON
+/// results (no call shape) and prose that merely mentions a tool are not flagged.
+enum SimulatedToolCall {
+    static func isSimulated(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        if lower.hasPrefix("<tool_call>") || lower.hasPrefix("[tool_calls]") || lower.hasPrefix("<|python_tag|>") { return true }
+        let payload = unfence(trimmed)
+        guard let data = payload.data(using: .utf8), let object = try? JSONSerialization.jsonObject(with: data) else { return false }
+        return looksLikeCall(object)
+    }
+
+    private static func unfence(_ text: String) -> String {
+        var t = text
+        if t.hasPrefix("```") {
+            t = String(t.drop(while: { $0 == "`" }))
+            if let newline = t.firstIndex(of: "\n"), !t[..<newline].contains("{"), !t[..<newline].contains("[") { t = String(t[t.index(after: newline)...]) }
+            while t.hasSuffix("`") { t.removeLast() }
+        }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func looksLikeCall(_ value: Any) -> Bool {
+        if let array = value as? [Any] { return !array.isEmpty && array.allSatisfy(looksLikeCall) }
+        guard let object = value as? [String: Any] else { return false }
+        if object["tool_calls"] != nil { return true }
+        if let function = object["function"] as? [String: Any] { return looksLikeCall(function) }
+        let named = object["name"] is String || object["tool"] is String || object["tool_name"] is String || object["function_name"] is String
+        let carriesArguments = ["arguments", "parameters", "args", "input"].contains { object[$0] != nil }
+        return named && carriesArguments
     }
 }
