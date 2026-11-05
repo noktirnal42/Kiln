@@ -31,6 +31,9 @@ public enum ModelLabAgentTools {
         case startSmallLM = "start_small_lm"
         case startLoRA = "start_lora"
         case startDistillation = "start_distillation"
+        case listModels = "list_models"
+        case registerModel = "register_model"
+        case deleteModel = "delete_model"
 
         var spec: ToolSpec {
             switch self {
@@ -122,6 +125,15 @@ public enum ModelLabAgentTools {
                             ToolParam(name: "image_paths", type: "array", description: "Absolute image file paths, at most 200", required: false),
                             ToolParam(name: "folder", description: "Absolute folder of images; subfolders are treated as true labels", required: false),
                          ], permission: .read)
+            case .listModels:
+                ToolSpec(name: "lab_list_models", summary: "List models registered in Model Lab (Hugging Face MLX repositories and local artifacts) with format, origin, size and whether a Hub repository is cached on this Mac.",
+                         parameters: [ToolParam(name: "limit", type: "integer", description: "Default 25", required: false)], permission: .read)
+            case .registerModel:
+                ToolSpec(name: "lab_register_model", summary: "Register a Hugging Face MLX repository (org/name) in Model Lab's model list. Downloads nothing: the weights are fetched only when a training or inference run first needs them, and lab_start_lora / lab_start_distillation still require allow_download for an uncached model. Registering the same repository again just refreshes it.",
+                         parameters: [ToolParam(name: "repo", description: "Hugging Face repository id, org/name")], permission: .write)
+            case .deleteModel:
+                ToolSpec(name: "lab_delete_model", summary: "Remove one registered model by its exact ID from lab_list_models. A Hub repository entry is only unregistered (the Hugging Face cache is never touched). A local artifact entry also deletes its copy in the Model Lab library; experiment records are kept. Cannot be undone; requires approval.",
+                         parameters: [ToolParam(name: "model_id", description: "Exact ID from lab_list_models")], permission: .execute)
             case .exportModel:
                 ToolSpec(name: "lab_export_model", summary: "Export a produced model artifact (Create ML .mlmodel/.mlpackage as core_ml, or MLX artifacts as mlx_package) into an existing folder, keeping its file name (a numbered suffix is added rather than overwriting). GGUF is not available.",
                          parameters: [
@@ -158,6 +170,23 @@ struct ModelLabAgentTool: ToolExecuting {
         case .cancelTraining:
             let id = try Self.experimentID(args)
             return try await MainActor.run { try Self.cancelTraining(module, id: id) }
+        case .listModels:
+            return try await MainActor.run {
+                guard let context = module.mainContext else { throw ModelLabToolError.storeUnavailable }
+                return try Self.models(context: context, limit: limit)
+            }
+        case .registerModel:
+            let repo = try Self.requiredString(args, "repo")
+            return try await MainActor.run {
+                guard let context = module.mainContext else { throw ModelLabToolError.storeUnavailable }
+                return try Self.registerModel(context: context, repo: repo)
+            }
+        case .deleteModel:
+            let id = try Self.requiredString(args, "model_id")
+            return try await MainActor.run {
+                guard let context = module.mainContext else { throw ModelLabToolError.storeUnavailable }
+                return try Self.deleteModel(context: context, id: id)
+            }
         case .datasets:
             return try await MainActor.run { try Self.datasets(module, limit: limit) }
         case .importDataset:
@@ -327,6 +356,42 @@ struct ModelLabAgentTool: ToolExecuting {
         else if module.distillationCoordinator.runningExperimentID == id { module.distillationCoordinator.cancel() }
         else { throw ModelLabToolError.experimentNotRunning(id) }
         return "Cancellation requested for experiment \(id). Poll lab_get_experiment for the final state."
+    }
+
+    @MainActor
+    static func models(context: ModelContext, limit: Int) throws -> String {
+        var descriptor = FetchDescriptor<ModelArtifactRecord>(sortBy: [SortDescriptor(\.createdAt, order: .reverse)])
+        descriptor.fetchLimit = limit
+        let rows = try context.fetch(descriptor).map { record -> String in
+            var row = "\(record.id) · \(record.name) · \(record.formatRaw) · \(record.originRaw)"
+            if let size = record.sizeBytes { row += " · \(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))" }
+            if record.format == .mlxHubRepository { row += ModelDownloadPolicy.isCached(repo: record.localRelativePath) ? " · cached" : " · not cached" }
+            return row
+        }
+        return lines(rows, empty: "No models registered.")
+    }
+
+    @MainActor
+    static func registerModel(context: ModelContext, repo: String) throws -> String {
+        guard ModelDownloadPolicy.isValidRepoID(repo) else {
+            throw ModelLabToolError.invalid("repo must look like org/name (letters, digits, - _ .)")
+        }
+        let record = try ModelLabCore.ModelRegistry(context: context).registerHuggingFaceMLXRepository(id: repo)
+        let cached = ModelDownloadPolicy.isCached(repo: repo)
+        return "Registered \(record.id) · \(repo). " + (cached ? "Its weights are already cached on this Mac." : "Nothing was downloaded; the weights are not cached yet, so a run that uses it will need allow_download after the user agrees.")
+    }
+
+    @MainActor
+    static func deleteModel(context: ModelContext, id: String) throws -> String {
+        let descriptor = FetchDescriptor<ModelArtifactRecord>(predicate: #Predicate { $0.id == id })
+        guard let record = try context.fetch(descriptor).first else {
+            throw ModelLabToolError.invalid("no registered model with ID \(id); use lab_list_models")
+        }
+        let name = record.name
+        let hub = record.format == .mlxHubRepository
+        try ModelLabCore.ModelRegistry(context: context).delete(record)
+        return hub ? "Unregistered \(name). The Hugging Face cache was not touched."
+                   : "Deleted \(name) and its copy in the Model Lab library. Experiment records were kept."
     }
 
     @MainActor

@@ -114,6 +114,42 @@ struct ModelLabActionToolTests {
 }
 
 @MainActor
+struct ModelLifecycleToolTests {
+    private func context() throws -> ModelContext {
+        let schema = Schema([ModelArtifactRecord.self])
+        return ModelContext(try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)]))
+    }
+
+    @Test func specsDeclareTheirPermissionTiers() {
+        #expect(ModelLabAgentTools.Kind.listModels.spec.permission == .read)
+        #expect(ModelLabAgentTools.Kind.registerModel.spec.permission == .write)
+        #expect(ModelLabAgentTools.Kind.deleteModel.spec.permission == .execute)
+        #expect(ModelLabAgentTools.Kind.registerModel.spec.name == "lab_register_model")
+    }
+
+    @Test func registerListAndDeleteARepositoryWithoutDownloading() throws {
+        let context = try context()
+        #expect(try ModelLabAgentTool.models(context: context, limit: 10) == "No models registered.")
+        let message = try ModelLabAgentTool.registerModel(context: context, repo: "kiln-test-org/never-downloaded-model")
+        #expect(message.contains("Nothing was downloaded"))
+        _ = try ModelLabAgentTool.registerModel(context: context, repo: "kiln-test-org/never-downloaded-model")
+        let listing = try ModelLabAgentTool.models(context: context, limit: 10)
+        #expect(listing.components(separatedBy: "\n").count == 1 && listing.contains("not cached"))
+        let id = try #require(try context.fetch(FetchDescriptor<ModelArtifactRecord>()).first?.id)
+        #expect(try ModelLabAgentTool.deleteModel(context: context, id: id).contains("cache was not touched"))
+        #expect(try ModelLabAgentTool.models(context: context, limit: 10) == "No models registered.")
+    }
+
+    @Test func badRepositoryIdsAndUnknownModelsAreRejected() throws {
+        let context = try context()
+        for bad in ["no-slash", "../etc/passwd", "a/b/c", "org/", "org/na me"] {
+            #expect(throws: ModelLabToolError.self) { try ModelLabAgentTool.registerModel(context: context, repo: bad) }
+        }
+        #expect(throws: ModelLabToolError.self) { try ModelLabAgentTool.deleteModel(context: context, id: "missing") }
+    }
+}
+
+@MainActor
 struct ClassifierTrainingActionTests {
     private func fixture() throws -> (URL, ExperimentRecord, DatasetRecord) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-classifier-\(UUID().uuidString)")
