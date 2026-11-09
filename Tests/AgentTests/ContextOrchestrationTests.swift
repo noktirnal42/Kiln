@@ -25,7 +25,7 @@ private final class RoundScript: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         if request.messages.first?.content == ContextCompactor.summaryInstructions {
             _summaryRequests += 1
-            if failSummary { throw ProviderError.authenticationFailed("no") }
+            if failSummary { throw ProviderError.authenticationFailed }
             return ChatChunk(delta: ChatMessage(role: .assistant, content: "SUMMARY of the work so far."), finishReason: .stop)
         }
         _requestSizes.append(ContextCompactor.estimateTokens(request.messages))

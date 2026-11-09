@@ -610,6 +610,9 @@ public final class ChatSession {
     /// The window of the selected model, cached; nil when no provider reports it.
     func contextWindow(for modelID: String) async -> Int? {
         guard !modelID.isEmpty else { return nil }
+        // For testing compaction without a long run: `-agent.contextWindowOverride 4000` on the command line.
+        let override = UserDefaults.standard.integer(forKey: "agent.contextWindowOverride")
+        if override > 0 { windowCache[modelID] = override; return override }
         if let cached = windowCache[modelID] { return cached }
         let models = await registry.allModels()
         for model in models { windowCache[model.id] = model.contextWindow }

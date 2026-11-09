@@ -70,6 +70,21 @@ One window, one sidebar, one conversation.
 
 - **Agent mode** runs `AgentOrchestrator` (policy gates A and B, approvals, behavior monitor, tamper-evident audit).
   Profiles: Research Assistant (read-only), Coding Agent, Workstation Agent (adds `re_*` and `lab_*`).
+- **Context management** (`Core/Agent/ContextCompactor.swift`, `ChatSession`): before each model call, if the estimate
+  (chars/3.5 + tool-call arguments) passes 70% of window − `maxTokens` − tool-schema size, (a) older tool results become
+  `[result cleared: <tool>, N chars]` stubs (newest 4 kept), (b) if still over, the older part is summarised by the
+  model into one message (system messages and the recent tail stay verbatim, a tool call never separated from its
+  results), (c) if the summary call fails the oldest part is dropped with an honest note. `run(contextWindow:)` nil = off.
+  `AgentEvent.contextCompacted` / `.contextMeasured`. `ChatSession` keeps per conversation the summary + covered-message
+  count (UserDefaults key `chat.compaction.v1`; off under tests) and rebuilds history as [summary] + later messages.
+  The run limit is 200 steps and **pauses** ("Paused after N steps; say continue…") instead of erroring.
+  UI: context meter + compact button in the composer bar (tooltip has detail), `/compact`, "Context compacted (A → B
+  tokens)" notes in the thread, and a finished run's tool calls collapsed to one line ("Ran 4 commands · edited 2 files ·
+  read 6 files", expandable; stored with the reply as name + arguments, results are not kept); live rows are compact.
+  Test aid: launch with `-agent.contextWindowOverride 4000`. **Not verified:** none of the UI has been seen in the running
+  app (computer-use access was declined), compaction quality with a real model, tool calls from earlier turns are still
+  not replayed to the model (only the summary and text). Test suite: all pass except the relay test
+  (`a device reaches the Mac only through the relay…`, times out here; unrelated).
 - **Approvals:** reads run freely; writes, commands and network calls open the approval sheet. "Always Allow"
   creates a standing grant (revocable under Approvals). `ApprovalCenter` is a Combine `ObservableObject`: views must
   observe it directly (`ApprovalSheetHost`), reading it through `AppModel` never re-renders.

@@ -84,7 +84,7 @@ struct ContextSessionTests {
             let providerType: ProviderType = .customEndpoint
             let capabilities: ProviderCapabilities = [.streaming]
             func fetchModels() async throws -> [ModelDescriptor] {
-                [ModelDescriptor(id: "stub-m1", name: "m1", providerID: id, providerType: providerType, contextWindow: 6_000)]
+                [ModelDescriptor(id: "stub-m1", name: "m1", providerID: id, providerType: providerType, contextWindow: 14_000)]
             }
             func streamChat(_ request: ChatRequest, reasoning: ReasoningConfig?) async throws -> AsyncThrowingStream<ChatChunk, Error> {
                 AsyncThrowingStream { c in
@@ -111,7 +111,7 @@ struct ContextSessionTests {
         #expect(session.messages.count == 8)
         await session.refreshContext()
         let before = try #require(session.contextUsage)
-        #expect(before.window == 6_000)
+        #expect(before.window == 14_000)
         #expect(before.used > 0)
         #expect(!session.hasContextSummary)
 

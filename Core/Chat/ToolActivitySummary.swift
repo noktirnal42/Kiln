@@ -44,12 +44,12 @@ public enum ToolActivitySummary {
     public static func line(for items: [ToolActivityItem]) -> String {
         guard !items.isEmpty else { return "" }
         var parts: [String] = []
-        for category in Category.allCases {
-            let group = items.filter { category(of: $0.name) == category }
+        for kind in Category.allCases {
+            let group = items.filter { category(of: $0.name) == kind }
             guard !group.isEmpty else { continue }
             let distinctPaths = Set(group.compactMap(path(of:)))
             let fileCount = distinctPaths.isEmpty ? group.count : max(distinctPaths.count, 1)
-            switch category {
+            switch kind {
             case .command: parts.append("Ran \(plural(group.count, "command"))")
             case .edit: parts.append("edited \(plural(fileCount, "file"))")
             case .read: parts.append("read \(plural(fileCount, "file"))")

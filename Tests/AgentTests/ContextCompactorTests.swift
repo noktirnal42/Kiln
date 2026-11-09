@@ -27,7 +27,7 @@ private func pairsIntact(_ messages: [ChatMessage]) -> Bool {
     return true
 }
 
-private final class CallLog: @unchecked Sendable {
+private final class SummaryCallLog: @unchecked Sendable {
     private let lock = NSLock()
     private var _transcripts: [String] = []
     var transcripts: [String] { lock.lock(); defer { lock.unlock() }; return _transcripts }
@@ -68,7 +68,7 @@ struct ContextCompactorStageTests {
     private let budget = ContextBudget(window: 4_000, reservedForOutput: 500, toolSchemaTokens: 0) // available 3500, trigger 2450
 
     @Test func underTheTriggerNothingChangesAndNoModelIsCalled() async {
-        let log = CallLog()
+        let log = SummaryCallLog()
         let messages = [ChatMessage(role: .user, content: "hi")]
         let outcome = await ContextCompactor.compact(messages, budget: budget) { text in log.add(text); return "s" }
         #expect(outcome.stage == .none)
@@ -102,7 +102,7 @@ struct ContextCompactorStageTests {
     @Test func clearingAloneIsEnoughWhenItGetsUnderTheTrigger() async {
         var messages: [ChatMessage] = [ChatMessage(role: .system, content: "sys"), ChatMessage(role: .user, content: "go")]
         for i in 0..<8 { messages += toolTurn("c\(i)", result: bulky(1_400)) } // ~3200 tokens of results
-        let log = CallLog()
+        let log = SummaryCallLog()
         let outcome = await ContextCompactor.compact(messages, budget: budget) { text in log.add(text); return "s" }
         #expect(outcome.stage == .clearedToolResults)
         #expect(outcome.clearedResults == 4)
@@ -114,19 +114,19 @@ struct ContextCompactorStageTests {
 
     @Test func whenClearingIsNotEnoughTheOlderPartIsSummarisedAndTheTailKeptVerbatim() async {
         var messages: [ChatMessage] = [ChatMessage(role: .system, content: "be careful"), ChatMessage(role: .user, content: "first ask")]
-        for i in 0..<14 { messages += toolTurn("c\(i)", result: bulky(1_400)) }
+        for i in 0..<14 { messages += toolTurn("c\(i)", result: bulky(4_000)) }
         messages.append(ChatMessage(role: .assistant, content: "Here is where we are."))
         messages.append(ChatMessage(role: .user, content: "now do the last thing"))
         let before = ContextCompactor.estimateTokens(messages)
         #expect(before > budget.triggerTokens)
 
-        let log = CallLog()
+        let log = SummaryCallLog()
         let outcome = await ContextCompactor.compact(messages, budget: budget) { text in
             log.add(text); return "The user wants X. Files: a.txt."
         }
         #expect(outcome.stage == .summarized)
         #expect(log.transcripts.count == 1)
-        #expect(log.transcripts[0].contains("first ask"))
+        #expect(log.transcripts.first?.contains("first ask") == true)
         #expect(outcome.summary?.contains("The user wants X") == true)
         // System message first, then exactly one summary, then the recent turns untouched.
         #expect(outcome.messages[0] == messages[0])
@@ -160,7 +160,7 @@ struct ContextCompactorStageTests {
 
     @Test func aFailedSummaryFallsBackToDroppingTheOldestPartWithAnHonestNote() async {
         var messages: [ChatMessage] = [ChatMessage(role: .user, content: "first ask")]
-        for i in 0..<14 { messages += toolTurn("c\(i)", result: bulky(1_400)) }
+        for i in 0..<14 { messages += toolTurn("c\(i)", result: bulky(4_000)) }
         messages.append(ChatMessage(role: .user, content: "and finally"))
         let outcome = await ContextCompactor.compact(messages, budget: budget) { _ in throw SummaryFailed() }
         #expect(outcome.stage == .dropped)
@@ -174,7 +174,7 @@ struct ContextCompactorStageTests {
 
     @Test func anEmptySummaryCountsAsAFailure() async {
         var messages: [ChatMessage] = [ChatMessage(role: .user, content: "first ask")]
-        for i in 0..<14 { messages += toolTurn("c\(i)", result: bulky(1_400)) }
+        for i in 0..<14 { messages += toolTurn("c\(i)", result: bulky(4_000)) }
         let outcome = await ContextCompactor.compact(messages, budget: budget) { _ in "  \n " }
         #expect(outcome.stage == .dropped)
     }
@@ -185,7 +185,7 @@ struct ContextCompactorStageTests {
             messages.append(ChatMessage(role: .user, content: "question \(i) " + bulky(900)))
             messages.append(ChatMessage(role: .assistant, content: "answer \(i) " + bulky(900)))
         }
-        let roomy = ContextBudget(window: 50_000, reservedForOutput: 1_000, toolSchemaTokens: 0)
+        let roomy = ContextBudget(window: 5_500, reservedForOutput: 500, toolSchemaTokens: 0)
         let plain = await ContextCompactor.compact(messages, budget: roomy) { _ in "s" }
         #expect(plain.stage == .none)
         let forced = await ContextCompactor.compact(messages, budget: roomy, force: true) { _ in "Short summary." }
@@ -196,12 +196,12 @@ struct ContextCompactorStageTests {
 
     @Test func aSecondCompactionFoldsThePreviousSummaryIn() async {
         var messages: [ChatMessage] = [ContextCompactor.restoredSummary("[Summary] earlier work on parser", covers: 4)]
-        for i in 0..<14 { messages += toolTurn("c\(i)", result: bulky(1_400)) }
+        for i in 0..<14 { messages += toolTurn("c\(i)", result: bulky(4_000)) }
         messages.append(ChatMessage(role: .user, content: "keep going"))
-        let log = CallLog()
+        let log = SummaryCallLog()
         let outcome = await ContextCompactor.compact(messages, budget: budget) { text in log.add(text); return "merged" }
         #expect(outcome.stage == .summarized)
-        #expect(log.transcripts[0].contains("earlier work on parser"))
+        #expect(log.transcripts.first?.contains("earlier work on parser") == true)
         #expect(outcome.messages.filter { $0.metadata[ContextMetadata.kind] != nil }.count == 1)
     }
 
@@ -209,7 +209,7 @@ struct ContextCompactorStageTests {
         var messages: [ChatMessage] = [ChatMessage(role: .user, content: "start")]
         for i in 0..<400 { messages += toolTurn("c\(i)", result: bulky(2_000)) }
         let small = ContextBudget(window: 3_000, reservedForOutput: 500, toolSchemaTokens: 0)
-        let log = CallLog()
+        let log = SummaryCallLog()
         _ = await ContextCompactor.compact(messages, budget: small) { text in log.add(text); return "s" }
         let sent = log.transcripts.first?.count ?? Int.max
         #expect(sent <= Int(Double(small.available) * 0.7 * ContextCompactor.charsPerToken) + 200)

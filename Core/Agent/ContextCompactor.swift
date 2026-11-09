@@ -258,7 +258,11 @@ public enum ContextCompactor {
         var text = transcript(head)
         let transcriptCap = Int(Double(max(budget.available, 2_000)) * 0.7 * charsPerToken)
         if text.count > transcriptCap {
-            text = "[older part of the transcript omitted: it was too long to summarise in one call]\n\n" + String(text.suffix(transcriptCap))
+            // Keep how it began (the goal) and how it ended (the current state); cut the middle.
+            let head = Int(Double(transcriptCap) * 0.3)
+            text = String(text.prefix(head))
+                + "\n\n[middle of the transcript omitted: it was too long to summarise in one call]\n\n"
+                + String(text.suffix(transcriptCap - head))
         }
         let summaryText: String?
         do {
