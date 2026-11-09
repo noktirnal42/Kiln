@@ -87,6 +87,7 @@ public final class AppModel {
         factories.register(ChatModule.self)
         factories.register(ModelLabModule.self)
         factories.register(REModule.self)
+        factories.register(BrowserModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
@@ -191,6 +192,16 @@ public final class AppModel {
         }
         if let lab = (await manager.record(for: ModelLabModule.identifier))?.module as? ModelLabModule {
             ModelLabAgentTools.register(module: lab)
+        }
+        if let browser = (await manager.record(for: BrowserModule.identifier))?.module as? BrowserModule {
+            BrowserAgentTools.register(module: browser)
+            // A download is only handed to Analyze when the user presses "Analyze in Kiln".
+            let re = (await manager.record(for: REModule.identifier))?.module as? REModule
+            browser.importPackage = { [weak re] url in
+                guard let re else { throw BrowserToolError.page("Analyze is not available.") }
+                _ = try await re.importBinary(at: url)
+                return url.lastPathComponent
+            }
         }
         await syncUIModules()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {

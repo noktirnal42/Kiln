@@ -1,0 +1,16 @@
+{
+  "identifier": "com.kiln.browser",
+  "displayName": "Browser",
+  "version": "1.0.0",
+  "minAppVersion": "0.1.0",
+  "maxAppVersion": null,
+  "author": "Kiln Team",
+  "description": "Tabbed web browser with its own persistent website data, find in page, download handling that feeds the package intake, and browser_* tools for the agent.",
+  "category": "web",
+  "icon": "globe",
+  "dependencies": [],
+  "requiredCapabilities": ["network.client", "fileSystem.readWrite"],
+  "optionalCapabilities": [],
+  "provides": ["browser"],
+  "entryPoint": "BrowserModule"
+}
