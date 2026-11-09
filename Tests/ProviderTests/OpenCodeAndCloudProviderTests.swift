@@ -108,6 +108,14 @@ struct CloudProviderCatalogTests {
         #expect(models.contains { $0.id == "nvidia-nim-meta/llama-3.1-8b-instruct" })
     }
 
+    @Test func hostedModelsWithoutAPublishedWindowAreNotAssumedToBeTiny() throws {
+        // A 4096 placeholder pins the context meter at 100% and triggers compaction on every run.
+        let models = try NVIDIANIMProvider.catalog(from: Data(ProviderTestFixtures.nimModels().utf8))
+        let llama = try #require(models.first { $0.id == "nvidia-nim-meta/llama-3.1-8b-instruct" })
+        #expect(llama.contextWindow == ModelDescriptor.unknownHostedWindow)
+        #expect(ModelDescriptor.unknownHostedWindow >= 32_768)
+    }
+
     @Test func nimGLMRequestOptions() {
         let deep = NVIDIANIMProvider.requestOptions(model: "z-ai/glm-5.3-flash", reasoning: ReasoningConfig(depth: .deep))
         #expect(deep["reasoning_effort"] == ProviderJSON("max"))

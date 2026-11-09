@@ -248,6 +248,9 @@ public struct ModelDescriptor: Identifiable, Codable, Equatable, Sendable {
     public var name: String
     public var providerID: String
     public var providerType: ProviderType
+    /// What a hosted catalog that does not publish a window is assumed to have. Kept well above 4096 so the
+    /// context meter and compaction are not driven by a placeholder: nearly every hosted chat model has at least this.
+    public static let unknownHostedWindow = 32_768
     public var contextWindow: Int
     public var supportsReasoning: Bool
     public var supportsTools: Bool

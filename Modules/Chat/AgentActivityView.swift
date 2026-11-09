@@ -211,6 +211,7 @@ struct ContextMeterView: View {
                 .frame(width: 13, height: 13)
                 Text(session.isCompacting ? "Compacting…" : "\(usage.percent)%")
                     .font(SSTypography.caption()).monospacedDigit().foregroundStyle(tint(usage))
+                    .lineLimit(1).fixedSize()
                 Button { Task { await session.compactNow() } } label: {
                     Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 10))
                 }
