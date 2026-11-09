@@ -89,6 +89,7 @@ public final class AppModel {
         factories.register(REModule.self)
         factories.register(BrowserModule.self)
         factories.register(DevicesModule.self)
+        factories.register(MediaModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
@@ -206,6 +207,16 @@ public final class AppModel {
         }
         if let devices = (await manager.record(for: DevicesModule.identifier))?.module as? DevicesModule {
             DeviceAgentTools.register(service: devices.service)
+        }
+        if let media = (await manager.record(for: MediaModule.identifier))?.module as? MediaModule {
+            MediaAgentTools.register(module: media)
+            #if DEBUG
+            // Visual-QA hook, compiled out of release builds: open Kiln.app --args -KilnOpenMedia /path/to/file
+            // shows the file in the Media viewer at launch.
+            if let path = UserDefaults.standard.string(forKey: "KilnOpenMedia") {
+                _ = try? media.openForAgent(URL(fileURLWithPath: path))
+            }
+            #endif
         }
         await syncUIModules()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {

@@ -32,6 +32,10 @@ struct MainWindow: View {
         .navigationTitle("Kiln — \(workstation.selected.title)")
         .overlay { paletteOverlay }
         .background { shortcuts }
+        .onChange(of: (app.uiModules[MediaModule.identifier] as? MediaModule)?.openRequests) { old, new in
+            // The agent asked to show a file (media_open): bring the viewer forward.
+            if let new, new != old, new > 0 { workstation.select(.media, app: app) }
+        }
         .modifier(ApprovalSheetHost(center: app.approvalCenter, requested: $workstation.showApprovals))
         .sheet(isPresented: $workstation.showModules) {
             VStack(spacing: 0) {
@@ -54,7 +58,7 @@ struct MainWindow: View {
         case .swarm: SwarmView()
         case .develop: DevelopView()
         case .audit: AuditActivityView()
-        case .agent, .analyze, .lab, .browser, .devices:
+        case .agent, .analyze, .lab, .browser, .devices, .media:
             if let identifier = workstation.selected.moduleIdentifier {
                 ModuleActivityView(identifier: identifier)
             }

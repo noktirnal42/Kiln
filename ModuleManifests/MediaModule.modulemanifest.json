@@ -1,0 +1,16 @@
+{
+  "identifier": "com.kiln.media",
+  "displayName": "Media",
+  "version": "1.0.0",
+  "minAppVersion": "0.1.0",
+  "maxAppVersion": null,
+  "author": "Kiln Team",
+  "description": "Video, image and audio viewer with a gallery of generated items, image generation behind a provider protocol, text to speech and speech to text, all also available to agents as media_* tools.",
+  "category": "media",
+  "icon": "play.rectangle",
+  "dependencies": [],
+  "requiredCapabilities": ["fileSystem.readWrite", "network.client", "microphone.access"],
+  "optionalCapabilities": [],
+  "provides": ["mediaViewer", "imageGeneration", "textToSpeech", "speechToText"],
+  "entryPoint": "MediaModule"
+}

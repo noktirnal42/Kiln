@@ -29,6 +29,7 @@ struct WorkstationTests {
         #expect(Activity.analyze.moduleIdentifier == REModule.identifier)
         #expect(Activity.lab.moduleIdentifier == ModelLabModule.identifier)
         #expect(Activity.browser.moduleIdentifier == BrowserModule.identifier)
+        #expect(Activity.media.moduleIdentifier == MediaModule.identifier)
         for activity in [Activity.home, .swarm, .develop, .audit] { #expect(activity.moduleIdentifier == nil) }
     }
 

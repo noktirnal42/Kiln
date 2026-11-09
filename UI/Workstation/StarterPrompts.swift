@@ -54,6 +54,13 @@ enum StarterPrompts {
                            text: "List my simulators and emulators, tell me which are running and which tools are missing."),
                     Prompt(title: "Look at the screen", symbol: "camera.viewfinder",
                            text: "Take a screenshot of the booted device and describe what is on screen.")]
+        case .media:
+            return [Prompt(title: "Generate an image", symbol: "photo",
+                           text: "Use media_generate_image to make an image of: "),
+                    Prompt(title: "Read this aloud", symbol: "speaker.wave.2",
+                           text: "Use media_speak to turn the following text into an audio file I can play: "),
+                    Prompt(title: "Transcribe a recording", symbol: "waveform",
+                           text: "Use media_transcribe on the audio file at this path and give me the transcript: ")]
         case .audit:
             return [Prompt(title: "What did agents do?", symbol: "checkmark.shield",
                            text: "Read my recent agent activity and tell me anything that looks risky or surprising.")]
