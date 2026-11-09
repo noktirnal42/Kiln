@@ -97,6 +97,12 @@ One window, one sidebar, one conversation.
   store listing (Kiln does not sign in to any store). Only http(s) is accepted, a non-2xx answer is an error, and
   `re_download_package` is a write, so it needs approval like `edit_file`. Files land in
   `Application Support/Kiln/ReverseEngineering/Downloads` and are analyzed, never run.
+- **Media (⌘8, `Modules/Media`, `Core/Media`):** viewer (AVKit video with scrub and 0.5–2× speed, zoomable images, audio with waveform) that opens workspace files,
+  drops and agent results; a gallery of generated items in `Application Support/Kiln/Media`; image generation behind `ImageGenerationProvider`
+  (Apple Image Playground when this Mac has it, else a custom OpenAI-compatible `/images/generations` endpoint — unverified against a live endpoint; with neither
+  configured the call fails and says why, nothing is faked); text to speech to a file (AVSpeechSynthesizer.write) and speech to text from a file
+  (`AudioTranscriber.transcribe(fileAt:)`; the composer's existing mic button is the dictation hook, untouched). Tools: `media_open`, `media_list` (read),
+  `media_generate_image`, `media_speak`, `media_transcribe` (write, need approval). Verified here: a real MP4 plays in the viewer; TTS then STT round trip returned the spoken sentence.
 - **Model Lab:** `lab_hardware`, `lab_list_experiments`, `lab_list_datasets`, Hugging Face search tools.
 
 ## Providers (all verified with real calls, 2026-11-01)

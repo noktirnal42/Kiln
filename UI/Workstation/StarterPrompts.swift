@@ -44,6 +44,13 @@ enum StarterPrompts {
         case .swarm:
             return [Prompt(title: "Just ask the agent", symbol: "sparkles",
                            text: "Break this job into steps and do it: ")] + project.prefix(2)
+        case .media:
+            return [Prompt(title: "Generate an image", symbol: "photo",
+                           text: "Use media_generate_image to make an image of: "),
+                    Prompt(title: "Read this aloud", symbol: "speaker.wave.2",
+                           text: "Use media_speak to turn the following text into an audio file I can play: "),
+                    Prompt(title: "Transcribe a recording", symbol: "waveform",
+                           text: "Use media_transcribe on the audio file at this path and give me the transcript: ")]
         case .audit:
             return [Prompt(title: "What did agents do?", symbol: "checkmark.shield",
                            text: "Read my recent agent activity and tell me anything that looks risky or surprising.")]

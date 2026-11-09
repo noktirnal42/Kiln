@@ -87,6 +87,7 @@ public final class AppModel {
         factories.register(ChatModule.self)
         factories.register(ModelLabModule.self)
         factories.register(REModule.self)
+        factories.register(MediaModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
@@ -191,6 +192,16 @@ public final class AppModel {
         }
         if let lab = (await manager.record(for: ModelLabModule.identifier))?.module as? ModelLabModule {
             ModelLabAgentTools.register(module: lab)
+        }
+        if let media = (await manager.record(for: MediaModule.identifier))?.module as? MediaModule {
+            MediaAgentTools.register(module: media)
+            #if DEBUG
+            // Visual-QA hook, compiled out of release builds: open Kiln.app --args -KilnOpenMedia /path/to/file
+            // shows the file in the Media viewer at launch.
+            if let path = UserDefaults.standard.string(forKey: "KilnOpenMedia") {
+                _ = try? media.openForAgent(URL(fileURLWithPath: path))
+            }
+            #endif
         }
         await syncUIModules()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
