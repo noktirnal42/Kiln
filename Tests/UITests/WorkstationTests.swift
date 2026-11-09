@@ -20,7 +20,8 @@ struct WorkstationTests {
 
     @Test func everyActivityHasAUniqueShortcutInRailOrder() {
         let keys = Activity.allCases.map { String($0.shortcutKey) }
-        #expect(keys == ["1", "2", "3", "4", "5", "6", "7", "8"])
+        // ⌘1…⌘9, then ⌘0 for the tenth. A new activity must not fall off the end into a duplicate key.
+        #expect(keys == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
         #expect(Set(keys).count == Activity.allCases.count)
     }
 
