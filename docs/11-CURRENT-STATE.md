@@ -91,6 +91,12 @@ One window, one sidebar, one conversation.
   and analyst signatures, checks project revision and binary hash, and rejects concurrent runs. Ghidra 12.1.4 + Java 21 produced real persisted pseudocode here.
 - **Reverse engineering:** import via `re_import_binary` (returns `project_id`; every other `re_*` tool takes it;
   the analysis id is accepted too). Native `otool` engine; Ghidra optional.
+- **Package downloader (Analyze → Download…, `re_search_packages`, `re_download_package`):** one code path
+  (`Core/ReverseEngineering/PackageIntake.swift`) serves the sheet, the in-app agent and the MCP server. Aptoide search returns
+  direct APK links with the store's MD5, which the download verifies; Apple, Google Play, APKPure and Amazon only open a
+  store listing (Kiln does not sign in to any store). Only http(s) is accepted, a non-2xx answer is an error, and
+  `re_download_package` is a write, so it needs approval like `edit_file`. Files land in
+  `Application Support/Kiln/ReverseEngineering/Downloads` and are analyzed, never run.
 - **Model Lab:** `lab_hardware`, `lab_list_experiments`, `lab_list_datasets`, Hugging Face search tools.
 
 ## Providers (all verified with real calls, 2026-11-01)
