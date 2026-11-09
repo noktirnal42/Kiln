@@ -354,6 +354,35 @@ public enum REMCPTools {
             ],
             readOnly: true
         )
+        ,
+        REMCPToolDefinition(
+            name: "search_packages",
+            description: "Look up an app package by name. source=aptoide returns APK results Kiln can download itself (direct_url, md5); apple returns App Store listings; google, apkpure and amazon return only a store search page to open. Only Aptoide and direct URLs can be fetched by re_download_package. Read-only: nothing is downloaded.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "query": ["type": "string", "description": "App name or bundle identifier (or, for source=direct, an http(s) URL)."],
+                    "source": ["type": "string", "description": "aptoide (default), apple, google, apkpure, amazon or direct."]
+                ],
+                "required": ["query"],
+                "additionalProperties": false
+            ],
+            readOnly: true
+        ),
+        REMCPToolDefinition(
+            name: "download_package",
+            description: "Download an http(s) package file (APK, IPA, DEB, a native bundle archive or a binary) into Kiln's downloads folder and import it as a reverse-engineering project, returning the project_id. Pass the md5 from re_search_packages to verify the file; a mismatch discards it. Only fetch packages the user is authorized to analyze. The package is analyzed, never run.",
+            inputSchema: [
+                "type": "object",
+                "properties": [
+                    "url": ["type": "string", "description": "http or https link to the package file."],
+                    "md5": ["type": "string", "description": "Optional expected MD5 (from re_search_packages) to verify the download."]
+                ],
+                "required": ["url"],
+                "additionalProperties": false
+            ],
+            readOnly: false
+        )
     ]
 
     /// Route one tool call onto the module service. Result JSON text; throwing
@@ -368,6 +397,37 @@ public enum REMCPTools {
             let analysis = try await service.importBinary(at: URL(fileURLWithPath: path))
             let projectID = await MainActor.run { service.projects.first { $0.analysis?.id == analysis.id }?.id }
             return try text(JSONSerialization.data(withJSONObject: summary(analysis, projectID: projectID)))
+        case "search_packages":
+            guard let query = arguments["query"] as? String, !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+                throw REMToolError.missingArgument("query")
+            }
+            let sourceName = ((arguments["source"] as? String) ?? "aptoide").lowercased()
+            guard let source = KilnPackageSource(rawValue: sourceName) else {
+                throw REMToolError.missingArgument("source (aptoide, apple, google, apkpure, amazon or direct)")
+            }
+            let results = try await KilnPackageCatalog.search(source: source, query: query)
+            let rows: [[String: Any]] = results.map { result in
+                var row: [String: Any] = ["name": result.name, "detail": result.detail,
+                                          "listing_url": result.listingURL.absoluteString,
+                                          "can_download": result.directURL != nil]
+                if let direct = result.directURL { row["direct_url"] = direct.absoluteString }
+                if let md5 = result.md5 { row["md5"] = md5 }
+                return row
+            }
+            return try text(JSONSerialization.data(withJSONObject: ["source": source.rawValue, "results": rows]))
+        case "download_package":
+            guard let urlText = arguments["url"] as? String, !urlText.isEmpty else {
+                throw REMToolError.missingArgument("url")
+            }
+            let url = try KilnPackageCatalog.downloadableURL(urlText)
+            let saved = try await KilnPackageCatalog.download(url, into: KilnPackageCatalog.defaultDownloadsFolder,
+                                                              expectedMD5: arguments["md5"] as? String)
+            let analysis = try await service.importBinary(at: saved)
+            let projectID = await MainActor.run { service.projects.first { $0.analysis?.id == analysis.id }?.id }
+            var result = summary(analysis, projectID: projectID)
+            result["downloaded_from"] = url.absoluteString
+            result["saved_as"] = saved.lastPathComponent
+            return try text(JSONSerialization.data(withJSONObject: result))
         case "analyze_binary":
             let projectID = try projectArgument(arguments)
             let engine = ((arguments["engine"] as? String) ?? "ghidra").lowercased()
