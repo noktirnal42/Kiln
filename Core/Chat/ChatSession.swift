@@ -23,6 +23,30 @@ struct ToolCallAccumulator {
     }
 }
 
+/// A line in the thread that is not a message: "Context compacted (A → B tokens)".
+public struct ContextNote: Identifiable, Equatable, Codable, Sendable {
+    public var id = UUID()
+    /// Shown after this many of the conversation's messages.
+    public var afterMessageCount: Int
+    public var text: String
+}
+
+/// What a conversation remembers of its own compaction: the summary, how many messages it stands in for, and the
+/// notes to show. History is rebuilt as [summary] + the messages after `covered`.
+struct ConversationCompaction: Codable, Equatable, Sendable {
+    var summary: String?
+    var covered = 0
+    var notes: [ContextNote] = []
+}
+
+/// The context meter's reading.
+public struct ContextUsage: Equatable, Sendable {
+    public var used: Int
+    public var window: Int
+    public var fraction: Double { window > 0 ? min(1, Double(used) / Double(window)) : 0 }
+    public var percent: Int { Int((fraction * 100).rounded()) }
+}
+
 @MainActor
 @Observable
 public final class ChatSession {
@@ -71,6 +95,19 @@ public final class ChatSession {
     public private(set) var agentNotice: String?
     private var agentStop: AgentStopFlag?
 
+    // MARK: Context management
+    /// Notes ("Context compacted …") for the open conversation, in thread order.
+    public private(set) var contextNotes: [ContextNote] = []
+    /// Estimated tokens used against the model's window, nil until a window is known.
+    public private(set) var contextUsage: ContextUsage?
+    public private(set) var isCompacting = false
+    /// Whether the open conversation carries a summary of earlier messages.
+    public var hasContextSummary: Bool { compactions[conversationID ?? UUID()]?.summary != nil }
+    private var compactions: [UUID: ConversationCompaction] = [:]
+    private var windowCache: [String: Int] = [:]
+    private var compactionDefaults: UserDefaults?
+    nonisolated static let compactionKey = "chat.compaction.v1"
+
     public var agentProfiles: [AgentProfile] { AgentProfile.builtIns.filter { !$0.toolPermissions.enabledTools.isEmpty } }
     public var agentProfile: AgentProfile? {
         let all = agentProfiles
@@ -106,7 +143,8 @@ public final class ChatSession {
         gitService: GitService = GitService(),
         fileIndexService: FileIndexService = FileIndexService(),
         workspaceRoot: String? = nil,
-        initialModelID: String = ""
+        initialModelID: String = "",
+        compactionDefaults: UserDefaults? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil
     ) {
         self.registry = registry
         self.conversations = conversations
@@ -121,6 +159,11 @@ public final class ChatSession {
         self.selectedModelID = initialModelID
         self.conversationTitle = "New Conversation"
         self.messages = []
+        self.compactionDefaults = compactionDefaults
+        if let data = compactionDefaults?.data(forKey: Self.compactionKey),
+           let saved = try? JSONDecoder().decode([UUID: ConversationCompaction].self, from: data) {
+            compactions = saved
+        }
         recentsDefaults = UserDefaults.standard
         recentModelIDs = recentsDefaults?.stringArray(forKey: recentsKey) ?? []
     }
@@ -142,7 +185,9 @@ public final class ChatSession {
             conversationID = summary.id
             conversationTitle = summary.title
             messages = []
+            contextNotes = []
             errorText = nil
+            await refreshContext()
         } catch {
             errorText = "Could not create conversation: \(error)"
         }
@@ -160,6 +205,8 @@ public final class ChatSession {
                 selectedModelID = model
             }
             errorText = page.truncated ? "Showing the last \(page.messages.count) of \(page.total) messages." : nil
+            contextNotes = compactions[id]?.notes ?? []
+            await refreshContext()
         } catch {
             errorText = "Could not load conversation: \(error)"
         }
@@ -185,7 +232,15 @@ public final class ChatSession {
         guard conversationID != nil else { return }
         do {
             try await conversations.deleteMessage(id)
-            messages.removeAll { $0.id == id }
+            if let index = messages.firstIndex(where: { $0.id == id }) {
+                // Deleting a message the summary already covers shifts the covered count with it.
+                if var state = compactions[conversationID!], index < state.covered {
+                    state.covered -= 1
+                    compactions[conversationID!] = state
+                }
+                messages.remove(at: index)
+            }
+            updateContextMeter()
         } catch {
             errorText = "Delete failed: \(error)"
         }
@@ -209,8 +264,12 @@ public final class ChatSession {
 
     public func deleteConversation(_ id: UUID) async {
         try? await conversations.deleteConversation(id)
+        compactions[id] = nil
+        saveCompactions()
         if conversationID == id {
             conversationID = nil
+            contextNotes = []
+            contextUsage = nil
             messages = []
             conversationTitle = ConversationTitle.placeholder
         }
@@ -231,6 +290,7 @@ public final class ChatSession {
     public func send(_ text: String) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isStreaming else { return }
+        if Self.isCompactCommand(trimmed) { await compactNow(); return }
         guard !selectedModelID.isEmpty else {
             errorText = "No model selected. Pick one in the model picker."
             return
@@ -411,7 +471,8 @@ public final class ChatSession {
     private func runAgent(orchestrator: AgentOrchestrator, profile: AgentProfile, conversationID: UUID) async {
         guard let promptIndex = messages.lastIndex(where: { $0.role == .user }) else { isStreaming = false; return }
         let prompt = messages[promptIndex].content
-        let history = messages[..<promptIndex].map { ChatMessage(role: $0.role, content: $0.content) }
+        let history = Self.agentHistory(messages: messages, upTo: promptIndex, compaction: compactions[conversationID])
+        let window = await contextWindow(for: selectedModelID)
         var profile = profile
         profile.modelID = selectedModelID
         let stop = AgentStopFlag()
@@ -431,7 +492,7 @@ public final class ChatSession {
             var tokens = 0
             var firstTokenAt: Date?
             let stream = orchestrator.run(
-                profile: profile, prompt: prompt, history: Array(history), workspaceRoot: root, stop: stop,
+                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
             )
             do {
@@ -449,6 +510,9 @@ public final class ChatSession {
                     case .retryScheduled(let attempt, let delay, let reason):
                         self.agentNotice = "Retrying (\(attempt)) in \(Int(delay))s: \(reason)"
                     case .policyDenied(let tool, _, let reason): self.agentNotice = "\(tool) was blocked: \(reason)"
+                    case .contextMeasured(let used, let window): self.contextUsage = ContextUsage(used: used, window: window)
+                    case .contextCompacted(let compaction):
+                        self.recordCompaction(compaction, conversationID: conversationID, promptIndex: promptIndex)
                     case .finished(let summary): finalText = summary.finalText; tokens = summary.totalTokens
                     default: break
                     }
@@ -472,10 +536,11 @@ public final class ChatSession {
             }
             if !finalText.isEmpty, let saved = try? await store.appendMessage(
                 conversationID: conversationID, role: .assistant, content: finalText,
-                reasoning: nil, tokenCount: tokens, toolCalls: [], modelID: model
+                reasoning: nil, tokenCount: tokens, toolCalls: self?.finishedToolCalls() ?? [], modelID: model
             ) {
                 self?.messages.append(saved)
             }
+            self?.updateContextMeter()
             self?.streamingText = ""
             self?.streamingReasoning = ""
             self?.isStreaming = false
@@ -484,4 +549,131 @@ public final class ChatSession {
         streamTask = task
         await task.value
     }
+
+    // MARK: Context management
+
+    nonisolated static func isCompactCommand(_ text: String) -> Bool {
+        let lowered = text.lowercased()
+        return lowered == "/compact" || lowered.hasPrefix("/compact ")
+    }
+
+    /// Prior turns as the model should see them: the summary (if any) followed by the messages it doesn't cover.
+    /// Each carries its position so a later compaction can say which messages it replaced.
+    nonisolated static func agentHistory(messages: [MessageSnapshot], upTo end: Int, compaction: ConversationCompaction?) -> [ChatMessage] {
+        let end = min(max(0, end), messages.count)
+        var result: [ChatMessage] = []
+        var start = 0
+        if let compaction, let summary = compaction.summary {
+            start = min(max(0, compaction.covered), end)
+            result.append(ContextCompactor.restoredSummary(summary, covers: start))
+        }
+        for index in start..<end {
+            let message = messages[index]
+            result.append(ChatMessage(role: message.role, content: message.content,
+                                      metadata: [ContextMetadata.sourceIndex: String(index)]))
+        }
+        return result
+    }
+
+    /// How many conversation messages a compaction's summary now stands in for.
+    nonisolated static func coveredCount(replaced: [ChatMessage], promptIndex: Int, previous: Int) -> Int {
+        var covered = previous
+        for message in replaced {
+            if let raw = message.metadata[ContextMetadata.sourceIndex], let index = Int(raw) { covered = max(covered, index + 1) }
+            if let raw = message.metadata[ContextMetadata.covers], let count = Int(raw) { covered = max(covered, count) }
+            if message.metadata[ContextMetadata.prompt] != nil { covered = max(covered, promptIndex + 1) }
+        }
+        return covered
+    }
+
+    private func saveCompactions() {
+        guard let compactionDefaults else { return }
+        if let data = try? JSONEncoder().encode(compactions) { compactionDefaults.set(data, forKey: Self.compactionKey) }
+    }
+
+    private func recordCompaction(_ compaction: ContextCompaction, conversationID: UUID, promptIndex: Int) {
+        var state = compactions[conversationID] ?? ConversationCompaction()
+        if let summary = compaction.summary {
+            state.summary = summary
+            state.covered = Self.coveredCount(replaced: compaction.replacedMessages, promptIndex: promptIndex, previous: state.covered)
+        }
+        let note = ContextNote(afterMessageCount: messages.count, text: compaction.headline)
+        state.notes.append(note)
+        compactions[conversationID] = state
+        saveCompactions()
+        if self.conversationID == conversationID {
+            contextNotes = state.notes
+            contextUsage = contextUsage.map { ContextUsage(used: compaction.tokensAfter, window: $0.window) }
+        }
+    }
+
+    /// The window of the selected model, cached; nil when no provider reports it.
+    func contextWindow(for modelID: String) async -> Int? {
+        guard !modelID.isEmpty else { return nil }
+        // For testing compaction without a long run: `-agent.contextWindowOverride 4000` on the command line.
+        let override = UserDefaults.standard.integer(forKey: "agent.contextWindowOverride")
+        if override > 0 { windowCache[modelID] = override; return override }
+        if let cached = windowCache[modelID] { return cached }
+        let models = await registry.allModels()
+        for model in models { windowCache[model.id] = model.contextWindow }
+        return windowCache[modelID]
+    }
+
+    /// Looks up the model's window and refreshes the meter. Call when the model or conversation changes.
+    public func refreshContext() async {
+        _ = await contextWindow(for: selectedModelID)
+        updateContextMeter()
+    }
+
+    /// Re-estimates what the next request will carry. Cheap: no model call.
+    public func updateContextMeter() {
+        guard let window = windowCache[selectedModelID], let profile = agentProfile else { contextUsage = nil; return }
+        let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        var tokens = ContextCompactor.estimateTokens(profile.systemPrompt)
+        tokens += ContextCompactor.estimateTokens(Self.agentHistory(messages: messages, upTo: messages.count,
+                                                                    compaction: conversationID.flatMap { compactions[$0] }))
+        if let orchestrator {
+            tokens += orchestrator.contextBudget(profile: profile, contextWindow: window, workspaceRoot: root).toolSchemaTokens
+        }
+        contextUsage = ContextUsage(used: tokens, window: window)
+    }
+
+    /// `/compact`: summarise the conversation now instead of waiting for the window to fill.
+    public func compactNow() async {
+        guard !isStreaming, !isCompacting, let conversationID else {
+            if conversationID == nil { agentNotice = "Nothing to compact yet." }
+            return
+        }
+        guard let orchestrator, let profile = agentProfile, !selectedModelID.isEmpty,
+              let window = await contextWindow(for: selectedModelID) else {
+            errorText = "Compaction needs the agent and a model with a known context window."
+            return
+        }
+        isCompacting = true
+        defer { isCompacting = false }
+        errorText = nil
+        var profile2 = profile
+        profile2.modelID = selectedModelID
+        let history = Self.agentHistory(messages: messages, upTo: messages.count, compaction: compactions[conversationID])
+        let registry = registry, reasoning = reasoning
+        let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let outcome = await orchestrator.compact(
+            profile: profile2, history: history, contextWindow: window, workspaceRoot: root,
+            chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
+        )
+        guard outcome.didCompact, outcome.summary != nil else {
+            agentNotice = "Nothing to compact yet: the conversation is already short."
+            updateContextMeter()
+            return
+        }
+        agentNotice = nil
+        recordCompaction(ContextCompaction(outcome), conversationID: conversationID, promptIndex: messages.count)
+        updateContextMeter()
+    }
+
+    /// The finished run's tool calls as stored with its reply, so the thread can show them collapsed later.
+    private func finishedToolCalls() -> [ToolCall] {
+        agentActivity.map { ToolCall(id: $0.callID.isEmpty ? $0.id.uuidString : $0.callID, name: $0.toolName, arguments: $0.argumentsJSON) }
+    }
+
 }

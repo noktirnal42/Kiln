@@ -103,7 +103,7 @@ public final class AgentAuditRecorder: @unchecked Sendable {
 
     static func entry(for event: AgentEvent) -> (type: String, payload: [String: AuditValue])? {
         switch event {
-        case .textDelta, .textReset, .reasoningDelta:
+        case .textDelta, .textReset, .reasoningDelta, .contextMeasured:
             return nil
         case .roundStarted(let round):
             return ("agent.round", ["round": .int(round)])
@@ -146,6 +146,14 @@ public final class AgentAuditRecorder: @unchecked Sendable {
                 "attempt": .int(attempt),
                 "delay_seconds": .double(delay),
                 "reason": .string(clip(SecretRedactor.redact(reason).text)),
+            ])
+        case .contextCompacted(let compaction):
+            // Counts only; the summary is conversation content and stays out of the chain.
+            return ("context.compacted", [
+                "stage": .string(compaction.stage.rawValue),
+                "tokens_before": .int(compaction.tokensBefore),
+                "tokens_after": .int(compaction.tokensAfter),
+                "results_cleared": .int(compaction.clearedResults),
             ])
         case .finished(let summary):
             // The final text is the model's answer and may hold anything; only counts are kept.

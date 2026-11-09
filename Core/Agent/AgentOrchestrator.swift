@@ -17,7 +17,42 @@ public enum AgentEvent: Sendable {
     /// A transient provider failure is being retried after `delaySeconds`.
     case retryScheduled(attempt: Int, delaySeconds: Double, reason: String)
     case policyDenied(tool: String, rule: String, reason: String)
+    /// The conversation was trimmed to stay inside the model's context window.
+    case contextCompacted(ContextCompaction)
+    /// Estimated tokens in the request about to be sent, against the model's window. Not audited.
+    case contextMeasured(used: Int, window: Int)
     case finished(AgentRunSummary)
+}
+
+/// What one compaction did, for the thread note and for persisting the summary across turns.
+public struct ContextCompaction: Sendable {
+    public var tokensBefore: Int
+    public var tokensAfter: Int
+    public var stage: CompactionStage
+    public var clearedResults: Int
+    /// The summary (or the drop note), or nil when only old tool results were stubbed.
+    public var summary: String?
+    /// The messages folded into the summary, with their source tags (`ContextMetadata`).
+    public var replacedMessages: [ChatMessage]
+
+    public init(_ outcome: CompactionOutcome) {
+        tokensBefore = outcome.tokensBefore
+        tokensAfter = outcome.tokensAfter
+        stage = outcome.stage
+        clearedResults = outcome.clearedResults
+        summary = outcome.summary
+        replacedMessages = outcome.replacedMessages
+    }
+
+    /// "Context compacted (12,400 → 3,100 tokens)".
+    public var headline: String {
+        let verb: String
+        switch stage {
+        case .dropped: verb = "Context trimmed"
+        default: verb = "Context compacted"
+        }
+        return "\(verb) (\(tokensBefore.formatted()) → \(tokensAfter.formatted()) tokens)"
+    }
 }
 
 public struct AgentRunSummary: Codable, Equatable, Sendable {
@@ -27,6 +62,8 @@ public struct AgentRunSummary: Codable, Equatable, Sendable {
     public var redactionCount: Int
     public var totalTokens: Int
     public var finalText: String
+    /// Set when the run stopped at the step limit instead of finishing; saying "continue" picks it up.
+    public var pausedAfterRounds: Int?
 
     public init(
         rounds: Int = 0,
@@ -34,7 +71,8 @@ public struct AgentRunSummary: Codable, Equatable, Sendable {
         toolCallsDenied: Int = 0,
         redactionCount: Int = 0,
         totalTokens: Int = 0,
-        finalText: String = ""
+        finalText: String = "",
+        pausedAfterRounds: Int? = nil
     ) {
         self.rounds = rounds
         self.toolCallsExecuted = toolCallsExecuted
@@ -42,6 +80,7 @@ public struct AgentRunSummary: Codable, Equatable, Sendable {
         self.redactionCount = redactionCount
         self.totalTokens = totalTokens
         self.finalText = finalText
+        self.pausedAfterRounds = pausedAfterRounds
     }
 }
 
@@ -213,12 +252,22 @@ public final class AgentOrchestrator: Sendable {
         return await MainActor.run { ApprovalCenter.shared }
     }
 
+    /// Steps (model rounds) a run may take before it pauses and waits for "continue".
+    public static let defaultRoundLimit = 200
+
+    /// The message shown when a run reaches its step limit.
+    public static func pauseMessage(rounds: Int) -> String {
+        "Paused after \(rounds) steps; say continue to pick up where it left off."
+    }
+
     public func run(
         profile: AgentProfile,
         prompt: String,
         history: [ChatMessage] = [],
         workspaceRoot: URL? = nil,
         policy override: ExecutionPolicy? = nil,
+        contextWindow: Int? = nil,
+        roundLimit: Int = AgentOrchestrator.defaultRoundLimit,
         stop: AgentStopFlag = AgentStopFlag(),
         backoffUnitSeconds: Double = 1.0,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>
@@ -239,6 +288,8 @@ public final class AgentOrchestrator: Sendable {
                             history: history,
                             workspaceRoot: workspaceRoot,
                             policy: override,
+                            contextWindow: contextWindow,
+                            roundLimit: roundLimit,
                             stop: stop,
                             backoffUnitSeconds: backoffUnitSeconds,
                             chat: chat,
@@ -318,6 +369,8 @@ public final class AgentOrchestrator: Sendable {
         history initialHistory: [ChatMessage],
         workspaceRoot: URL?,
         policy override: ExecutionPolicy?,
+        contextWindow: Int?,
+        roundLimit: Int,
         stop: AgentStopFlag,
         backoffUnitSeconds: Double,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>,
@@ -365,7 +418,7 @@ public final class AgentOrchestrator: Sendable {
         if !profile.systemPrompt.isEmpty {
             history.insert(ChatMessage(role: .system, content: profile.systemPrompt), at: 0)
         }
-        history.append(ChatMessage(role: .user, content: finalPrompt))
+        history.append(ChatMessage(role: .user, content: finalPrompt, metadata: [ContextMetadata.prompt: "1"]))
 
         var summary = AgentRunSummary(redactionCount: redactions)
         var assistantText = ""
@@ -392,6 +445,21 @@ public final class AgentOrchestrator: Sendable {
             )
             if budgetDecision.verdict == .deny {
                 throw AgentRunError.budgetExhausted(budgetDecision.reason)
+            }
+
+            if let contextWindow {
+                let budget = ContextCompactor.budget(window: contextWindow, maxTokens: profile.maxTokens ?? 4096, tools: providerTools)
+                let outcome = await ContextCompactor.compact(history, budget: budget) { text in
+                    try await self.summarize(text, profile: profile, window: contextWindow, chat: chat, stop: stop)
+                }
+                if outcome.didCompact {
+                    history = outcome.messages
+                    yield(.contextCompacted(ContextCompaction(outcome)))
+                }
+            }
+
+            if let contextWindow {
+                yield(.contextMeasured(used: ContextCompactor.estimateTokens(history), window: contextWindow))
             }
 
             var request = ChatRequest(
@@ -434,7 +502,6 @@ public final class AgentOrchestrator: Sendable {
 
             if turn.text.isEmpty && turn.toolCalls.isEmpty { break }
             if turn.toolCalls.isEmpty { break }
-            if summary.rounds >= 40 { throw AgentRunError.roundLimitReached(40) }
 
             for call in turn.toolCalls {
                 if stop.stopped { throw AgentRunError.stopped }
@@ -481,6 +548,12 @@ public final class AgentOrchestrator: Sendable {
                 ))
             }
 
+            if summary.rounds >= roundLimit {
+                summary.pausedAfterRounds = summary.rounds
+                assistantText = Self.pauseMessage(rounds: summary.rounds)
+                break
+            }
+
             if let rubric, let findings {
                 let round = summary.rounds
                 let activity = RubricMonitor.activityText(round: round, assistantText: turn.text, calls: turn.toolCalls)
@@ -507,6 +580,54 @@ public final class AgentOrchestrator: Sendable {
 
         summary.finalText = assistantText
         yield(.finished(summary))
+    }
+
+    /// One non-streaming-style model call (collected from the stream) that writes a summary. No tools.
+    private func summarize(
+        _ transcript: String,
+        profile: AgentProfile,
+        window: Int,
+        chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>,
+        stop: AgentStopFlag
+    ) async throws -> String {
+        let request = ChatRequest(
+            messages: [
+                ChatMessage(role: .system, content: ContextCompactor.summaryInstructions),
+                ChatMessage(role: .user, content: transcript),
+            ],
+            model: profile.modelID ?? "",
+            temperature: 0.2,
+            maxTokens: min(2_048, max(256, window / 8))
+        )
+        var text = ""
+        for try await chunk in try await chat(request) {
+            if stop.stopped { throw AgentRunError.stopped }
+            if let delta = chunk.delta?.content { text += delta }
+        }
+        return text
+    }
+
+    /// Compacts a conversation on demand (the `/compact` command): the same stages, summary forced.
+    public func compact(
+        profile: AgentProfile,
+        history: [ChatMessage],
+        contextWindow: Int,
+        workspaceRoot: URL? = nil,
+        chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>
+    ) async -> CompactionOutcome {
+        let budget = contextBudget(profile: profile, contextWindow: contextWindow, workspaceRoot: workspaceRoot)
+        return await ContextCompactor.compact(history, budget: budget, force: true) { text in
+            try await self.summarize(text, profile: profile, window: contextWindow, chat: chat, stop: AgentStopFlag())
+        }
+    }
+
+    /// The window a run with this profile has for messages, for the context meter and for compaction.
+    public func contextBudget(profile: AgentProfile, contextWindow: Int, workspaceRoot: URL? = nil) -> ContextBudget {
+        var policy = ExecutionPolicy(mode: profile.mode)
+        policy.toolsAllowed = policy.toolsAllowed.filter { profile.toolPermissions.isEnabled($0) }
+        if profile.toolPermissions.enabledTools.isEmpty { policy.toolsAllowed = [] }
+        let tools = policy.offeredTools(from: toolRegistry, permissions: profile.toolPermissions, workspaceRoot: workspaceRoot)
+        return ContextCompactor.budget(window: contextWindow, maxTokens: profile.maxTokens ?? 4096, tools: tools.map(\.providerTool))
     }
 
     // MARK: One model turn with retry/backoff

@@ -61,7 +61,7 @@ struct MessageBubble: View {
             if isStreaming { ThinkingDots(label: message.content.isEmpty && reasoningText.isEmpty ? "Working" : nil) }
 
             if !message.toolCalls.isEmpty {
-                ToolCallChipsView(calls: message.toolCalls)
+                StoredToolRunView(calls: message.toolCalls)
             }
 
             if !isStreaming { actionRow }
