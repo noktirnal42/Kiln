@@ -34,6 +34,13 @@ One window, one sidebar, one conversation.
 - **Sidebar** (`UI/Workstation/WorkstationSidebar.swift`): New chat, project switcher, chat history grouped by day
   (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit. The Kiln logo opens
   Overview (the old Home). ⌘1–⌘7 and ⌘K still work.
+- **Shared activity chrome** (`UI/DesignSystem/ActivityChrome.swift`, added in the 2026-11-09 UI pass): every activity (Develop, Analyze, Lab,
+  Swarm, Audit) opens with `SSActivityHeader` (40 pt: name, optional `SSTabStrip`, trailing actions) and uses `SSPaneHeader` (28 pt) over its panes,
+  `SSCodeBlock` for listings and `SSEmptyState` for empty panes. Activities never use the window toolbar or `.navigationTitle`, so the title bar
+  stays "Kiln — <Activity>" and the same height on every screen. The tab strip shows full labels when they fit, then keeps only the selected label,
+  then scrolls. **Analyze** is now a Ghidra-style browser: project list (collapses below ~820 pt; header button brings it back) | function list with
+  filter | decompiler and listing panes (side by side from 640 pt, stacked below), callers/callees as links, annotations in a popover, engines in one
+  Analyze menu, engine status as one quiet line. QA screenshots: `docs/qa/ui-rework/`.
 - **Develop → Editor** (`UI/Workstation/EditorView.swift`, `Core/Editor/*`): file navigator (new / rename / trash, Find in Project, Changes list with
   discard), tabs and a split pane, native text editing (system undo, find bar, line numbers, auto-indent, regex syntax colouring, bracket matching,
   soft wrap, font/tab settings), Open Quickly (⌘P), go to line (⌘L), save (⌘S / ⇧⌘S). Documents live in `AppModel.editor`, so unsaved edits survive

@@ -50,7 +50,8 @@ struct EditorView: View {
             Divider()
             HSplitView {
                 navigator
-                    .frame(minWidth: 160, idealWidth: 200, maxWidth: 280)
+                    .frame(minWidth: 160, idealWidth: 200, maxWidth: 280, maxHeight: .infinity, alignment: .top)
+                    .background(SSColor.surface)
                 VStack(spacing: 0) {
                     tabBar
                     Divider()
@@ -60,9 +61,11 @@ struct EditorView: View {
                     statusBar
                     if showProblems { problemsPanel }
                 }
-                .frame(minWidth: 320)
+                .frame(minWidth: 320, maxHeight: .infinity, alignment: .top)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(shortcuts)
         .sheet(isPresented: $showQuickOpen) { QuickOpenView(editor: editor, isPresented: $showQuickOpen) }
         .alert(fileActionTitle, isPresented: Binding(get: { fileAction != nil }, set: { if !$0 { fileAction = nil } })) {
@@ -174,8 +177,6 @@ struct EditorView: View {
             if editor.secondary != nil {
                 Button { editor.closeSplit() } label: { Label("Unsplit", systemImage: "rectangle") }
             }
-            Toggle("Hidden files", isOn: Binding(get: { editor.showHidden }, set: { editor.showHidden = $0; treeVersion += 1 }))
-                .toggleStyle(.checkbox).font(SSTypography.caption())
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
@@ -199,6 +200,7 @@ struct EditorView: View {
             Toggle("Insert spaces for Tab", isOn: $settings.insertSpaces)
             Toggle("Wrap long lines", isOn: $settings.softWrap)
             Toggle("Line numbers", isOn: $settings.showLineNumbers)
+            Toggle("Show hidden files", isOn: Binding(get: { editor.showHidden }, set: { editor.showHidden = $0; treeVersion += 1 }))
         }
         .padding(SSSpacing.m).frame(width: 280)
     }
@@ -628,6 +630,7 @@ struct EditorView: View {
         } else {
             SSEmptyState(symbol: "doc.text", title: "No file open",
                          message: "Pick a file in the navigator, or press ⌘P to open one by name.")
+                .frame(maxHeight: .infinity)
         }
     }
 

@@ -264,7 +264,6 @@ struct ExperimentComparisonView: View {
                 }
             }
         }
-        .navigationTitle("Compare")
     }
 }
 

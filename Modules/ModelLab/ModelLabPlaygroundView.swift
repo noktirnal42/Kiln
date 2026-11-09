@@ -88,7 +88,6 @@ struct ModelLabPlaygroundView: View {
                 .padding(8)
             }
         }
-        .navigationTitle("Playground")
     }
 
     private func send() {

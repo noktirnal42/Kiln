@@ -30,11 +30,12 @@ struct ModelLabExperimentsView: View {
                     ContentUnavailableView("No experiments", systemImage: "flask", description: Text("Create one, or use the built-in demo experiment."))
                 }
             }
-            .toolbar {
-                Button("New Experiment", systemImage: "plus") { showsNewSheet = true }
-                Button("Compare runs", systemImage: "rectangle.split.2x1") { showsComparison = true }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                SSPaneHeader(title: "Experiments", count: experiments.count) {
+                    Button("New Experiment", systemImage: "plus") { showsNewSheet = true }
+                    Button("Compare runs", systemImage: "rectangle.split.2x1") { showsComparison = true }
+                }
             }
-            .navigationTitle("Experiments")
             .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
         } detail: {
             if let experiment = selection {
@@ -136,7 +137,6 @@ private struct ExperimentDetailView: View {
             .padding()
             .frame(maxWidth: 640, alignment: .leading)
         }
-        .navigationTitle(experiment.name)
     }
 
     private var currentPhase: TrainingProgress? {
