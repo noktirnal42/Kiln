@@ -109,7 +109,7 @@ struct LiveGhidraFixtureTests {
         let greet = try #require(analysis.functions.first { $0.name.contains("greet") })
         #expect(entry.callees.contains { ProjectStore.normalizedAddress($0) == ProjectStore.normalizedAddress(add.address) })
         #expect(entry.callees.contains { ProjectStore.normalizedAddress($0) == ProjectStore.normalizedAddress(greet.address) })
-        #expect((add.code ?? "").contains("+"))
+        #expect(add.code.contains("+"))
         #expect(analysis.strings.contains { $0.value.contains("KILN-FIXTURE-GREETING") })
         #expect(analysis.engine.hasPrefix("Ghidra"))
     }
