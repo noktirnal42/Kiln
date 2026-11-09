@@ -33,6 +33,35 @@ struct REAgentToolsTests {
         #expect(path.type == "string")
     }
 
+    @Test func packageToolsAreExposedAndDownloadNeedsApproval() throws {
+        let tools = makeTools()
+        let search = try #require(tools.first { $0.spec.name == "re_search_packages" })
+        let download = try #require(tools.first { $0.spec.name == "re_download_package" })
+        #expect(search.spec.permission == .read)
+        // A download writes a file and a project, so it goes through the same approval as other writes.
+        #expect(download.spec.permission == .write)
+        #expect(try #require(download.spec.parameters.first { $0.name == "url" }).required)
+        #expect(ExecutionPolicy.moduleToolPrefixes.contains { download.spec.name.hasPrefix($0) })
+    }
+
+    @Test func packageToolsRejectBadInputWithoutTouchingTheNetwork() async throws {
+        let module = REModule()
+        func run(_ name: String, _ args: [String: Any]) async throws -> String {
+            try await REMCPTools.call(tool: name, arguments: args, service: module)
+        }
+        await #expect(throws: REMToolError.self) { try await run("search_packages", [:]) }
+        await #expect(throws: REMToolError.self) { try await run("search_packages", ["query": "x", "source": "nope"]) }
+        await #expect(throws: PackageIntakeError.self) { try await run("download_package", ["url": "file:///etc/hosts"]) }
+        await #expect(throws: REMToolError.self) { try await run("download_package", [:]) }
+        // Listing-only sources answer from a built URL, so this stays offline.
+        let json = try await run("search_packages", ["query": "notes", "source": "google"])
+        let object = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        let rows = try #require(object["results"] as? [[String: Any]])
+        #expect(rows.count == 1)
+        #expect(rows[0]["can_download"] as? Bool == false)
+        #expect(rows[0]["direct_url"] == nil)
+    }
+
     @Test func missingRequiredArgumentFailsWithSpecificReason() async throws {
         let module = REModule()
         let tool = REAgentTool(
