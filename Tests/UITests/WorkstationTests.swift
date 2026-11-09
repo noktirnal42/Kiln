@@ -20,7 +20,7 @@ struct WorkstationTests {
 
     @Test func everyActivityHasAUniqueShortcutInRailOrder() {
         let keys = Activity.allCases.map { String($0.shortcutKey) }
-        #expect(keys == ["1", "2", "3", "4", "5", "6", "7"])
+        #expect(keys == ["1", "2", "3", "4", "5", "6", "7", "8"])
         #expect(Set(keys).count == Activity.allCases.count)
     }
 

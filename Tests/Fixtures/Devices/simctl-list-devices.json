@@ -1,0 +1,117 @@
+{
+  "devices": {
+    "com.apple.CoreSimulator.SimRuntime.watchOS-27-0": [
+      {
+        "udid": "0C1DBDCD-2D2F-4670-9A94-C21B4B957798",
+        "lastUsedAt": "2026-11-03T22:57:10Z",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-12-46mm",
+        "state": "Shutdown",
+        "name": "Apple Watch Series 12 (46mm)"
+      },
+      {
+        "udid": "64A6D510-F4C9-4212-8223-AECE8E6E1EDD",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-12-42mm",
+        "state": "Shutdown",
+        "name": "Apple Watch Series 12 (42mm)"
+      }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.watchOS-26-2": [
+      {
+        "udid": "5073B545-37E4-4D89-B4A1-291665BD3F1C",
+        "lastUsedAt": "2026-11-03T21:40:14Z",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-11-46mm",
+        "state": "Shutdown",
+        "name": "Apple Watch Series 11 (46mm)"
+      },
+      {
+        "udid": "32459400-0856-4608-AF69-624A96827DF8",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-11-42mm",
+        "state": "Shutdown",
+        "name": "Apple Watch Series 11 (42mm)"
+      }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.watchOS-26-5": [
+      {
+        "udid": "21284100-C18A-4487-8096-BD56FAA69D20",
+        "lastUsedAt": "2026-10-21T19:12:13Z",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-11-46mm",
+        "state": "Shutdown",
+        "name": "Apple Watch Series 11 (46mm)"
+      },
+      {
+        "udid": "D16CC40E-D71A-4A4C-B8A2-3C6F654EB5E5",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-11-42mm",
+        "state": "Shutdown",
+        "name": "Apple Watch Series 11 (42mm)"
+      }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.watchOS-26-4": [
+      {
+        "udid": "4FE1336A-2767-4DD5-87F7-802CEE5BB7CA",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-11-46mm",
+        "state": "Shutdown",
+        "name": "Apple Watch Series 11 (46mm)"
+      },
+      {
+        "udid": "1A40A1E2-FEDE-4788-8227-62E39F528C6C",
+        "lastUsedAt": "2026-10-17T00:09:50Z",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-11-42mm",
+        "state": "Shutdown",
+        "name": "Apple Watch Series 11 (42mm)"
+      }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-5": [
+      {
+        "udid": "1A2D569E-915F-4EB9-94BF-CF60EF1E5FF7",
+        "lastUsedAt": "2026-10-12T18:01:57Z",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+        "state": "Booted",
+        "name": "iPhone 17 Pro"
+      },
+      {
+        "udid": "B6FDC2D3-79EB-4104-A587-BFF543E5B1F1",
+        "lastUsedAt": "2026-09-04T02:50:09Z",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max",
+        "state": "Shutdown",
+        "name": "iPhone 17 Pro Max"
+      }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.tvOS-27-0": [
+      {
+        "udid": "A4EA1D0A-7031-4760-AC4A-06F7887ACBF3",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K",
+        "state": "Shutdown",
+        "name": "Apple TV 4K (3rd generation)"
+      },
+      {
+        "udid": "16282145-1247-4814-AF8A-B5B5EBE2A6D9",
+        "lastUsedAt": "2026-07-30T18:05:29Z",
+        "isAvailable": true,
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-1080p",
+        "state": "Shutdown",
+        "name": "Apple TV"
+      }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-18-0": [
+      {
+        "isAvailable": false,
+        "availabilityError": "runtime profile not found using \"System\" match policy",
+        "state": "Shutdown",
+        "name": "iPhone 16",
+        "udid": "00000000-0000-0000-0000-000000000016",
+        "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16"
+      }
+    ]
+  }
+}

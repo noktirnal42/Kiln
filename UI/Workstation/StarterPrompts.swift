@@ -44,6 +44,11 @@ enum StarterPrompts {
         case .swarm:
             return [Prompt(title: "Just ask the agent", symbol: "sparkles",
                            text: "Break this job into steps and do it: ")] + project.prefix(2)
+        case .devices:
+            return [Prompt(title: "What devices do I have?", symbol: "iphone.gen3",
+                           text: "List my simulators and emulators, tell me which are running and which tools are missing."),
+                    Prompt(title: "Look at the screen", symbol: "camera.viewfinder",
+                           text: "Take a screenshot of the booted device and describe what is on screen.")]
         case .audit:
             return [Prompt(title: "What did agents do?", symbol: "checkmark.shield",
                            text: "Read my recent agent activity and tell me anything that looks risky or surprising.")]

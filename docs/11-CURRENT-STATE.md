@@ -32,8 +32,8 @@ Older docs describe the plan; this describes the app.
 One window, one sidebar, one conversation.
 
 - **Sidebar** (`UI/Workstation/WorkstationSidebar.swift`): New chat, project switcher, chat history grouped by day
-  (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit. The Kiln logo opens
-  Overview (the old Home). ⌘1–⌘7 and ⌘K still work.
+  (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Devices, Audit. The Kiln logo opens
+  Overview (the old Home). ⌘1–⌘8 (Devices is ⌘8) and ⌘K work.
 - **Develop → Editor** (`UI/Workstation/EditorView.swift`, `Core/Editor/*`): file navigator (new / rename / trash, Find in Project, Changes list with
   discard), tabs and a split pane, native text editing (system undo, find bar, line numbers, auto-indent, regex syntax colouring, bracket matching,
   soft wrap, font/tab settings), Open Quickly (⌘P), go to line (⌘L), save (⌘S / ⇧⌘S). Documents live in `AppModel.editor`, so unsaved edits survive
@@ -97,6 +97,7 @@ One window, one sidebar, one conversation.
   store listing (Kiln does not sign in to any store). Only http(s) is accepted, a non-2xx answer is an error, and
   `re_download_package` is a write, so it needs approval like `edit_file`. Files land in
   `Application Support/Kiln/ReverseEngineering/Downloads` and are analyzed, never run.
+- **Devices (Apple simulators + Android emulators):** list/boot/shutdown/screenshot/install/launch/open URL/record/logs via `xcrun simctl` and `adb`/`emulator`, `device_*` agent and MCP tools, live screenshot view with Android touch forwarding. Apple input is not possible through simctl. See `docs/16-DEVICES.md` (also Windows/Linux design and sandbox notes).
 - **Model Lab:** `lab_hardware`, `lab_list_experiments`, `lab_list_datasets`, Hugging Face search tools.
 
 ## Providers (all verified with real calls, 2026-11-01)

@@ -4,7 +4,7 @@ import Observation
 /// The places you work in. Each is a whole screen, not a window onto one module: the agent dock stays
 /// beside all of them except Agent itself, so the same agent can drive whatever is on screen.
 enum Activity: String, CaseIterable, Identifiable, Sendable {
-    case home, agent, swarm, develop, analyze, lab, audit
+    case home, agent, swarm, develop, analyze, lab, audit, devices
 
     var id: String { rawValue }
 
@@ -17,6 +17,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .analyze: "Analyze"
         case .lab: "Lab"
         case .audit: "Audit"
+        case .devices: "Devices"
         }
     }
 
@@ -29,6 +30,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .analyze: "magnifyingglass.circle"
         case .lab: "brain.head.profile"
         case .audit: "checkmark.seal"
+        case .devices: "iphone.gen3"
         }
     }
 
@@ -41,6 +43,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .analyze: "Reverse engineering and decryption"
         case .lab: "Datasets, training, evaluation and models"
         case .audit: "What agents did, and whether the record is intact"
+        case .devices: "iOS simulators and Android emulators: boot, view, install, drive"
         }
     }
 
@@ -50,11 +53,12 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .agent: ChatModule.identifier
         case .analyze: REModule.identifier
         case .lab: ModelLabModule.identifier
+        case .devices: DevicesModule.identifier
         case .home, .swarm, .develop, .audit: nil
         }
     }
 
-    /// ⌘1…⌘6, in rail order.
+    /// ⌘1…⌘8, in declaration order (Devices is ⌘8, added last so the older shortcuts did not move).
     var shortcutKey: Character {
         Character(String((Activity.allCases.firstIndex(of: self) ?? 0) + 1))
     }

@@ -1,0 +1,3 @@
+INFO    | Storing crashdata in: /tmp/x, detection is enabled for process: 123
+Pixel_8_API_35
+Medium_Phone_API_36.1
