@@ -74,12 +74,9 @@ struct SwarmView: View {
     @State private var model = SwarmModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SSSpacing.m) {
-            VStack(alignment: .leading, spacing: SSSpacing.xs) {
-                Text("Swarm").font(SSTypography.title())
-                Text("Give the team a goal. Kiln splits it into tasks, runs independent ones in parallel, and stops at anything that needs you. Writes, commands and network calls still ask for approval.")
-                    .font(SSTypography.caption()).foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            SSActivityHeader(title: "Swarm", subtitle: "A team of agents working a goal in parallel", symbol: "person.3.sequence")
+            VStack(alignment: .leading, spacing: SSSpacing.m) {
             HStack(alignment: .top, spacing: SSSpacing.s) {
                 TextField("Goal, e.g. “Find where the app stores API keys and list any that are not in the Keychain”",
                           text: $model.goal, axis: .vertical)
@@ -105,12 +102,13 @@ struct SwarmView: View {
                 }
             } else if !model.isRunning {
                 SSEmptyState(symbol: "person.3.sequence", title: "No swarm running",
-                             message: "Describe what you want done. Researchers read, implementers change things, reviewers check.")
+                             message: "Describe what you want done. Kiln splits it into tasks and runs independent ones in parallel; researchers read, implementers change things, reviewers check. Writes, commands and network calls still ask for approval.")
             } else {
                 ProgressView("Planning…").frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            }
+            .padding(SSSpacing.m)
         }
-        .padding(SSSpacing.m)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 

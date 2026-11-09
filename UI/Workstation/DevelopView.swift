@@ -24,19 +24,9 @@ struct DevelopView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Picker("Tool", selection: $tool) {
-                    ForEach(Tool.allCases) { tool in
-                        Label(tool.rawValue, systemImage: tool.symbol).tag(tool)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 420)
-                Spacer()
-            }
-            .padding(SSSpacing.s)
-            Divider()
+            SSActivityHeader(title: "Develop", symbol: "chevron.left.forwardslash.chevron.right", tabs: {
+                SSTabStrip(tabs: Tool.allCases, selection: $tool, title: { $0.rawValue }, symbol: { $0.symbol })
+            })
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }

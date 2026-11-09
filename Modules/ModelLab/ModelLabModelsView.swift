@@ -73,7 +73,6 @@ struct ModelLabModelsView: View {
                     }
                 }
             }
-            .navigationTitle("Models")
             .task {
                 // Walks the store's files to total sizes, which is slow on an external drive: off the main thread.
                 storeModels = await UniversalModelStore().installedOffPool().filter(\.isLanguageModel)
@@ -204,7 +203,6 @@ private struct ModelArtifactDetailView: View {
             .padding()
             .frame(maxWidth: 640, alignment: .leading)
         }
-        .navigationTitle(record.name)
         .fileImporter(isPresented: $showsFolderPicker, allowedContentTypes: [.folder]) { result in
             if case .success(let destination) = result {
                 export(to: destination)

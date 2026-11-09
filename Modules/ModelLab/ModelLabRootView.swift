@@ -10,24 +10,26 @@ struct ModelLabRootView: View {
         case overview = "Overview", experiments = "Experiments", datasets = "Datasets"
         case models = "Models", playground = "Playground", evaluation = "Evaluation", redTeam = "Red Team"
         var id: String { rawValue }
+        var symbol: String {
+            switch self {
+            case .overview: "gauge.with.dots.needle.33percent"
+            case .experiments: "flask"
+            case .datasets: "tablecells"
+            case .models: "cube.box"
+            case .playground: "text.bubble"
+            case .evaluation: "checkmark.seal"
+            case .redTeam: "shield.lefthalf.filled"
+            }
+        }
     }
 
     var body: some View {
         Group {
             if let container = module.container {
                 VStack(spacing: 0) {
-                    ScrollView(.horizontal) {
-                        Picker("Model Lab", selection: $section) {
-                            ForEach(Section.allCases) { section in
-                                Text(section.rawValue).tag(section)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .labelsHidden()
-                        .fixedSize()
-                        .padding(SSSpacing.s)
-                    }
-                    Divider()
+                    SSActivityHeader(title: "Lab", symbol: "brain.head.profile", tabs: {
+                        SSTabStrip(tabs: Section.allCases, selection: $section, title: { $0.rawValue }, symbol: { $0.symbol })
+                    })
                     Group {
                         switch section {
                         case .overview: ModelLabOverviewView(module: module)
@@ -50,7 +52,7 @@ struct ModelLabRootView: View {
                 }
             }
         }
-        .frame(minWidth: 600, minHeight: 480)
+        .background(SSColor.canvas)
     }
 }
 
@@ -97,6 +99,5 @@ struct ModelLabOverviewView: View {
                 .foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Model Lab")
     }
 }

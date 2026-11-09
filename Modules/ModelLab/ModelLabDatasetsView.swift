@@ -74,7 +74,6 @@ struct ModelLabDatasetsView: View {
                 }
             }
         }
-        .navigationTitle("Datasets")
         .fileImporter(isPresented: $showsImporter, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
             importLocal(result)
         }

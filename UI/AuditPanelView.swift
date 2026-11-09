@@ -16,11 +16,16 @@ struct AuditPanelView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: SSSpacing.m) {
-            HStack {
-                Text("Audit & Monitor").font(SSTypography.headline())
-                Spacer()
-                if !embedded { Button("Done") { dismiss() }.keyboardShortcut(.cancelAction) }
+        VStack(alignment: .leading, spacing: 0) {
+            if embedded {
+                SSActivityHeader(title: "Audit", subtitle: "What agents did, and whether the record is intact", symbol: "checkmark.seal")
+            } else {
+                HStack {
+                    Text("Audit & Monitor").font(SSTypography.headline())
+                    Spacer()
+                    Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+                }
+                .padding(SSSpacing.m)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: SSSpacing.m) {
@@ -29,9 +34,9 @@ struct AuditPanelView: View {
                     monitorCard
                     eventsCard
                 }
+                .padding(SSSpacing.m)
             }
         }
-        .padding(SSSpacing.m)
         .frame(minWidth: embedded ? 0 : 640, minHeight: embedded ? 0 : 600)
         .task { await model.refresh() }
     }

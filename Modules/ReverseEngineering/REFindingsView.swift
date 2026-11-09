@@ -46,8 +46,7 @@ struct REFindingsView: View {
             if isRunning {
                 ProgressView().controlSize(.small)
             } else if hasRun && rows.isEmpty && status == nil {
-                ContentUnavailableView("No results", systemImage: "magnifyingglass",
-                                       description: Text(emptyHint))
+                SSEmptyState(symbol: "magnifyingglass", title: "No results", message: emptyHint)
             } else {
                 List(rows) { row in
                     VStack(alignment: .leading, spacing: 2) {
@@ -56,11 +55,13 @@ struct REFindingsView: View {
                     }
                     .padding(.vertical, 2)
                 }
-                .listStyle(.inset)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
         }
-        .padding()
+        .padding(SSSpacing.m)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(SSColor.canvas)
         .onChange(of: tab) { _, _ in reset() }
         .onChange(of: projectID) { _, _ in reset() }
     }

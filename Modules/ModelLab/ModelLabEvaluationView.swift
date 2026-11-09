@@ -78,7 +78,6 @@ struct ModelLabEvaluationView: View {
                 }
             }
         }
-        .navigationTitle("Evaluation")
     }
 
     private func lines(_ text: String) -> [String] {
@@ -240,7 +239,6 @@ struct ModelLabRedTeamView: View {
                 }
             }
         }
-        .navigationTitle("Red Team")
     }
 
     private func run() {
