@@ -17,9 +17,13 @@ struct ChatRootView: View {
                         ChatHero(session: session)
                     }
                     LazyVStack(alignment: .leading, spacing: SSSpacing.l) {
-                        ForEach(session.messages) { message in
+                        ForEach(Array(session.messages.enumerated()), id: \.element.id) { index, message in
                             MessageBubble(session: session, message: message)
                                 .id(message.id)
+                            ForEach(session.contextNotes.filter { $0.afterMessageCount == index + 1 }) { ContextNoteView(note: $0) }
+                        }
+                        ForEach(session.contextNotes.filter { $0.afterMessageCount > session.messages.count || $0.afterMessageCount <= 0 }) {
+                            ContextNoteView(note: $0)
                         }
                         AgentActivityView(session: session)
                         if session.isStreaming {
@@ -78,6 +82,7 @@ struct ChatRootView: View {
             }
         }
         .onDisappear { voice.stopEverything() }
+        .task(id: session.selectedModelID) { await session.refreshContext() }
         .onChange(of: session.isStreaming) { _, streaming in
             guard !streaming, voice.speakReplies else { return }
             Task {
@@ -305,5 +310,21 @@ struct ComposerView: View {
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.vertical, SSSpacing.s)
+    }
+}
+
+/// "Context compacted (12,400 → 3,100 tokens)", as a quiet divider in the thread.
+struct ContextNoteView: View {
+    let note: ContextNote
+
+    var body: some View {
+        HStack(spacing: SSSpacing.xs) {
+            VStack { Divider() }
+            Label(note.text, systemImage: "arrow.down.right.and.arrow.up.left")
+                .font(SSTypography.caption()).foregroundStyle(.secondary)
+                .fixedSize()
+            VStack { Divider() }
+        }
+        .accessibilityElement(children: .combine)
     }
 }

@@ -1,45 +1,149 @@
 import SwiftUI
 import AppKit
 
-/// Live record of what the agent is doing: one row per tool call, newest last.
+/// What the agent is doing, in the style of Claude Code and Codex: while it works, the newest few calls as compact
+/// one-line rows; once it is done, one line ("Ran 4 commands · edited 2 files") that expands to the rows.
 struct AgentActivityView: View {
     let session: ChatSession
+    /// Live rows kept visible while running; older ones fold into the summary line.
+    static let liveRowLimit = 5
 
     var body: some View {
-        if session.agentEnabled && (!session.agentActivity.isEmpty || session.isStreaming) {
-            VStack(alignment: .leading, spacing: SSSpacing.xs) {
-                HStack(spacing: SSSpacing.xs) {
-                    SSSectionLabel(session.isStreaming ? "Agent working · round \(max(1, session.agentRound))" : "Last agent run")
-                    Spacer()
-                }
-                ForEach(session.agentActivity) { record in
-                    ToolCallRow(record: record)
-                }
+        if session.agentEnabled && !session.agentActivity.isEmpty && showsActivity {
+            VStack(alignment: .leading, spacing: 3) {
+                if session.isStreaming { live } else { finished }
                 if let notice = session.agentNotice {
                     Text(notice).font(SSTypography.caption()).foregroundStyle(SSColor.warning)
                 }
             }
-            .padding(SSSpacing.s)
-            .ssPanel()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if let notice = session.agentNotice, session.agentEnabled {
+            Text(notice).font(SSTypography.caption()).foregroundStyle(SSColor.warning)
+        }
+    }
+
+    /// After a run, the reply carries the collapsed line itself; show this view only for a run with no saved reply.
+    private var showsActivity: Bool {
+        session.isStreaming || (session.messages.last?.toolCalls.isEmpty ?? true)
+    }
+
+    private var live: some View {
+        let records = session.agentActivity
+        let hidden = max(0, records.count - Self.liveRowLimit)
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: SSSpacing.xs) {
+                ProgressView().controlSize(.mini)
+                Text("Working · step \(max(1, session.agentRound))").font(SSTypography.caption()).foregroundStyle(.secondary)
+                if hidden > 0 {
+                    Text("· " + ToolActivitySummary.line(for: records.map(Self.item)))
+                        .font(SSTypography.caption()).foregroundStyle(.tertiary).lineLimit(1)
+                }
+            }
+            ForEach(records.suffix(Self.liveRowLimit)) { record in
+                ToolCallRow(record: record, compact: true)
+            }
+        }
+    }
+
+    private var finished: some View {
+        ToolRunSummaryView(
+            line: ToolActivitySummary.line(for: session.agentActivity.map(Self.item)),
+            records: session.agentActivity
+        )
+    }
+
+    static func item(_ record: ToolCallRecord) -> ToolActivityItem {
+        ToolActivityItem(name: record.toolName, argumentsJSON: record.argumentsJSON, failed: record.status == .failed)
+    }
+}
+
+/// A finished run folded into one line, expandable to a row per call.
+struct ToolRunSummaryView: View {
+    let line: String
+    let records: [ToolCallRecord]
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Button { withAnimation(.easeOut(duration: 0.12)) { expanded.toggle() } } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
+                    Text(line).font(SSTypography.caption())
+                }
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(line)
+            .accessibilityHint(expanded ? "Hide the tool calls" : "Show the tool calls")
+            if expanded {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(records) { ToolCallRow(record: $0, compact: true) }
+                }
+                .padding(.leading, 14)
+            }
         }
     }
 }
 
-private struct ToolCallRow: View {
+/// Persisted tool calls (name and arguments only: results are not kept) under a reply, collapsed the same way.
+struct StoredToolRunView: View {
+    let calls: [ToolCall]
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Button { withAnimation(.easeOut(duration: 0.12)) { expanded.toggle() } } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
+                    Text(line).font(SSTypography.caption())
+                }
+                .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(line)
+            if expanded {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
+                        HStack(spacing: SSSpacing.xs) {
+                            Text(call.name.isEmpty ? "tool call" : call.name)
+                                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            Text(ToolCallRow.summary(call.arguments))
+                                .font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                }
+                .padding(.leading, 14)
+            }
+        }
+    }
+
+    private var line: String {
+        ToolActivitySummary.line(for: calls.map { ToolActivityItem(name: $0.name, argumentsJSON: $0.arguments) })
+    }
+}
+
+struct ToolCallRow: View {
     let record: ToolCallRecord
+    var compact = false
     @State private var expanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Button { expanded.toggle() } label: {
                 HStack(spacing: SSSpacing.xs) {
-                    Image(systemName: symbol).foregroundStyle(color).frame(width: 14)
-                    Text(record.toolName).font(.system(size: 12, weight: .medium, design: .monospaced))
+                    Image(systemName: symbol).font(.system(size: compact ? 10 : 12)).foregroundStyle(color).frame(width: 14)
+                    Text(record.toolName).font(.system(size: compact ? 11 : 12, weight: .medium, design: .monospaced))
                     Text(Self.summary(record.argumentsJSON))
                         .font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
                     Spacer(minLength: 0)
-                    Text(label).font(SSTypography.caption()).foregroundStyle(color)
+                    if !compact || record.status == .awaitingApproval || record.status == .failed || record.status == .denied {
+                        Text(label).font(SSTypography.caption()).foregroundStyle(color)
+                    }
                 }
+                .padding(.vertical, record.status == .awaitingApproval ? 3 : 0)
+                .padding(.horizontal, record.status == .awaitingApproval ? 6 : 0)
+                .background(record.status == .awaitingApproval ? SSColor.warning.opacity(0.14) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 5))
             }
             .buttonStyle(.plain)
             if expanded {
@@ -88,6 +192,49 @@ private struct ToolCallRow: View {
             if let value = object[key] as? String { return value.replacingOccurrences(of: "\n", with: " ") }
         }
         return ""
+    }
+}
+
+/// Used of the model's window, as a ring and a percentage, with a button that compacts now.
+struct ContextMeterView: View {
+    let session: ChatSession
+
+    var body: some View {
+        if let usage = session.contextUsage {
+            HStack(spacing: 6) {
+                ZStack {
+                    Circle().stroke(Color.secondary.opacity(0.25), lineWidth: 2)
+                    Circle().trim(from: 0, to: max(0.02, usage.fraction))
+                        .stroke(tint(usage), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                }
+                .frame(width: 13, height: 13)
+                Text(session.isCompacting ? "Compacting…" : "\(usage.percent)%")
+                    .font(SSTypography.caption()).monospacedDigit().foregroundStyle(tint(usage))
+                Button { Task { await session.compactNow() } } label: {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left").font(.system(size: 10))
+                }
+                .buttonStyle(.borderless)
+                .disabled(session.isStreaming || session.isCompacting || session.messages.isEmpty)
+                .help("Compact now: summarise the earlier conversation to free context (same as /compact)")
+                .accessibilityLabel("Compact conversation")
+            }
+            .help(Self.tooltip(usage, summarised: session.hasContextSummary))
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Context \(usage.percent) percent used")
+        }
+    }
+
+    private func tint(_ usage: ContextUsage) -> Color {
+        usage.fraction >= 0.9 ? SSColor.danger : usage.fraction >= 0.7 ? SSColor.warning : Color.secondary
+    }
+
+    static func tooltip(_ usage: ContextUsage, summarised: Bool) -> String {
+        var text = "Context: about \(usage.used.formatted()) of \(usage.window.formatted()) tokens (\(usage.percent)%). An estimate: it counts the conversation, the system prompt and the tool list."
+        text += "\nAt about 70% Kiln clears old tool output, then summarises the earlier conversation, on its own."
+        if summarised { text += "\nEarlier messages are already replaced by a summary." }
+        text += "\n/compact does it now."
+        return text
     }
 }
 
@@ -189,6 +336,7 @@ struct AgentModeBar: View {
                 }
             }
             Spacer()
+            ContextMeterView(session: session)
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.top, SSSpacing.xs)
