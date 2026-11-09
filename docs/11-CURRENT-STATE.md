@@ -32,8 +32,8 @@ Older docs describe the plan; this describes the app.
 One window, one sidebar, one conversation.
 
 - **Sidebar** (`UI/Workstation/WorkstationSidebar.swift`): New chat, project switcher, chat history grouped by day
-  (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit. The Kiln logo opens
-  Overview (the old Home). ⌘1–⌘7 and ⌘K still work.
+  (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit, Browser. The Kiln logo opens
+  Overview (the old Home). ⌘1–⌘8 (Browser is ⌘8) and ⌘K still work.
 - **Develop → Editor** (`UI/Workstation/EditorView.swift`, `Core/Editor/*`): file navigator (new / rename / trash, Find in Project, Changes list with
   discard), tabs and a split pane, native text editing (system undo, find bar, line numbers, auto-indent, regex syntax colouring, bracket matching,
   soft wrap, font/tab settings), Open Quickly (⌘P), go to line (⌘L), save (⌘S / ⇧⌘S). Documents live in `AppModel.editor`, so unsaved edits survive
@@ -91,6 +91,13 @@ One window, one sidebar, one conversation.
   and analyst signatures, checks project revision and binary hash, and rejects concurrent runs. Ghidra 12.1.4 + Java 21 produced real persisted pseudocode here.
 - **Reverse engineering:** import via `re_import_binary` (returns `project_id`; every other `re_*` tool takes it;
   the analysis id is accepted too). Native `otool` engine; Ghidra optional.
+- **Browser (`Modules/Browser/`, activity ⌘8):** tabbed WKWebView browser: address bar (bare hosts get https, other text searches
+  DuckDuckGo, only http/https open), back/forward/reload, tabs (⌘T, ⌘⌥W), find in page (⌘F), a Kiln-only persistent website data store
+  (`WKWebsiteDataStore(forIdentifier:)`, cleared from the ⋯ menu), and downloads saved to the package-intake folder with an
+  "Analyze in Kiln" button (never auto-imported). Agent/MCP tools `browser_open` (execute, egress-checked like `web_fetch`),
+  `browser_read_page`, `browser_screenshot`, `browser_list_tabs` (read), `browser_click`, `browser_type` (write; approval). Page content is
+  labelled untrusted; `browser_type` refuses password, card and one-time-code fields and password values are never read out. Not done:
+  popup windows with `window.opener` (they open as new tabs), JS dialogs, HTTP auth prompts, per-tab incognito, history/bookmarks.
 - **Package downloader (Analyze → Download…, `re_search_packages`, `re_download_package`):** one code path
   (`Core/ReverseEngineering/PackageIntake.swift`) serves the sheet, the in-app agent and the MCP server. Aptoide search returns
   direct APK links with the store's MD5, which the download verifies; Apple, Google Play, APKPure and Amazon only open a

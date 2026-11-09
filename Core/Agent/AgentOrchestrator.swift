@@ -707,7 +707,7 @@ public final class AgentOrchestrator: Sendable {
             }
         }
 
-        if call.name == "web_fetch", let url = args["url"] as? String,
+        if call.name == "web_fetch" || call.name == "browser_open", let url = args["url"] as? String,
            let host = URL(string: url)?.host() {
             let grants = await MainActor.run { Set(approvalCenter.grants.values(kind: .egressHost)) }
             let decision = policy.checkEgress(host, grants: grants)

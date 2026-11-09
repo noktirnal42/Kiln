@@ -126,7 +126,7 @@ struct WorkstationSidebar: View {
     private var tools: some View {
         VStack(alignment: .leading, spacing: 2) {
             SSSectionLabel("Workstation").padding(.horizontal, SSSpacing.s).padding(.bottom, 2)
-            ForEach([Activity.swarm, .develop, .analyze, .lab, .audit]) { activity in
+            ForEach([Activity.swarm, .develop, .analyze, .lab, .audit, .browser]) { activity in
                 let selected = workstation.selected == activity
                 Button { workstation.select(activity, app: app) } label: {
                     HStack(spacing: SSSpacing.s) {
