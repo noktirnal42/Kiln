@@ -644,6 +644,7 @@ public enum REError: LocalizedError {
     case radare2NotInstalled
     case analysisInProgress
     case scriptTimedOut(Int)
+    case invalidArgument(String)
 
     public var errorDescription: String? {
         switch self {
@@ -651,6 +652,7 @@ public enum REError: LocalizedError {
             "radare2 was not found. Install it with `brew install radare2`, or use Ghidra."
         case .scriptTimedOut(let seconds):
             "Script did not finish within \(seconds) s and was abandoned. Its background thread may stay busy until the process exits."
+        case .invalidArgument(let detail): detail
         case .notAFile(let path): "Not a regular file: \(path)"
         case .fileTooLarge(let size):
             "File too large: \(size / 1024 / 1024) MiB (import limit is 256 MiB)."

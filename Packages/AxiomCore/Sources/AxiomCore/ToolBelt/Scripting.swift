@@ -138,6 +138,11 @@ public final class ScriptConsole {
         }
     }
 
+    /// Adds another global object to the script environment (the host's own API next to `axiom`).
+    public func install(_ name: String, _ object: Any) { context.setObject(object, forKeyedSubscript: name as NSString) }
+    /// Lines the script has logged through `axiom.log`, for hosts that evaluate with their own wrapper.
+    public var logLines: [String] { bridge.consoleOutput }
+
     /// Runs a script; returns (result, console output lines). The script's last expression is
     /// the result. Errors come back as the thrown JS exception text.
     public func run(script: String) -> Result<(String, [String]), AxiomError> {
