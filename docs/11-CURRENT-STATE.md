@@ -32,8 +32,8 @@ Older docs describe the plan; this describes the app.
 One window, one sidebar, one conversation.
 
 - **Sidebar** (`UI/Workstation/WorkstationSidebar.swift`): New chat, project switcher, chat history grouped by day
-  (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit, Browser. The Kiln logo opens
-  Overview (the old Home). ⌘1–⌘8 and ⌘K still work.
+  (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit, Browser, Devices. The Kiln logo opens
+  Overview (the old Home). ⌘1–⌘9 and ⌘K still work.
 - **Shared activity chrome** (`UI/DesignSystem/ActivityChrome.swift`, added in the 2026-11-09 UI pass): every activity (Develop, Analyze, Lab,
   Swarm, Audit) opens with `SSActivityHeader` (40 pt: name, optional `SSTabStrip`, trailing actions) and uses `SSPaneHeader` (28 pt) over its panes,
   `SSCodeBlock` for listings and `SSEmptyState` for empty panes. Activities never use the window toolbar or `.navigationTitle`, so the title bar
@@ -126,6 +126,7 @@ One window, one sidebar, one conversation.
   store listing (Kiln does not sign in to any store). Only http(s) is accepted, a non-2xx answer is an error, and
   `re_download_package` is a write, so it needs approval like `edit_file`. Files land in
   `Application Support/Kiln/ReverseEngineering/Downloads` and are analyzed, never run.
+- **Devices (Apple simulators + Android emulators):** list/boot/shutdown/screenshot/install/launch/open URL/record/logs via `xcrun simctl` and `adb`/`emulator`, `device_*` agent and MCP tools, live screenshot view with Android touch forwarding. Apple input is not possible through simctl. See `docs/16-DEVICES.md` (also Windows/Linux design and sandbox notes).
 - **Model Lab:** `lab_hardware`, `lab_list_experiments`, `lab_list_datasets`, Hugging Face search tools.
 
 ## Providers (all verified with real calls, 2026-11-01)

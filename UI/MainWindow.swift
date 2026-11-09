@@ -54,7 +54,7 @@ struct MainWindow: View {
         case .swarm: SwarmView()
         case .develop: DevelopView()
         case .audit: AuditActivityView()
-        case .agent, .analyze, .lab, .browser:
+        case .agent, .analyze, .lab, .browser, .devices:
             if let identifier = workstation.selected.moduleIdentifier {
                 ModuleActivityView(identifier: identifier)
             }

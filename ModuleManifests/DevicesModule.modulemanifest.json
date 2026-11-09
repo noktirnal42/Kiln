@@ -1,0 +1,16 @@
+{
+  "identifier": "com.kiln.devices",
+  "displayName": "Devices",
+  "version": "1.0.0",
+  "minAppVersion": "0.1.0",
+  "maxAppVersion": null,
+  "author": "Kiln Team",
+  "description": "Apple simulators (simctl) and Android emulators (adb, emulator): list, boot, shut down, screenshot, install, launch, open URLs, record video, tail logs and forward touch input where the platform allows it. Also exposed to the agent and MCP server as device_* tools.",
+  "category": "development",
+  "icon": "iphone.gen3",
+  "dependencies": [],
+  "requiredCapabilities": ["process.spawn", "simulator.control", "fileSystem.read", "fileSystem.write"],
+  "optionalCapabilities": [],
+  "provides": ["deviceList", "deviceBoot", "deviceScreenshot", "deviceInstall", "deviceInput"],
+  "entryPoint": "DevicesModule"
+}
