@@ -138,6 +138,26 @@ public final class ChatSession {
         return profile
     }
 
+    // MARK: Verifier
+    /// The model that re-checks each reply against the tool evidence; empty = off (UserDefaults `agent.verifier.model`).
+    nonisolated static let verifierModelKey = "agent.verifier.model"
+    public private(set) var verifierReport: VerifierReport?
+
+    func verify(answer: String, evidence: [ToolCallRecord], conversationID: UUID) async {
+        let model = UserDefaults.standard.string(forKey: Self.verifierModelKey) ?? ""
+        guard !model.isEmpty, !answer.isEmpty else { verifierReport = nil; return }
+        let registry = registry
+        let items = evidence.map { VerifierEvidence(tool: $0.toolName, arguments: $0.argumentsJSON, status: $0.status.rawValue, excerpt: $0.errorText ?? $0.resultText ?? "") }
+        let report = await ClaimVerifier.verify(answer: answer, evidence: items, model: model) { model, system, prompt in
+            var text = ""
+            let request = ChatRequest(messages: [ChatMessage(role: .system, content: system), ChatMessage(role: .user, content: prompt)], model: model, temperature: 0, maxTokens: 800)
+            for try await chunk in try await registry.streamChat(request, reasoning: nil) { text += chunk.delta?.content ?? "" }
+            return text
+        }
+        verifierReport = report
+        await platformAudit.record("verifier.report", ["model": .string(model), "findings": .int(report.findings.count), "available": .bool(report.unavailable == nil)])
+    }
+
     // MARK: Scheduled tasks
     public func platformAuditRecord(_ type: String, _ payload: [String: AuditValue]) async { await platformAudit.record(type, payload) }
     let scheduleStore: ScheduleStore?
@@ -723,6 +743,7 @@ public final class ChatSession {
         let planning = planMode
         if planning { profile.mode = .plan; profile.systemPrompt += PlanMode.instructions }
         pendingPlan = nil
+        verifierReport = nil
         setSessionState(.running, for: conversationID)
         let recorder: CheckpointRecorder? = {
             guard let checkpointStore, let rootPath = workspaceRoot, !planning else { return nil }
@@ -805,6 +826,7 @@ public final class ChatSession {
                 self?.messages.append(saved)
             }
             self?.recordUsage(tokens: tokens, model: model, conversationID: conversationID)
+            if !finalText.isEmpty, let self { await self.verify(answer: finalText, evidence: self.agentActivity, conversationID: conversationID) }
             if let recorder, let made = recorder.finish() {
                 await self?.platformAudit.record("checkpoint.created", [
                     "files": .int(made.files.count), "unrestorable_commands": .int(made.unrestorable.count), "message_id": .string(made.messageID.uuidString),

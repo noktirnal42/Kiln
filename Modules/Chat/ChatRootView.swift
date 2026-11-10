@@ -26,6 +26,10 @@ struct ChatRootView: View {
                             ContextNoteView(note: $0)
                         }
                         AgentActivityView(session: session)
+                        if let report = session.verifierReport, !session.isStreaming {
+                            Label(report.summary, systemImage: report.findings.isEmpty && report.unavailable == nil ? "checkmark.shield" : "exclamationmark.shield")
+                                .font(SSTypography.caption()).foregroundStyle(report.findings.isEmpty ? Color.secondary : SSColor.warning)
+                        }
                         if let plan = session.pendingPlan, !session.isStreaming { PlanCardView(session: session, plan: plan) }
                         if session.isStreaming {
                             MessageBubble(

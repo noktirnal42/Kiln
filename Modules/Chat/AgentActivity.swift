@@ -38,6 +38,8 @@ enum AgentActivity {
                     because: "Deliberate: the budget limits the agent, so an agent must not be able to raise it."),
             .tool("kiln_schedule_list", "List scheduled tasks", .read),
             .tool("kiln_schedule_write", "Create, change or remove a scheduled task", .write),
+            .exempt("agent.verifier", "Check a reply against the tool evidence with a second model", .read,
+                    because: "Deliberate: Kiln runs it after each reply as an independent check; the agent being checked must not run or silence it. Gap: set the model with the agent.verifier.model default, no settings control yet."),
             .exempt("agent.plan", "Approve or reject a proposed plan", .write,
                     because: "Deliberate: a plan is approved by the person; an agent approving its own plan would defeat plan mode."),
             .exempt("agent.new-conversation", "Start a new conversation", .write,

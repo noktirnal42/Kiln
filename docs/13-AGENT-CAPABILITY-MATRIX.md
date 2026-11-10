@@ -91,3 +91,6 @@ With `lab_import_dataset` → `lab_start_small_lm` (100 iterations, 64 dimension
 | Memory files | `kiln_memory_read` (read), `kiln_memory_write` (write; approval; only KILN.md / AGENTS.md / CLAUDE.md in the project or user folders; audit `memory.saved`) | `@import`, per-directory files |
 | Slash commands | `kiln_command_list`, `kiln_command_expand` (read), `kiln_command_write` (write; approval; built-in names refused; audit `command.saved`) | Palette entries |
 | Hooks | `kiln_hooks_list` (read). Hooks themselves run in every agent run and external MCP call that goes through the orchestrator's `run`; MCP `callTool` does not run hooks yet | Hook editing by the agent (edit `.kiln/hooks/hooks.json` with the file tools, which need approval) |
+| Plan mode, rewind, sessions, budget | Deliberately not agent actions (a plan is approved, rewound and budgeted by the person); `kiln_checkpoint_list`, `kiln_usage_report` read-only | Sessions list has no tool until the conversation store is reachable from tools |
+| Usage | `kiln_usage_report` (read) | Prices and budget are set by the person only |
+| Schedules | `kiln_schedule_list` (read), `kiln_schedule_write` (write; approval; interval ≥ 5 min; audit `schedule.saved`) | |
