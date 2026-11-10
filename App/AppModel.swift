@@ -93,6 +93,7 @@ public final class AppModel {
         factories.register(BrowserModule.self)
         factories.register(DevicesModule.self)
         factories.register(MediaModule.self)
+        factories.register(ImageStudioModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
