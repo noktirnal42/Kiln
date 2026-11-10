@@ -23,6 +23,7 @@ for f in $FILES; do
     -e 's#independent open-source project#independent project#g' \
     -e 's#open-source native macOS#source-available native macOS#g' \
     -e 's#the project.s MIT license#the project'"'"'s license (PolyForm Noncommercial, see LICENSE)#g' \
+    -e 's#The MIT license does not replace#The project license does not replace#g' \
     -e 's#^\[MIT\](LICENSE)\. #[PolyForm Noncommercial License 1.0.0](LICENSE) for source and builds from the relicensing onward; releases up to v0.1.1 remain MIT (see [LICENSE-HISTORY.md](LICENSE-HISTORY.md)). Commercial use: see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md). Third-party licenses: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). #' \
     "$f"
 done
