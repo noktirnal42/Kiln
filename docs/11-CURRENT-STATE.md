@@ -1,5 +1,7 @@
 # Kiln — current state (2026-11-03)
 
+> **Next session: read [HANDOFF-2026-11-10.md](HANDOFF-2026-11-10.md) first** (state, unverified items, open work, pitfalls, commands).
+
 Read this first. It says what exists, how it was checked, how to build and ship it, and what is still open.
 Older docs describe the plan; this describes the app.
 
