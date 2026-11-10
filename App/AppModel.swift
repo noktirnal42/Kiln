@@ -90,6 +90,7 @@ public final class AppModel {
         factories.register(BrowserModule.self)
         factories.register(DevicesModule.self)
         factories.register(MediaModule.self)
+        factories.register(ImageStudioModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
@@ -217,6 +218,9 @@ public final class AppModel {
                 _ = try? media.openForAgent(URL(fileURLWithPath: path))
             }
             #endif
+        }
+        if let images = (await manager.record(for: ImageStudioModule.identifier))?.module as? ImageStudioModule {
+            ImageAgentTools.register(module: images)
         }
         await syncUIModules()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {

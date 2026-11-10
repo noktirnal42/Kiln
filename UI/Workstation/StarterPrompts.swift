@@ -61,6 +61,11 @@ enum StarterPrompts {
                            text: "Use media_speak to turn the following text into an audio file I can play: "),
                     Prompt(title: "Transcribe a recording", symbol: "waveform",
                            text: "Use media_transcribe on the audio file at this path and give me the transcript: ")]
+        case .images:
+            return [Prompt(title: "What can I generate with?", symbol: "photo.artframe",
+                           text: "Use image_list_models and tell me which engines are ready and which model I should download first."),
+                    Prompt(title: "Generate an image", symbol: "wand.and.stars",
+                           text: "Use image_generate to make an image of: ")]
         case .audit:
             return [Prompt(title: "What did agents do?", symbol: "checkmark.shield",
                            text: "Read my recent agent activity and tell me anything that looks risky or surprising.")]

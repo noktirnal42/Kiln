@@ -4,7 +4,7 @@ import Observation
 /// The places you work in. Each is a whole screen, not a window onto one module: the agent dock stays
 /// beside all of them except Agent itself, so the same agent can drive whatever is on screen.
 enum Activity: String, CaseIterable, Identifiable, Sendable {
-    case home, agent, swarm, develop, analyze, lab, audit, browser, devices, media
+    case home, agent, swarm, develop, analyze, lab, audit, browser, devices, media, images
 
     var id: String { rawValue }
 
@@ -20,6 +20,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .browser: "Browser"
         case .devices: "Devices"
         case .media: "Media"
+        case .images: "Images"
         }
     }
 
@@ -35,6 +36,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .browser: "globe"
         case .devices: "iphone.gen3"
         case .media: "play.rectangle"
+        case .images: "photo.artframe"
         }
     }
 
@@ -50,6 +52,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .browser: "Tabbed web browser the agent can read"
         case .devices: "iOS simulators and Android emulators: boot, view, install, drive"
         case .media: "Video, images and audio: view, generate, speak and transcribe"
+        case .images: "Generate, edit and upscale images; download FLUX, SDXL and other models"
         }
     }
 
@@ -62,6 +65,7 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
         case .browser: BrowserModule.identifier
         case .devices: DevicesModule.identifier
         case .media: MediaModule.identifier
+        case .images: ImageStudioModule.identifier
         case .home, .swarm, .develop, .audit: nil
         }
     }
@@ -69,7 +73,8 @@ enum Activity: String, CaseIterable, Identifiable, Sendable {
     /// ⌘1…⌘9 in declaration order, then ⌘0 for the tenth. Later activities share ⌘0 until the shell gets a better scheme.
     var shortcutKey: Character {
         let number = (Activity.allCases.firstIndex(of: self) ?? 0) + 1
-        return number < 10 ? Character(String(number)) : "0"
+        // ⌘1…⌘9, ⌘0 for the tenth, ⌘- for the eleventh.
+        return number < 10 ? Character(String(number)) : (number == 10 ? "0" : "-")
     }
 }
 

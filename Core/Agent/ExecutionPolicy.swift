@@ -226,7 +226,7 @@ public struct ExecutionPolicy: Codable, Equatable, Sendable {
     /// Tools contributed by Kiln's own modules (Reverse Engineering, Model Lab, Devices). They are not in the
     /// fixed allowlist above, but each declares its permission level, which the mode cap, the
     /// approval gate and the agent's own tool set still enforce.
-    public static let moduleToolPrefixes = ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_"]
+    public static let moduleToolPrefixes = ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_", "image_"]
     public static func isModuleTool(_ name: String) -> Bool { moduleToolPrefixes.contains { name.hasPrefix($0) } }
 
     /// A policy for modes that must not touch anything: read tools only.
