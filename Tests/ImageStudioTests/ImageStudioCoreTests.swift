@@ -471,3 +471,48 @@ private actor OrderLog { var items: [String] = []; func add(_ s: String) { items
         #expect(ProviderKeyEntry.all.first { $0.id == "huggingface" }?.keysPage?.host == "huggingface.co")
     }
 }
+
+// MARK: A1111-style engine against a loopback mock (the API shape, not the real Draw Things app)
+
+@Suite(.serialized) struct A1111EngineMockTests {
+    private func png() -> Data { samplePNG(width: 8, height: 8) }
+
+    @Test func textToImageSendsLoraTagsAndReadsImagesAndSeeds() async throws {
+        let server = try LoopbackServer(); try await server.start(); defer { server.stop() }
+        let image = png().base64EncodedString()
+        let body = Counter2()
+        server.handler = { request in
+            if request.path == "/sdapi/v1/options" { return .init(body: Data("{}".utf8)) }
+            if request.path == "/sdapi/v1/samplers" { return .init(body: Data(#"[{"name":"Euler a"},{"name":"DPM++ 2M"}]"#.utf8)) }
+            if request.path == "/sdapi/v1/sd-models" { return .init(body: Data(#"[{"title":"sd_xl_turbo_f16.ckpt","model_name":"SDXL Turbo"}]"#.utf8)) }
+            if request.path == "/sdapi/v1/txt2img" {
+                body.hit()
+                return .init(body: Data(#"{"images":["\#(image)","\#(image)"],"info":"{\"all_seeds\":[5,6]}"}"#.utf8))
+            }
+            return .init(status: 404)
+        }
+        let engine = A1111CompatibleEngine(id: "drawthings", displayName: "Draw Things", baseURL: server.baseURL, setupSteps: [])
+        #expect(await engine.status().isReady)
+        let caps = await engine.capabilities(model: nil)
+        #expect(caps.supports(.lora) && caps.supports(.inpaint) && caps.samplers.map(\.id) == ["Euler a", "DPM++ 2M"])
+        #expect(await engine.models().first?.id == "sd_xl_turbo_f16.ckpt")
+        var request = ImageGenerationRequest(prompt: "fox", model: "sd_xl_turbo_f16.ckpt"); request.count = 2; request.seed = 5; request.loras = [LoRAWeight(name: "detail", weight: 0.7)]
+        let pictures = try await engine.generate(request) { _ in }
+        #expect(pictures.map(\.seed) == [5, 6] && pictures.count == 2)
+        #expect(body.count == 1)
+    }
+
+    @Test func anEngineThatIsNotRunningReportsSetupSteps() async {
+        let engine = A1111CompatibleEngine.drawThings(port: 1)   // nothing listens there
+        let status = await engine.status()
+        guard case .setup(let reason, let steps) = status else { Issue.record("expected setup"); return }
+        #expect(reason.contains("not answering") && steps.contains { $0.contains("API Server") })
+        await #expect(throws: Error.self) { _ = try await engine.generate(ImageGenerationRequest(prompt: "x", model: "m")) { _ in } }
+    }
+}
+
+private final class Counter2: @unchecked Sendable {
+    private var n = 0; private let lock = NSLock()
+    func hit() { lock.lock(); n += 1; lock.unlock() }
+    var count: Int { lock.lock(); defer { lock.unlock() }; return n }
+}
