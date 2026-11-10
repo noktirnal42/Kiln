@@ -4,7 +4,7 @@ import Foundation
 /// agent and external MCP clients can use what the person can. All are named `kiln_*`.
 public enum PlatformTools {
     public static var all: [any ToolExecuting] {
-        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool()]
+        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool()]
     }
 }
 
@@ -130,5 +130,21 @@ public struct CommandWriteTool: ToolExecuting {
         try args.content.write(to: url, atomically: true, encoding: .utf8)
         await context.services.audit?.record("command.saved", ["path": .string(url.path), "created": .bool(!existed), "source": .string("tool")])
         return "Saved \(url.path)"
+    }
+}
+
+public struct HooksListTool: ToolExecuting {
+    var home: URL? = FileManager.default.homeDirectoryForCurrentUser
+    public init() {}
+    init(home: URL?) { self.home = home }
+    public var spec: ToolSpec {
+        ToolSpec(name: "kiln_hooks_list", summary: "List the hooks configured for this project and user",
+                 detail: "Hooks run scripts at pre_tool, post_tool, prompt_submit and stop. They can block or annotate, never grant.",
+                 parameters: [], permission: .read)
+    }
+    public func execute(argumentsJSON: String, context: ToolExecutionContext) async throws -> String {
+        let hooks = HookRunner.load(workspaceRoot: context.workspaceRoot, home: home)
+        if hooks.isEmpty { return "No hooks configured (.kiln/hooks/hooks.json)." }
+        return hooks.map { "\($0.scope ?? "project") \($0.event.rawValue)\($0.match.map { " [\($0)]" } ?? "") → \($0.command)" }.joined(separator: "\n")
     }
 }

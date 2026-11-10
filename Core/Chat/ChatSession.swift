@@ -139,7 +139,7 @@ public final class ChatSession {
     }
 
     // MARK: Slash commands
-    public enum Pane: Equatable { case memory, commands }
+    public enum Pane: Equatable { case memory, commands, hooks }
     /// A pane a slash command asked the chat to open.
     public var requestedPane: Pane?
 
@@ -154,6 +154,7 @@ public final class ChatSession {
         case .clear: await newConversation()
         case .memory: reloadMemory(); requestedPane = .memory
         case .commands: requestedPane = .commands
+        case .hooks: requestedPane = .hooks
         case .help:
             agentNotice = availableCommands().map { "/\($0.name) — \($0.summary)" }.joined(separator: "\n")
         case .model:
@@ -179,6 +180,17 @@ public final class ChatSession {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try text.write(to: url, atomically: true, encoding: .utf8)
         await platformAudit.record("command.saved", ["path": .string(path), "name": .string(name), "created": .bool(!existed), "source": .string("pane")])
+    }
+
+    /// Writes `.kiln/hooks/hooks.json` for the project after checking it parses, and records it in the audit chain.
+    public func saveHooksFile(_ text: String) async throws {
+        guard let workspaceRoot else { throw MemoryLoader.SaveError.notAMemoryFile("no project open") }
+        struct File: Decodable { var hooks: [HookDefinition] }
+        let parsed = try JSONDecoder().decode(File.self, from: Data(text.utf8))
+        let url = URL(fileURLWithPath: workspaceRoot).appendingPathComponent(".kiln/hooks/hooks.json")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        await platformAudit.record("hooks.saved", ["path": .string(url.path), "hooks": .int(parsed.hooks.count)])
     }
 
     public var agentProfiles: [AgentProfile] { AgentProfile.builtIns.filter { !$0.toolPermissions.enabledTools.isEmpty } }
@@ -571,6 +583,7 @@ public final class ChatSession {
         let reasoning = reasoning
         let store = conversations
         let model = selectedModelID
+        let hooks = HookRunner.load(workspaceRoot: root, home: memoryHome)
 
         let startedAt = Date()
         let task = Task { [weak self] in
@@ -578,7 +591,7 @@ public final class ChatSession {
             var tokens = 0
             var firstTokenAt: Date?
             let stream = orchestrator.run(
-                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop,
+                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop, hooks: hooks,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
             )
             do {

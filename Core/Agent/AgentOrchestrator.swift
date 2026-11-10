@@ -270,6 +270,7 @@ public final class AgentOrchestrator: Sendable {
         roundLimit: Int = AgentOrchestrator.defaultRoundLimit,
         stop: AgentStopFlag = AgentStopFlag(),
         backoffUnitSeconds: Double = 1.0,
+        hooks: [HookDefinition] = [],
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -292,6 +293,7 @@ public final class AgentOrchestrator: Sendable {
                             roundLimit: roundLimit,
                             stop: stop,
                             backoffUnitSeconds: backoffUnitSeconds,
+                            hooks: hooks.isEmpty ? nil : HookRunner(hooks: hooks, workspaceRoot: workspaceRoot, audit: PlatformAudit(chain: self.auditChain)),
                             chat: chat,
                             audit: recorder,
                             rubric: rubricMonitor,
@@ -373,6 +375,7 @@ public final class AgentOrchestrator: Sendable {
         roundLimit: Int,
         stop: AgentStopFlag,
         backoffUnitSeconds: Double,
+        hooks: HookRunner?,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>,
         audit: AgentAuditRecorder?,
         rubric: RubricMonitor?,
@@ -405,6 +408,20 @@ public final class AgentOrchestrator: Sendable {
         )
         let providerTools = offered.map(\.providerTool)
 
+        // prompt_submit hooks: a denial ends the run before any model call; a note is shown to the model as context.
+        var hookNotes: [String] = []
+        if let hooks {
+            let result = await hooks.run(.promptSubmit, payload: ["prompt_characters": prompt.count])
+            if let reason = result.denial {
+                yield(.policyDenied(tool: "prompt", rule: "hook", reason: reason))
+                var summary = AgentRunSummary()
+                summary.finalText = "A hook blocked this message: \(reason)"
+                yield(.finished(summary))
+                return
+            }
+            hookNotes = result.notes
+        }
+
         // Secret redaction, before anything reaches a provider.
         var finalPrompt = prompt
         var redactions = 0
@@ -418,6 +435,7 @@ public final class AgentOrchestrator: Sendable {
         if !profile.systemPrompt.isEmpty {
             history.insert(ChatMessage(role: .system, content: profile.systemPrompt), at: 0)
         }
+        if !hookNotes.isEmpty { finalPrompt += "\n\n[Notes from hooks]\n" + hookNotes.joined(separator: "\n") }
         history.append(ChatMessage(role: .user, content: finalPrompt, metadata: [ContextMetadata.prompt: "1"]))
 
         var summary = AgentRunSummary(redactionCount: redactions)
@@ -522,6 +540,7 @@ public final class AgentOrchestrator: Sendable {
                     toolTimeout: toolBudget,
                     audit: audit,
                     findings: findings,
+                    hooks: hooks,
                     yield: yield
                 )
                 switch record.status {
@@ -578,6 +597,7 @@ public final class AgentOrchestrator: Sendable {
             }
         }
 
+        if let hooks { _ = await hooks.run(.stop, payload: ["rounds": summary.rounds, "tool_calls": summary.toolCallsExecuted]) }
         summary.finalText = assistantText
         yield(.finished(summary))
     }
@@ -737,6 +757,7 @@ public final class AgentOrchestrator: Sendable {
         toolTimeout: TimeInterval,
         audit: AgentAuditRecorder?,
         findings: RubricFindings?,
+        hooks: HookRunner? = nil,
         yield: @escaping @Sendable (AgentEvent) -> Void
     ) async throws -> ToolCallRecord {
         var record = ToolCallRecord(
@@ -798,6 +819,7 @@ public final class AgentOrchestrator: Sendable {
             return finish(.denied, error: "The current mode (\(policy.mode.displayName)) does not allow '\(call.name)', which requires \(spec.permission.displayName) access.")
         }
 
+        var hookNoteText: [String] = []
         // Argument-level checks by tool family.
         var approvalKindFromPolicy: ApprovalKind?
         let args = ToolArgs.object(from: call.arguments) ?? [:]
@@ -841,6 +863,16 @@ public final class AgentOrchestrator: Sendable {
             case .allow:
                 break
             }
+        }
+
+        // pre_tool hooks run after every policy check and before the approval gate. They can only refuse.
+        if let hooks {
+            let result = await hooks.run(.preTool, tool: call.name, payload: ["arguments": args])
+            if let reason = result.denial {
+                yield(.policyDenied(tool: call.name, rule: "hook", reason: reason))
+                return finish(.denied, error: "A hook blocked '\(call.name)': \(reason)")
+            }
+            hookNoteText = result.notes
         }
 
         // The approval gate. `denied` at the permission-set level never
@@ -970,7 +1002,13 @@ public final class AgentOrchestrator: Sendable {
             ) {
                 try await tool.execute(argumentsJSON: call.arguments, context: context)
             }
-            let fitted = ToolOutputCap.fit(raw, from: spec.name)
+            var fitted = ToolOutputCap.fit(raw, from: spec.name)
+            if let hooks {
+                let post = await hooks.run(.postTool, tool: call.name, payload: ["arguments": args, "result_characters": raw.count])
+                hookNoteText += post.notes
+                if let reason = post.denial { hookNoteText.append("A post-tool hook objected: \(reason)") }
+            }
+            if !hookNoteText.isEmpty { fitted += "\n\n[Notes from hooks]\n" + hookNoteText.joined(separator: "\n") }
             return finish(.succeeded, result: fitted)
         } catch let error as AgentRunError {
             return finish(.failed, error: error.description)
