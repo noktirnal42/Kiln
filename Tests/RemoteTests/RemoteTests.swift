@@ -279,8 +279,9 @@ struct RemoteRelayTests {
     @Test("a device reaches the Mac only through the relay, with no direct connection", .enabled(if: RemoteRelayTests.nodeAvailable)) func throughRelay() async throws {
         let relayPort = Int.random(in: 20_000...40_000)
         let relay = try startRelay(port: relayPort)
-        defer { relay.terminate() }
+        defer { if relay.isRunning { relay.terminate() } }
         try await Task.sleep(for: .milliseconds(800))
+        try #require(relay.isRunning, "Relay exited during startup; run npm ci --omit=dev --ignore-scripts in Relay and check that the port is available.")
         let backend = FakeBackend()
         _ = await backend.open("c1")
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-relay-\(UUID().uuidString)")
