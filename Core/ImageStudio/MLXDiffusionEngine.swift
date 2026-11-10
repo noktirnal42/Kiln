@@ -29,12 +29,18 @@ public actor MLXDiffusionEngine: ImageEngine {
     }
 
     public func status() async -> ImageEngineStatus {
-        let installed = store.installedDiffusers().filter { Self.supports(family: $0.family) }
+        let installed = await installedModels()
         if installed.isEmpty {
             return .setup(reason: "No image model is installed for the MLX engine.",
                           steps: ["Open Models, choose SD-Turbo (2.6 GB) and download it.", "SDXL-Turbo and SDXL fine-tunes (about 7 GB each) also run here."])
         }
         return .ready("\(installed.count) model\(installed.count == 1 ? "" : "s") installed")
+    }
+
+    /// The store scan stats files on a possibly slow drive: never on the cooperative pool.
+    private func installedModels() async -> [InstalledImageModel] {
+        let store = self.store
+        return (try? await Self.onWorkerThread { store.installedDiffusers().filter { Self.supports(family: $0.family) } }) ?? []
     }
 
     static func supports(family: String) -> Bool { family == "sd2" || family == "sdxl" }
@@ -54,7 +60,7 @@ public actor MLXDiffusionEngine: ImageEngine {
     }
 
     public func models() async -> [EngineModel] {
-        store.installedDiffusers().filter { Self.supports(family: $0.family) }
+        await installedModels()
             .map { EngineModel(id: $0.repoID, name: $0.repoID.split(separator: "/").last.map(String.init) ?? $0.repoID,
                                kind: .checkpoint, family: $0.family == "sdxl" ? "SDXL" : "SD 2.x") }
     }
@@ -63,7 +69,7 @@ public actor MLXDiffusionEngine: ImageEngine {
         guard request.task == .textToImage || request.task == .imageToImage else {
             throw ImageStudioError.unsupported("The MLX engine cannot do \(request.task.title.lowercased()).")
         }
-        guard let model = store.installedDiffusers().first(where: { $0.repoID == request.model }) else {
+        guard let model = await installedModels().first(where: { $0.repoID == request.model }) else {
             throw ImageStudioError.modelMissing("\(request.model) is not installed. Download it in Image studio → Models.")
         }
         guard Self.supports(family: model.family) else { throw ImageStudioError.unsupported("\(model.family) models do not run in the MLX engine.") }
