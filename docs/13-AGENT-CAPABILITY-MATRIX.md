@@ -54,3 +54,11 @@ A hosted model (Ollama Cloud `gemma4:31b`, Workstation Agent profile, Kiln Debug
 ## Small language model from scratch, driven by the agent (2026-11-02)
 
 With `lab_import_dataset` → `lab_start_small_lm` (100 iterations, 64 dimensions, 2 layers over an 11 KB text corpus) → `lab_get_experiment`, a hosted model (Ollama Cloud `gemma4:31b`, Workstation Agent) trained a small transformer on this Mac's GPU to completion (final training loss 0.493, artifact registered). The GUI and the tool build the job through the same `ModelLabModule.smallLMJob` and validator. `lab_start_lora` now exists behind a download policy (`ModelDownloadPolicy`: valid `org/name`, cached or explicitly allowed); `lab_start_distillation` uses the same policy for its teacher ("apple" or a cached MLX repo) and student.
+
+## Agent platform (memory, commands, hooks)
+
+| Area | Service-backed agent access | Missing application actions |
+| --- | --- | --- |
+| Memory files | `kiln_memory_read` (read), `kiln_memory_write` (write; approval; only KILN.md / AGENTS.md / CLAUDE.md in the project or user folders; audit `memory.saved`) | `@import`, per-directory files |
+| Slash commands | `kiln_command_list`, `kiln_command_expand` (read), `kiln_command_write` (write; approval; built-in names refused; audit `command.saved`) | Palette entries |
+| Hooks | `kiln_hooks_list` (read). Hooks themselves run in every agent run and external MCP call that goes through the orchestrator's `run`; MCP `callTool` does not run hooks yet | Hook editing by the agent (edit `.kiln/hooks/hooks.json` with the file tools, which need approval) |

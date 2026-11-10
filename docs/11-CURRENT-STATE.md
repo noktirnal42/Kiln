@@ -235,3 +235,23 @@ cannot grant. Codex's experimental native computer-use and MCP agent tools are m
   starter prompts; LM Studio and Ollama-directory scanning; a first-run flow (project, one model, one key); consistent
   header chrome for Lab and Analyze, which still carry their own toolbars; auto-title with a model instead of the
   first line; show reasoning/tool calls inline in the thread like the reference apps.
+
+## Agent platform (2026-11-09, `Core/Platform/`)
+
+Parity work against Claude Code Desktop and Codex (doc 17 §2). Each feature is a service in `Core/Platform/`, UI in the chat, tools named
+`kiln_*` (so the in-app agent and MCP clients get them; enabled for the Coding and Workstation profiles) and an audit record for state changes.
+**Unit-tested; not yet seen in the running app.**
+
+- **Memory files** (`MemoryFiles.swift`, `Modules/Chat/MemoryPaneView.swift`): `KILN.md`, `AGENTS.md`, `CLAUDE.md` from `~/.kiln`, `~/.claude`, `~/.codex`
+  and the project root are read when a run starts and appended to the system prompt (32 KiB per file, identical copies sent once; guidance only, never
+  permissions). The brain button beside the context meter shows their token cost and opens an editor. `kiln_memory_read` / `kiln_memory_write`;
+  audit `memory.saved`. Not done: `@import` lines, nested per-directory files.
+- **Slash commands** (`SlashCommands.swift`, `CommandsPaneView.swift`): `.kiln/commands/**/*.md` (also reads `.claude/commands`), user scope
+  `~/.kiln/commands`; frontmatter `description`, `argument-hint`, `model`; `$ARGUMENTS`, `$1`..`$9`; project overrides user; built-ins `/compact /clear /model
+  /memory /commands /hooks /help` always win. Composer shows completions while typing `/…` (Tab completes). Tools `kiln_command_list/expand/write`; audit
+  `command.invoked`, `command.builtin`, `command.saved`. Not done: command-palette (⌘K) entries.
+- **Hooks** (`Hooks.swift`, `HooksPaneView.swift`): `.kiln/hooks/hooks.json` (project) and `~/.kiln/hooks/hooks.json`; events `pre_tool`, `post_tool`,
+  `prompt_submit`, `stop`; script gets JSON on stdin; exit 2 or `{"decision":"deny"}` blocks, `annotate` adds a note to the tool result or prompt, `allow` is only
+  recorded. pre_tool runs after the policy checks and before the approval gate, so a hook can only make a run stricter. A hook that errors or times out is
+  recorded as `failed` and has no effect. Audit `hook.decision`, `hooks.saved`. `kiln_hooks_list`.
+- **Not started:** plan mode, checkpoints and rewind, sessions list and background runs, usage and cost view, schedules, verifier agent.
