@@ -38,7 +38,10 @@ public enum SessionList {
 public protocol AttentionSink: AnyObject {
     func needsApproval(tool: String, conversation: String, pending: Int)
     func cleared(pending: Int)
+    func scheduledTaskFinished(name: String)
 }
+
+extension AttentionSink { public func scheduledTaskFinished(name: String) {} }
 
 @MainActor
 public final class SystemAttentionSink: AttentionSink {
@@ -55,6 +58,14 @@ public final class SystemAttentionSink: AttentionSink {
         content.title = "Kiln needs your approval"
         content.body = "\(conversation): the agent wants to use \(tool)."
         center.add(UNNotificationRequest(identifier: "kiln.approval", content: content, trigger: nil))
+    }
+
+    public func scheduledTaskFinished(name: String) {
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = "Scheduled task finished"
+        content.body = name
+        center.add(UNNotificationRequest(identifier: "kiln.schedule.\(UUID().uuidString)", content: content, trigger: nil))
     }
 
     public func cleared(pending: Int) {

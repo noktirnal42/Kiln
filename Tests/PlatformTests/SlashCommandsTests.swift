@@ -40,7 +40,7 @@ struct SlashCommandsTests {
         let commands = SlashCommands.builtIns
         #expect(SlashCommands.completions(for: "/co", commands: commands).map(\.name).prefix(2) == ["compact", "commands"])
         #expect(SlashCommands.completions(for: "/model x", commands: commands).isEmpty)
-        #expect(SlashCommands.completions(for: "/", commands: commands).count == commands.count)
+        #expect(SlashCommands.completions(for: "/", commands: commands).count == min(8, commands.count))
         #expect(SlashCommands.fileURL(name: "clear", scope: .project, workspaceRoot: URL(fileURLWithPath: "/tmp"), home: nil) == nil)
     }
 

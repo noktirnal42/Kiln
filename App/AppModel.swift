@@ -251,6 +251,8 @@ public final class AppModel {
             hostName: Host.current().localizedName ?? "Mac"
         )
         if let orchestrator { session.attachOrchestrator(orchestrator) }
+        session.attention = SystemAttentionSink()
+        session.startScheduler()
         await serviceRegistry.register(session, for: ChatSession.self)
     }
 

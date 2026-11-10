@@ -4,7 +4,7 @@ import Foundation
 /// agent and external MCP clients can use what the person can. All are named `kiln_*`.
 public enum PlatformTools {
     public static var all: [any ToolExecuting] {
-        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool(), UsageReportTool()]
+        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool(), UsageReportTool(), ScheduleListTool(), ScheduleWriteTool()]
     }
 }
 
@@ -190,5 +190,69 @@ public struct UsageReportTool: ToolExecuting {
         text += "\n\nBy model:\n" + (ledger.byModel().prefix(15).map(line).joined(separator: "\n"))
         text += "\n\nDaily:\n" + ledger.daily(limit: 14).map(line).joined(separator: "\n")
         return text
+    }
+}
+
+public struct ScheduleListTool: ToolExecuting {
+    let store: ScheduleStore
+    public init() { store = .default }
+    init(store: ScheduleStore) { self.store = store }
+    public var spec: ToolSpec {
+        ToolSpec(name: "kiln_schedule_list", summary: "List scheduled agent tasks", detail: "Each task runs a prompt with an agent profile on a schedule, as a normal run with approvals.",
+                 parameters: [], permission: .read)
+    }
+    public func execute(argumentsJSON: String, context: ToolExecutionContext) async throws -> String {
+        let tasks = store.all
+        if tasks.isEmpty { return "No scheduled tasks." }
+        return tasks.map { "\($0.name) — \($0.describe), profile \($0.profileName), \($0.enabled ? "on" : "off")\($0.lastRun.map { ", last run \($0.formatted())" } ?? "")" }.joined(separator: "\n")
+    }
+}
+
+public struct ScheduleWriteTool: ToolExecuting {
+    let store: ScheduleStore
+    public init() { store = .default }
+    init(store: ScheduleStore) { self.store = store }
+    public var spec: ToolSpec {
+        ToolSpec(name: "kiln_schedule_write", summary: "Create, change or remove a scheduled agent task",
+                 detail: "Give every_minutes (minimum 5) or daily_at as HH:mm. Scheduled runs use the named profile and still ask for approvals. action: save (default) or remove.",
+                 parameters: [
+                    ToolParam(name: "name", type: "string", description: "Task name (identifies it)", required: true),
+                    ToolParam(name: "prompt", type: "string", description: "What the agent should do", required: false),
+                    ToolParam(name: "profile", type: "string", description: "Agent profile name, default Coding Agent", required: false),
+                    ToolParam(name: "every_minutes", type: "integer", description: "Repeat interval, at least 5", required: false),
+                    ToolParam(name: "daily_at", type: "string", description: "HH:mm", required: false),
+                    ToolParam(name: "enabled", type: "boolean", description: "Default true", required: false),
+                    ToolParam(name: "action", type: "string", description: "save or remove", required: false),
+                 ], permission: .write)
+    }
+    struct Args: Decodable, Sendable {
+        var name: String; var prompt: String?; var profile: String?; var every_minutes: Int?; var daily_at: String?; var enabled: Bool?; var action: String?
+    }
+    public func execute(argumentsJSON: String, context: ToolExecutionContext) async throws -> String {
+        let args = try ToolArgs.decode(Args.self, from: argumentsJSON)
+        let existing = store.all.first { $0.name == args.name }
+        if args.action == "remove" {
+            guard let existing else { throw AgentRunError.permissionDenied("No scheduled task named '\(args.name)'.") }
+            store.remove(existing.id)
+            await context.services.audit?.record("schedule.saved", ["name": .string(args.name), "removed": .bool(true)])
+            return "Removed \(args.name)."
+        }
+        let repeats: ScheduledTask.Repeat
+        if let minutes = args.every_minutes {
+            guard minutes >= 5 else { throw AgentRunError.permissionDenied("every_minutes must be at least 5.") }
+            repeats = .everyMinutes(minutes)
+        } else if let at = args.daily_at, let parts = Optional(at.split(separator: ":").compactMap { Int($0) }), parts.count == 2, (0..<24).contains(parts[0]), (0..<60).contains(parts[1]) {
+            repeats = .daily(hour: parts[0], minute: parts[1])
+        } else if let existing { repeats = existing.repeats } else {
+            throw AgentRunError.permissionDenied("Give every_minutes (≥5) or daily_at (HH:mm).")
+        }
+        guard let prompt = args.prompt ?? existing?.prompt, !prompt.isEmpty else { throw AgentRunError.permissionDenied("A prompt is required.") }
+        var task = existing ?? ScheduledTask(name: args.name, prompt: prompt, profileName: args.profile ?? "Coding Agent", repeats: repeats)
+        task.prompt = prompt; task.repeats = repeats
+        if let profile = args.profile { task.profileName = profile }
+        if let enabled = args.enabled { task.enabled = enabled }
+        store.upsert(task)
+        await context.services.audit?.record("schedule.saved", ["name": .string(task.name), "schedule": .string(task.describe), "profile": .string(task.profileName), "enabled": .bool(task.enabled)])
+        return "Saved \(task.name): \(task.describe)."
     }
 }

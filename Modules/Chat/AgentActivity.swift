@@ -36,6 +36,8 @@ enum AgentActivity {
             .tool("kiln_usage_report", "Tokens and estimated cost by provider, model and day", .read),
             .exempt("agent.usage-budget", "Set prices and the daily budget", .write,
                     because: "Deliberate: the budget limits the agent, so an agent must not be able to raise it."),
+            .tool("kiln_schedule_list", "List scheduled tasks", .read),
+            .tool("kiln_schedule_write", "Create, change or remove a scheduled task", .write),
             .exempt("agent.plan", "Approve or reject a proposed plan", .write,
                     because: "Deliberate: a plan is approved by the person; an agent approving its own plan would defeat plan mode."),
             .exempt("agent.new-conversation", "Start a new conversation", .write,

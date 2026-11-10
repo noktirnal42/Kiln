@@ -19,7 +19,7 @@ public struct SlashCommand: Identifiable, Equatable, Sendable {
 }
 
 public enum BuiltInCommand: String, CaseIterable, Sendable {
-    case compact, clear, model, plan, memory, commands, hooks, sessions, cost, help
+    case compact, clear, model, plan, memory, commands, hooks, sessions, cost, schedule, help
 
     public var summary: String {
         switch self {
@@ -29,6 +29,7 @@ public enum BuiltInCommand: String, CaseIterable, Sendable {
         case .plan: return "Plan mode: explore read-only, then approve a plan"
         case .sessions: return "Sessions: status, resume and fork"
         case .cost: return "Tokens and estimated cost, with a daily budget"
+        case .schedule: return "Scheduled and recurring agent tasks"
         case .memory: return "Open the memory files (KILN.md, AGENTS.md, CLAUDE.md)"
         case .commands: return "List and edit custom commands"
         case .hooks: return "Show and edit the hooks in .kiln/hooks"

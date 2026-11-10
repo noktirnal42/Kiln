@@ -138,6 +138,39 @@ public final class ChatSession {
         return profile
     }
 
+    // MARK: Scheduled tasks
+    public func platformAuditRecord(_ type: String, _ payload: [String: AuditValue]) async { await platformAudit.record(type, payload) }
+    let scheduleStore: ScheduleStore?
+    private var schedulerTask: Task<Void, Never>?
+
+    /// Checks every 30 seconds for due tasks. Call once at launch.
+    public func startScheduler() {
+        guard schedulerTask == nil, scheduleStore != nil else { return }
+        schedulerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                await self?.runDueTasks()
+            }
+        }
+    }
+
+    /// Runs each due task as a normal agent run in its own conversation, one at a time. A busy session defers them.
+    public func runDueTasks(now: Date = Date()) async {
+        guard let scheduleStore, !isStreaming else { return }
+        for task in scheduleStore.due(now: now) {
+            guard !isStreaming else { return }
+            scheduleStore.markRun(task.id, at: now)
+            await newConversation()
+            await renameConversation(to: "⏱ \(task.name)")
+            if let index = agentProfiles.firstIndex(where: { $0.name == task.profileName }) { agentProfileIndex = index }
+            agentEnabled = true
+            planMode = false
+            await platformAudit.record("schedule.run", ["name": .string(task.name), "profile": .string(task.profileName), "schedule": .string(task.describe)])
+            await send(task.prompt)
+            attention?.scheduledTaskFinished(name: task.name)
+        }
+    }
+
     // MARK: Usage and budget
     let usageLedger: UsageLedger?
     private var modelMeta: [String: (provider: String, local: Bool)] = [:]
@@ -239,7 +272,7 @@ public final class ChatSession {
     }
 
     // MARK: Slash commands
-    public enum Pane: Equatable { case memory, commands, hooks, sessions, usage }
+    public enum Pane: Equatable { case memory, commands, hooks, sessions, usage, schedules }
     /// A pane a slash command asked the chat to open.
     public var requestedPane: Pane?
 
@@ -257,6 +290,7 @@ public final class ChatSession {
             agentNotice = planMode ? "Plan mode on: the agent explores read-only and proposes a plan." : "Plan mode off."
             await platformAudit.record("plan.mode", ["on": .bool(planMode)])
         case .cost: requestedPane = .usage
+        case .schedule: requestedPane = .schedules
         case .memory: reloadMemory(); requestedPane = .memory
         case .commands: requestedPane = .commands
         case .hooks: requestedPane = .hooks
@@ -340,8 +374,10 @@ public final class ChatSession {
         compactionDefaults: UserDefaults? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil,
         memoryHome: URL? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? FileManager.default.homeDirectoryForCurrentUser : nil,
         checkpointStore: CheckpointStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil,
-        usageLedger: UsageLedger? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil
+        usageLedger: UsageLedger? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil,
+        scheduleStore: ScheduleStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil
     ) {
+        self.scheduleStore = scheduleStore
         self.usageLedger = usageLedger
         self.memoryHome = memoryHome
         self.checkpointStore = checkpointStore
