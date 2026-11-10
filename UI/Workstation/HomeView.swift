@@ -75,7 +75,7 @@ struct HomeView: View {
                                 Image(systemName: activity.symbol)
                                     .font(.system(size: 20)).foregroundStyle(SSColor.accent)
                                 Spacer()
-                                SSKeyCap("⌘\(activity.shortcutKey)")
+                                if let key = activity.shortcutKey { SSKeyCap("⌘\(key)") }
                             }
                             Text(activity.title).font(SSTypography.headline())
                             Text(activity.summary)
