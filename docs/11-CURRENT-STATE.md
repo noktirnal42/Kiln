@@ -122,6 +122,24 @@ One window, one sidebar, one conversation.
 - **Ghidra:** Kiln discovers existing stable releases in `~/Applications` and `/Applications`, or a valid `GHIDRA_HOME`, and bundles its export script.
   Analyze → Analyze with Ghidra and `re_analyze_binary` call the same bounded service; the agent action requires execution approval. Reanalysis preserves annotations
   and analyst signatures, checks project revision and binary hash, and rejects concurrent runs. Ghidra 12.1.4 + Java 21 produced real persisted pseudocode here.
+- **Analyze workbench (2026-11-09, `Core/ReverseEngineering/` + `Modules/ReverseEngineering/`):** services behind GUI, `re_*` tools and MCP:
+  control-flow graph with minimap and zoom (`REGraphs.swift`; engine blocks when Ghidra/radare2 provide them, otherwise rebuilt from branches),
+  call graph (callers above, callees below, DOT export), a project-wide cross-reference index (`REXrefs.swift`) so every address, symbol and
+  quoted string in the listing and pseudocode is a link that opens a references sheet (which also sets address comments, labels and bookmarks),
+  hex view synced to the selected function with `de ad ?? ef` / `"text"` search and a virtual-address map read from the load commands
+  (`REHexPatch.swift`), patches assembled with clang or typed as hex/NOP and written only to a copy (original never touched, expected bytes
+  checked), C-style struct/union editor with undo and apply-to-variable (`REWorkspace.swift`, stored in `kiln-workspace.json` beside the analysis),
+  function-level binary diff with listing diff (`REDiff.swift`), IPA/APK inspector (Info.plist, entitlements, manifest, permissions, components,
+  classes, resources; extract and import one entry) (`REPackage.swift`), findings with evidence and screenshots exported as Markdown and
+  HTML (`REReport.swift`), lldb plan/run (load-only, or launch with a confirmation) (`REDebugLink.swift`), and a JS console whose `re` object is
+  the same API the tools use (`REScript.swift`). New tools: `re_get_cfg`, `re_get_call_graph`, `re_get_references`, `re_read_bytes`,
+  `re_search_bytes`, `re_annotate_address`, `re_change_variable`, `re_list/define/delete/apply_structure(s)`, `re_bookmark_address`,
+  `re_create/remove/list_patch(es)`, `re_export_patched`, `re_diff_projects`, `re_inspect_package`, `re_import_package_entry`,
+  `re_list/add_finding(s)`, `re_export_report`, `re_plan_debugger`, `re_run_debugger` (execute), `re_run_script` (execute). `re_get_xrefs` had
+  `to`/`from` swapped and is fixed. Tests: `Tests/ReverseEngineeringTests/REWorkbenchTests.swift`. Screenshots: `docs/qa/analyze-re/`.
+  **Not done yet vs Ghidra/IDA:** a full data-type manager, decompiler-integrated retyping UI, switch/jump-table recovery, FLIRT-style library
+  signatures, emulation, collaborative projects, a patch assembler beyond clang for arm64/x86_64, string/crypto rows beyond strings and gadgets
+  linking to code, and live checks of the Patches, Diff, Package, Findings and Debug panes in the running app (covered by tests only).
 - **Reverse engineering:** import via `re_import_binary` (returns `project_id`; every other `re_*` tool takes it;
   the analysis id is accepted too). Native `otool` engine; Ghidra optional.
 - **Browser (`Modules/Browser/`, activity ⌘8):** tabbed WKWebView browser: address bar (bare hosts get https, other text searches

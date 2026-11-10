@@ -14,6 +14,9 @@ struct REProjectDetail: View {
     @State private var tab: REViewTab = .functions
     @State private var functionQuery = ""
     @State private var analysisError: String?
+    @State private var index: REXrefIndex?
+    @State private var scanTab: REFindingsTab = .crypto
+    @State private var referenceTarget: ReferenceTarget?
 
     private var selectedFunction: FunctionRecord? {
         guard let selectedAddress else { return nil }
@@ -45,11 +48,29 @@ struct REProjectDetail: View {
                 analyzeMenu.labelStyle(.titleAndIcon)
             }
             engineStrip
-            if let finding = tab.finding {
-                REFindingsView(module: module, projectID: project.id, tab: finding)
-            } else {
-                functionsBody
+            switch tab {
+            case .functions: functionsBody
+            case .graph: REGraphView(module: module, projectID: project.id, function: selectedFunction) { handle(.function($0)) }
+            case .hex: REHexView(module: module, projectID: project.id, function: selectedFunction)
+            case .types: RETypesView(module: module, projectID: project.id)
+            case .patches: REPatchView(module: module, projectID: project.id, function: selectedFunction)
+            case .diff: REDiffView(module: module, project: project)
+            case .package: REPackageView(module: module) { name in functionQuery = name; tab = .functions }
+            case .findings: REFindingsPane(module: module, projectID: project.id, function: selectedFunction)
+            case .debug: REDebugView(module: module, projectID: project.id, function: selectedFunction)
+            case .scan:
+                VStack(spacing: 0) {
+                    Picker("", selection: $scanTab) { ForEach(REFindingsTab.scans) { Text($0.rawValue).tag($0) } }
+                        .pickerStyle(.segmented).labelsHidden().padding(SSSpacing.s)
+                    REFindingsView(module: module, projectID: project.id, tab: scanTab, onLink: { handle($0) })
+                }
+            case .strings, .script:
+                if let finding = tab.finding { REFindingsView(module: module, projectID: project.id, tab: finding, onLink: { handle($0) }) }
             }
+        }
+        .task(id: analysis.revision) { index = try? await module.xrefIndex(projectID: project.id) }
+        .sheet(item: $referenceTarget) { target in
+            REReferencesSheet(module: module, projectID: project.id, target: target.value) { handle(.function($0)) }
         }
         .alert("Ghidra analysis failed", isPresented: Binding(get: { analysisError != nil }, set: { if !$0 { analysisError = nil } })) {
             Button("OK") { analysisError = nil }
@@ -111,6 +132,21 @@ struct REProjectDetail: View {
         .help(module.ghidraStatus)
     }
 
+    struct ReferenceTarget: Identifiable { let value: String; var id: String { value } }
+
+    /// Every address, symbol or string in a listing lands here.
+    private func handle(_ link: RELink) {
+        switch link {
+        case .function(let address):
+            let key = ProjectStore.normalizedAddress(address)
+            if let f = analysis.functions.first(where: { ProjectStore.normalizedAddress($0.address) == key || $0.name == address }) { selectedAddress = f.address; if tab != .graph { tab = .functions } }
+        case .address(let address):
+            if let value = REListing.address(address), let f = index?.functionContaining(analysis, address: value) { selectedAddress = f.address }
+            referenceTarget = ReferenceTarget(value: address)
+        case .string(let text): referenceTarget = ReferenceTarget(value: text)
+        }
+    }
+
     private var filteredFunctions: [FunctionRecord] {
         let q = functionQuery.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return analysis.functions }
@@ -146,7 +182,7 @@ struct REProjectDetail: View {
             Divider()
             Group {
                 if let function = selectedFunction {
-                    REFunctionDetail(module: module, projectID: project.id, analysis: analysis, function: function) { selectedAddress = $0 }
+                    REFunctionDetail(module: module, projectID: project.id, analysis: analysis, function: function, index: index, onLink: { handle($0) }, onShowReferences: { referenceTarget = ReferenceTarget(value: $0) }) { selectedAddress = $0 }
                 } else if analysis.functions.isEmpty {
                     if analysis.format.contains("Mach-O") {
                         REUnlabeledDisassembly(module: module, projectID: project.id)
@@ -166,19 +202,23 @@ struct REProjectDetail: View {
 
 /// What the Analyze detail can show: the function browser, or one of the whole-binary analyses.
 enum REViewTab: String, CaseIterable, Identifiable {
-    case functions = "Functions", strings = "Strings", crypto = "Crypto", formats = "Formats"
-    case gadgets = "Gadgets", rules = "Rules", forensics = "Forensics", script = "Script"
+    case functions = "Functions", graph = "Graph", hex = "Hex", types = "Types", strings = "Strings", scan = "Scan"
+    case patches = "Patches", diff = "Diff", package = "Package", findings = "Findings", debug = "Debug", script = "Script"
     var id: String { rawValue }
     var finding: REFindingsTab? { REFindingsTab(rawValue: rawValue) }
     var symbol: String {
         switch self {
         case .functions: "function"
+        case .graph: "point.3.connected.trianglepath.dotted"
+        case .hex: "number.square"
+        case .types: "ruler"
+        case .patches: "bandage"
+        case .diff: "arrow.left.arrow.right"
+        case .package: "shippingbox"
+        case .findings: "flag"
+        case .debug: "ladybug"
         case .strings: "textformat"
-        case .crypto: "key"
-        case .formats: "doc.text.magnifyingglass"
-        case .gadgets: "link"
-        case .rules: "checklist"
-        case .forensics: "waveform.path.ecg"
+        case .scan: "checklist"
         case .script: "curlybraces"
         }
     }
@@ -191,6 +231,9 @@ struct REFunctionDetail: View {
     let projectID: String
     let analysis: Analysis
     let function: FunctionRecord
+    var index: REXrefIndex?
+    var onLink: (RELink) -> Void = { _ in }
+    var onShowReferences: (String) -> Void = { _ in }
     var onSelectAddress: (String) -> Void = { _ in }
     @State private var showAnnotations = false
 
@@ -205,6 +248,8 @@ struct REFunctionDetail: View {
                     Text(function.name).font(SSTypography.mono(14).weight(.semibold)).lineLimit(1).textSelection(.enabled)
                     Text(function.address).font(SSTypography.mono(11)).foregroundStyle(.secondary).textSelection(.enabled)
                     Spacer(minLength: 0)
+                    Button { onShowReferences(function.address) } label: { Label("References", systemImage: "arrow.triangle.branch") }
+                        .buttonStyle(.borderless).controlSize(.small).labelStyle(.iconOnly).help("Cross-references to this function")
                     Button { showAnnotations.toggle() } label: { Label("Annotate", systemImage: "pencil.line") }
                         .buttonStyle(.borderless).controlSize(.small).labelStyle(.iconOnly)
                         .help("Annotate: rename, comment or bookmark this function")
@@ -269,7 +314,7 @@ struct REFunctionDetail: View {
                     .padding(SSSpacing.m).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .background(SSColor.canvas)
             } else {
-                SSCodeBlock(text: text)
+                RELinkedCodeBlock(text: text, index: index, onLink: onLink)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

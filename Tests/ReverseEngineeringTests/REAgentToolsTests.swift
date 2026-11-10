@@ -19,8 +19,8 @@ struct REAgentToolsTests {
 
     @Test func readOnlyDefinitionsMapToReadPermission() {
         for tool in makeTools() {
-            let readOnly = REMCPTools.definitions.first { REAgentTools.prefix + $0.name == tool.spec.name }?.readOnly
-            let expected: ToolPermissionLevel = tool.spec.name == "re_analyze_binary" ? .execute : (readOnly == true ? .read : .write)
+            let definition = REMCPTools.definitions.first { REAgentTools.prefix + $0.name == tool.spec.name }
+            let expected: ToolPermissionLevel = (tool.spec.name == "re_analyze_binary" || definition?.executes == true) ? .execute : (definition?.readOnly == true ? .read : .write)
             #expect(tool.spec.permission == expected)
         }
     }
