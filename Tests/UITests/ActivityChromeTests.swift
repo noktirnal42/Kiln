@@ -5,10 +5,11 @@ import Testing
 /// The shared activity chrome and the Analyze tab model that sits on it.
 @MainActor
 struct ActivityChromeTests {
-    @Test func analyzeTabsStartWithFunctionsThenEveryFindingsTab() {
+    @Test func analyzeTabsStartWithFunctionsAndKeepStringsAndScriptAsFindingsTabs() {
         let tabs = REViewTab.allCases
         #expect(tabs.first == .functions)
-        #expect(tabs.dropFirst().compactMap(\.finding) == REFindingsTab.allCases)
+        #expect(tabs.compactMap(\.finding) == [.strings, .script])
+        #expect(REFindingsTab.scans == [.crypto, .formats, .gadgets, .rules, .forensics])
         #expect(REViewTab.functions.finding == nil)
     }
 
