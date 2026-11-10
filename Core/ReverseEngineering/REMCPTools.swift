@@ -28,9 +28,11 @@ public struct REMCPToolDefinition: @unchecked Sendable {
     public let inputSchema: [String: Any]
     /// true when the tool has no side effects on any project or binary.
     public let readOnly: Bool
+    /// true when the tool runs code or a program (a script, the debugger, an analysis engine) and needs execute-level approval.
+    public let executes: Bool
 
-    public init(name: String, description: String, inputSchema: [String: Any], readOnly: Bool) {
-        self.name = name; self.description = description; self.inputSchema = inputSchema; self.readOnly = readOnly
+    public init(name: String, description: String, inputSchema: [String: Any], readOnly: Bool, executes: Bool = false) {
+        self.name = name; self.description = description; self.inputSchema = inputSchema; self.readOnly = readOnly; self.executes = executes
     }
 }
 
@@ -40,7 +42,9 @@ public struct REMCPToolDefinition: @unchecked Sendable {
 /// (256 MiB imports, 64 MiB wordlists, per-signature hit caps, step budgets) so
 /// no tool can unboundedly consume memory or time.
 public enum REMCPTools {
-    public static let definitions: [REMCPToolDefinition] = [
+    public static let definitions: [REMCPToolDefinition] = baseDefinitions + REWorkbenchTools.definitions
+
+    static let baseDefinitions: [REMCPToolDefinition] = [
         REMCPToolDefinition(
             name: "import_binary",
             description: "Copy a binary into the app sandbox and run native inspection (file type, format, sections, strings, otool disassembly). 256 MiB import cap.",
@@ -522,6 +526,7 @@ public enum REMCPTools {
             let modules = try await service.dumpForensics(projectID: try projectArgument(arguments)).modules
             return try text(JSONSerialization.data(withJSONObject: modules.map { String(describing: $0) }))
         default:
+            if let result = try await REWorkbenchTools.call(tool: name, arguments: arguments, service: service) { return result }
             throw REMToolError.unknownTool(name)
         }
     }
