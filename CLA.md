@@ -7,7 +7,7 @@ By opening a pull request or otherwise submitting a contribution to Kiln ("Contr
 
 1. You wrote the Contribution, or you have the right to submit it under these terms, and your employer (if any)
    does not claim rights in it, or has agreed in writing.
-2. You grant the project owner (the "Licensor") a perpetual, worldwide, non-exclusive, royalty-free,
+2. You grant the project owner, FreeRange Labs (the "Licensor") a perpetual, worldwide, non-exclusive, royalty-free,
    irrevocable license to use, copy, modify, publish, distribute, sublicense and relicense the Contribution and
    derivative works, under any terms, including commercial and proprietary terms.
 3. You grant the Licensor and recipients of Kiln a perpetual, worldwide, royalty-free, irrevocable patent license

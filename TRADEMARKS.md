@@ -1,6 +1,6 @@
 # Name and logo
 
-"Kiln", the Kiln mark and the app icon identify this project. The source license does **not** grant rights
+"Kiln", the Kiln mark and the app icon identify this project, owned by FreeRange Labs. The source license does **not** grant rights
 to use them (the PolyForm Noncommercial License grants no trademark rights).
 
 You may: say your work is "for Kiln" or "compatible with Kiln", and link to this repository.

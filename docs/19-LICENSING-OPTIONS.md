@@ -60,7 +60,7 @@ if you are willing to give up public source.
 ## Checklist to apply Option A (the draft already contains the files marked ✔)
 
 - ✔ `LICENSE` = PolyForm Noncommercial 1.0.0 (official text) with a Required Notice line.
-  **Fill in the owner's legal name or entity** (placeholder `[OWNER LEGAL NAME OR ENTITY]`).
+  The Required Notice names FreeRange Labs; confirm that is the correct legal name or entity before release.
 - ✔ `LICENSE-HISTORY.md` and `licenses/MIT-through-v0.1.1.txt`: keep the MIT record.
 - ✔ `COMMERCIAL-LICENSE.md` (placeholders for price, support terms and contact), `CLA.md`, `TRADEMARKS.md`.
 - ✔ `THIRD-PARTY-NOTICES.md` generated from the real dependency licenses.
