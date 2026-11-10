@@ -176,48 +176,12 @@ public final class AppModel {
             try? await manager.activate(record.id)
         }
         await refreshRecords()
-        if let re = (await manager.record(for: REModule.identifier))?.module as? REModule {
-            REAgentTools.register(module: re)
-            #if DEBUG
-            // Visual-QA hook, compiled out of release builds:
-            //   open Kiln.app --args -KilnImportFixture /usr/bin/true
-            // imports the binary at launch so analysis views can be checked without the file picker.
-            // Skips a fixture already imported on an earlier launch, so relaunches don't pile up copies.
-            if let fixture = UserDefaults.standard.string(forKey: "KilnImportFixture") {
-                let name = URL(fileURLWithPath: fixture).lastPathComponent
-                let alreadyImported = re.projects.contains { $0.binaryURL.lastPathComponent == name }
-                if !alreadyImported {
-                    _ = try? await re.importBinary(at: URL(fileURLWithPath: fixture))
-                }
-            }
-            #endif
-        }
-        if let lab = (await manager.record(for: ModelLabModule.identifier))?.module as? ModelLabModule {
-            ModelLabAgentTools.register(module: lab)
-        }
-        if let browser = (await manager.record(for: BrowserModule.identifier))?.module as? BrowserModule {
-            BrowserAgentTools.register(module: browser)
-            // A download is only handed to Analyze when the user presses "Analyze in Kiln".
-            let re = (await manager.record(for: REModule.identifier))?.module as? REModule
-            browser.importPackage = { [weak re] url in
-                guard let re else { throw BrowserToolError.page("Analyze is not available.") }
-                _ = try await re.importBinary(at: url)
-                return url.lastPathComponent
-            }
-        }
-        if let devices = (await manager.record(for: DevicesModule.identifier))?.module as? DevicesModule {
-            DeviceAgentTools.register(service: devices.service)
-        }
-        if let media = (await manager.record(for: MediaModule.identifier))?.module as? MediaModule {
-            MediaAgentTools.register(module: media)
-            #if DEBUG
-            // Visual-QA hook, compiled out of release builds: open Kiln.app --args -KilnOpenMedia /path/to/file
-            // shows the file in the Media viewer at launch.
-            if let path = UserDefaults.standard.string(forKey: "KilnOpenMedia") {
-                _ = try? media.openForAgent(URL(fileURLWithPath: path))
-            }
-            #endif
-        }
+        // Each activity registers its own agent tools (and so its MCP tools); see ActivityCatalog.
+        let manager = self.manager
+        await ActivityRegistry.standard.registerTools(ToolRegistrationContext(
+            registry: .shared,
+            loadedModule: { identifier in await manager.record(for: identifier)?.module }
+        ))
         await syncUIModules()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
             await activateModule(firstUI)
