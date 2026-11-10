@@ -40,8 +40,8 @@ struct MapPlace: Identifiable, Sendable {
         self.latitude = latitude; self.longitude = longitude; latitudeSpan = span; longitudeSpan = span; revision += 1
     }
     func setLayer(_ value: String) throws {
-        guard ["standard", "imagery", "usgs_topo"].contains(value) else { throw MapsError.invalid("Layer must be standard, imagery, or usgs_topo.") }
-        layer = value
+        guard ["standard", "satellite", "hybrid", "terrain", "imagery", "usgs_topo"].contains(value) else { throw MapsError.invalid("Layer must be standard, satellite, hybrid, terrain, or usgs_topo.") }
+        layer = value == "imagery" ? "satellite" : value
     }
     func addPin(name: String, latitude: Double, longitude: Double) throws {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 200,
