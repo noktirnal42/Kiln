@@ -23,6 +23,12 @@ struct StatusBar: View {
         let audit = WorkstationStatus.audit(chainConfigured: app.auditChain != nil,
                                             droppedEntries: app.auditHealth.snapshot.dropped)
         return HStack(spacing: SSSpacing.m) {
+            Button { workstation.sidebarVisible.toggle() } label: {
+                Image(systemName: "sidebar.left")
+            }
+            .buttonStyle(.plain)
+            .help("Show or hide the sidebar (⌃⌘S)")
+            .accessibilityLabel(workstation.sidebarVisible ? "Hide sidebar" : "Show sidebar")
             HStack(spacing: 6) {
                 SSStatusDot(color: color(for: state), pulsing: state != .idle)
                 Text(WorkstationStatus.agentLabel(state))

@@ -73,7 +73,8 @@ struct SSTabStrip<Tab: Hashable & Identifiable>: View {
             strip(allLabels: true)
             if symbol != nil { strip(allLabels: true, icons: false) }
             if symbol != nil { strip(allLabels: false) }
-            ScrollView(.horizontal, showsIndicators: false) { strip(allLabels: true) }
+            // Last resort: the compact strip, scrollable. Scrolling the full-label strip hid half the tabs off the edge.
+            ScrollView(.horizontal, showsIndicators: false) { strip(allLabels: symbol == nil) }
         }
         .frame(height: SSChrome.headerHeight - 8)
     }
@@ -90,7 +91,7 @@ struct SSTabStrip<Tab: Hashable & Identifiable>: View {
                         }
                     }
                     .foregroundStyle(selected ? Color.primary : Color.secondary)
-                    .padding(.horizontal, !icons ? 7 : (allLabels || selected ? 10 : 7)).padding(.vertical, 5)
+                    .padding(.horizontal, !icons ? 7 : (allLabels ? 10 : (selected ? 8 : 6))).padding(.vertical, 5)
                     .background(selected ? SSColor.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: SSCornerRadius.small))
                     .overlay(alignment: .bottom) {
                         if selected { Capsule().fill(SSColor.accent).frame(height: 2).padding(.horizontal, 8).offset(y: 3) }
@@ -155,6 +156,26 @@ struct SSStatusLine: View {
         HStack(spacing: 6) {
             SSStatusDot(color: color)
             Text(text).font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+        }
+    }
+}
+
+/// A list beside its detail, inside an activity. Use this instead of `NavigationSplitView`: a nested split view adds a
+/// window toolbar (the title bar grows and gains a second sidebar button) and dims its list like an unfocused sidebar.
+struct SSMasterDetail<Master: View, Detail: View>: View {
+    var masterWidth: CGFloat = 260
+    @ViewBuilder var master: () -> Master
+    @ViewBuilder var detail: () -> Detail
+
+    var body: some View {
+        HStack(spacing: 0) {
+            master()
+                .frame(width: masterWidth)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .background(SSColor.surface)
+            Divider()
+            detail()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
 }

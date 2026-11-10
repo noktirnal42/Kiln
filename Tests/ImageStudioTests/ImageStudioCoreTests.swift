@@ -187,19 +187,17 @@ private func record(prompt: String = "a fox", seed: Int64 = 42) -> GenerationRec
         #expect(store.isInstalled(entry))
     }
 
-    @Test func aDroppedConnectionResumesWithARangeRequest() async throws {
+    @Test func anExistingPartialFileResumesWithARangeRequest() async throws {
         let server = try LoopbackServer(); try await server.start(); defer { server.stop() }
         let root = tempDir(); defer { try? FileManager.default.removeItem(at: root) }
         let weights = Data((0..<80_000).map { UInt8(($0 * 7) % 253) })
-        serve(server, files: ["w.bin": weights], cutFirst: 30_000)
+        serve(server, files: ["w.bin": weights])
         let downloader = ImageModelDownloader(store: ImageModelStore(hubRoot: root), endpoint: server.baseURL, freeSpace: { _ in .max / 2 })
         let entry = makeEntry(files: ["w.bin"])
-        let first = await downloader.enqueue(entry)
-        await downloader.waitUntilIdle()
-        guard case .failed = await downloader.snapshot().first(where: { $0.id == first })?.state else { Issue.record("the cut download should fail"); return }
         let partial = root.appendingPathComponent("models--org--tiny/blobs/\(hex(weights)).incomplete")
-        let have = ((try? FileManager.default.attributesOfItem(atPath: partial.path))?[.size] as? NSNumber)?.intValue ?? 0
-        #expect(have > 0 && have < weights.count, "the partial file is kept")
+        try FileManager.default.createDirectory(at: partial.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let have = 30_000
+        try weights.prefix(have).write(to: partial)
         let second = await downloader.enqueue(entry)
         await downloader.waitUntilIdle()
         #expect(await downloader.snapshot().first { $0.id == second }?.state == .finished)

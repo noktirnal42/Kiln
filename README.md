@@ -49,8 +49,13 @@ The sidebar order is also the shortcut order (⌘1 to ⌘9, then ⌘0), and the 
 | ⌘8 | **Browser** | Tabbed WebKit browser the agent can read and drive | Sign-in, autofill and passkeys are unverified; see [browser authentication](docs/18-BROWSER-AUTHENTICATION.md) |
 | ⌘9 | **Devices** | iOS simulators and Android emulators: boot, view, install, launch, logs, record | Apple simulator input is not possible through `simctl`; Windows/Linux is design only |
 | ⌘0 | **Media** | Viewer for video, images and audio; text to speech, speech to text, image generation hooks | Image generation needs Apple Image Playground or a configured endpoint (endpoint path unverified) |
+| — | **Images** | Local SD-Turbo generation, history and model catalog; optional external engines | SDXL and external-engine generation remain unverified; see [Image Studio](docs/18-IMAGE-STUDIO.md) |
 
 Details for each are in the [wiki](https://github.com/noktirnal42/Kiln/wiki) (source in [`docs/wiki/`](docs/wiki/Activities.md)) and on the [website](https://noktirnal42.github.io/Kiln/activities.html).
+
+## Product direction
+
+See the [feature and Maps roadmap](docs/21-EVERYTHING-APP-ROADMAP.md) for reliability priorities, cross-activity workflows, and a proposed MapKit and USGS topographic and historical-map activity. These are proposals, not shipped features.
 
 ## Agent and MCP integration
 

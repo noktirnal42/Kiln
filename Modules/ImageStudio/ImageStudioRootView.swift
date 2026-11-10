@@ -19,6 +19,7 @@ struct ImageStudioRootView: View {
             }, trailing: {
                 if let ready = module.reports.first(where: { $0.status.isReady }) {
                     Text(ready.name).font(SSTypography.caption()).foregroundStyle(.secondary)
+                        .lineLimit(1).frame(maxWidth: 110).help(ready.name)
                 } else {
                     Text("No engine ready").font(SSTypography.caption()).foregroundStyle(.orange)
                 }
@@ -33,7 +34,7 @@ struct ImageStudioRootView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minWidth: 600, minHeight: 520)
         .task { await module.start(); await module.refresh() }
         .onChange(of: module.openRequests) { _, _ in tab = .create }
     }
@@ -47,8 +48,8 @@ private struct CreateView: View {
 
     var body: some View {
         HSplitView {
-            Inspector(module: module, showModels: showModels).frame(minWidth: 280, idealWidth: 320, maxWidth: 400)
-            CanvasPane(module: module).frame(minWidth: 360)
+            Inspector(module: module, showModels: showModels).frame(minWidth: 260, idealWidth: 280, maxWidth: 340)
+            CanvasPane(module: module).frame(minWidth: 300)
         }
     }
 }
@@ -76,6 +77,7 @@ private struct Inspector: View {
                 }
                 SSPaneHeader(title: "Prompt") { EmptyView() }
                 TextEditor(text: $module.draft.prompt).font(.body).frame(height: 84).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SSColor.hairline))
+                    .accessibilityLabel("Image prompt")
                 if caps.supports(.negativePrompt) {
                     TextField("Negative prompt", text: $module.draft.negativePrompt, axis: .vertical).lineLimit(1...3).textFieldStyle(.roundedBorder)
                 }
@@ -282,7 +284,8 @@ private struct CanvasPane: View {
                 Text("\(r.engine) · \(r.modelName) · \(r.request.width)×\(r.request.height) · \(r.request.steps) steps · guidance \(r.request.guidance, specifier: "%.1f") · seed \(r.seed) · \(r.seconds, specifier: "%.1f") s")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
-            HStack {
+            ScrollView(.horizontal) {
+              HStack {
                 Button { Task { await module.rerun(item) } } label: { Label("Re-run", systemImage: "arrow.clockwise") }
                 Button { module.loadSettings(from: item) } label: { Label("Load settings", systemImage: "slider.horizontal.3") }
                 Button { module.useAsReference(item) } label: { Label("Use as reference", systemImage: "photo.badge.arrow.down") }
@@ -291,6 +294,7 @@ private struct CanvasPane: View {
                 Button { module.sendToMedia(item) } label: { Label("Send to Media", systemImage: "play.rectangle") }
                 Button { NSWorkspace.shared.activateFileViewerSelecting([item.url]) } label: { Label("Reveal", systemImage: "magnifyingglass") }
                 Button(role: .destructive) { module.delete(item) } label: { Label("Delete", systemImage: "trash") }
+              }.fixedSize(horizontal: true, vertical: false)
             }
             .controlSize(.small).labelStyle(.titleAndIcon)
         }
@@ -307,6 +311,8 @@ private struct CanvasPane: View {
                                 .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(module.selected?.id == item.id ? SSColor.accent : .clear, lineWidth: 2))
                         }
                     }.buttonStyle(.plain)
+                        .accessibilityLabel(item.record?.request.prompt ?? "Generated image")
+                        .accessibilityAddTraits(module.selected?.id == item.id ? .isSelected : [])
                 }
             }.padding(SSSpacing.xs)
         }
@@ -371,11 +377,11 @@ private struct ModelsView: View {
                         }
                     }.padding(SSSpacing.s)
                 }
-            }.frame(minWidth: 240, idealWidth: 280, maxWidth: 340)
+            }.frame(minWidth: 220, idealWidth: 240, maxWidth: 300)
             VStack(spacing: 0) {
                 HStack {
                     Picker("Source", selection: $source) { ForEach(ImageStudioModule.CatalogSource.allCases) { Text($0.rawValue).tag($0) } }
-                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
                     TextField("Search", text: $query).textFieldStyle(.roundedBorder).onSubmit { Task { await module.showCatalog(source, query: query) } }
                     if module.catalogBusy { ProgressView().controlSize(.small) }
                 }.padding(SSSpacing.s)
@@ -383,7 +389,7 @@ private struct ModelsView: View {
                 if let note = module.catalogMessage { Text(note).font(.caption).foregroundStyle(.orange).padding(.horizontal, SSSpacing.s) }
                 Divider()
                 List(module.catalogRows) { entry in row(entry) }.listStyle(.plain)
-            }.frame(minWidth: 420)
+            }.frame(minWidth: 320)
         }
         .confirmationDialog("Download \(confirming?.name ?? "")?", isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }), presenting: confirming) { entry in
             Button("Download") { Task { await module.download(entry) } }

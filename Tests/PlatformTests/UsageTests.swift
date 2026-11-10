@@ -3,6 +3,19 @@ import Testing
 @testable import Kiln
 
 struct UsageLedgerTests {
+    @Test func invalidFormInputDoesNotBecomeAnUnlimitedBudgetOrFreePrice() {
+        for text in ["abc", "-1", "nan", "inf", "1e999"] {
+            #expect(UsageInput.budget(tokens: "100", dollars: text) == nil)
+            #expect(UsageInput.price(input: text, output: "1") == nil)
+            #expect(UsageInput.price(input: "1", output: text) == nil)
+        }
+        #expect(UsageInput.budget(tokens: "1.5", dollars: "0") == nil)
+        #expect(UsageInput.budget(tokens: "-1", dollars: "0") == nil)
+        #expect(UsageInput.price(input: "", output: "") == nil)
+        #expect(UsageInput.budget(tokens: "", dollars: "")?.dailyTokens == 0)
+        #expect(UsageInput.budget(tokens: " 100 ", dollars: " 2.5 ")?.dailyUSD == 2.5)
+        #expect(UsageInput.price(input: "0", output: "0")?.inputPer1M == 0)
+    }
     private func record(_ model: String, provider: String = "nim", local: Bool = false, input: Int, output: Int, at date: Date = Date()) -> UsageRecord {
         UsageRecord(date: date, providerID: provider, modelID: model, local: local, inputTokens: input, outputTokens: output, conversationID: nil)
     }

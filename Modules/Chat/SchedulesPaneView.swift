@@ -28,7 +28,14 @@ struct SchedulesPaneView: View {
                         }
                         Spacer()
                         Toggle("", isOn: Binding(get: { task.enabled }, set: { var t = task; t.enabled = $0; store.upsert(t); tick += 1 })).labelsHidden()
+                            .accessibilityLabel("Enable \(task.name)")
                         Button("Remove", role: .destructive) { store.remove(task.id); tick += 1 }
+                    }
+                }
+                .overlay {
+                    if store.all.isEmpty {
+                        ContentUnavailableView("No scheduled tasks", systemImage: "calendar.badge.clock",
+                            description: Text("Add a name, prompt and schedule below to create your first task."))
                     }
                 }
                 Divider()
@@ -46,8 +53,11 @@ struct SchedulesPaneView: View {
                                                    repeats: daily ? .daily(hour: parts.hour ?? 9, minute: parts.minute ?? 0) : .everyMinutes(minutes)))
                         Task { await session.platformAuditRecord("schedule.saved", ["name": .string(name), "source": .string("pane")]) }
                         name = ""; prompt = ""; tick += 1
-                    }.disabled(name.isEmpty || prompt.isEmpty)
+                    }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+            } else {
+                ContentUnavailableView("Scheduling unavailable", systemImage: "calendar.badge.exclamationmark",
+                    description: Text("This build does not have a schedule store."))
             }
         }
         .padding(SSSpacing.m).frame(width: 680, height: 500)

@@ -10,6 +10,7 @@ struct UsagePaneView: View {
     @State private var priceModel = ""
     @State private var priceIn = ""
     @State private var priceOut = ""
+    @State private var validationMessage: String?
 
     private var ledger: UsageLedger? { session.usageLedger }
 
@@ -26,7 +27,11 @@ struct UsagePaneView: View {
                     TextField("Daily token budget (0 = none)", text: $budgetTokens).textFieldStyle(.roundedBorder)
                     TextField("Daily USD budget (0 = none)", text: $budgetUSD).textFieldStyle(.roundedBorder)
                     Button("Set budget") {
-                        ledger.setBudget(UsageBudget(dailyTokens: Int(budgetTokens) ?? 0, dailyUSD: Double(budgetUSD) ?? 0)); tick += 1
+                        guard let budget = UsageInput.budget(tokens: budgetTokens, dollars: budgetUSD) else {
+                            validationMessage = "Enter a nonnegative whole token count and a valid dollar amount. Use 0 for no limit."
+                            return
+                        }
+                        ledger.setBudget(budget); validationMessage = "Budget saved."; tick += 1
                     }
                 }
                 HStack {
@@ -34,14 +39,27 @@ struct UsagePaneView: View {
                     TextField("$ / 1M in", text: $priceIn).textFieldStyle(.roundedBorder).frame(width: 90)
                     TextField("$ / 1M out", text: $priceOut).textFieldStyle(.roundedBorder).frame(width: 90)
                     Button("Set price") {
-                        guard !priceModel.isEmpty else { return }
-                        ledger.setPrice(ModelPrice(inputPer1M: Double(priceIn) ?? 0, outputPer1M: Double(priceOut) ?? 0), forModel: priceModel); tick += 1
+                        guard !priceModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                              let price = UsageInput.price(input: priceIn, output: priceOut) else {
+                            validationMessage = "Enter a model ID and valid nonnegative input and output prices."
+                            return
+                        }
+                        ledger.setPrice(price, forModel: priceModel.trimmingCharacters(in: .whitespacesAndNewlines)); validationMessage = "Price saved."; tick += 1
                     }
                 }
+                if let validationMessage { Text(validationMessage).font(.caption).accessibilityLabel(validationMessage) }
                 List {
-                    Section("By provider") { ForEach(ledger.byProvider(), id: \.key) { row($0) } }
-                    Section("By model") { ForEach(ledger.byModel(), id: \.key) { row($0) } }
-                    Section("By day") { ForEach(ledger.daily(), id: \.key) { row($0) } }
+                    if !ledger.all.isEmpty {
+                        Section("By provider") { ForEach(ledger.byProvider(), id: \.key) { row($0) } }
+                        Section("By model") { ForEach(ledger.byModel(), id: \.key) { row($0) } }
+                        Section("By day") { ForEach(ledger.daily(), id: \.key) { row($0) } }
+                    }
+                }
+                .overlay {
+                    if ledger.all.isEmpty {
+                        ContentUnavailableView("No usage recorded", systemImage: "chart.bar",
+                            description: Text("Token usage appears here after a model responds."))
+                    }
                 }
             } else {
                 Text("Usage is not recorded in this build.").foregroundStyle(.secondary)

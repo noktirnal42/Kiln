@@ -5,6 +5,14 @@ MODE="${1:-run}"
 DERIVED_DATA="${KILN_DERIVED_DATA:-$PWD/DerivedData}"
 APP="$DERIVED_DATA/Build/Products/Debug/Kiln.app"
 BINARY="$APP/Contents/MacOS/Kiln"
+# A second copy (especially an XCTest host) shares the bundle identifier and can receive UI actions.
+# Stop the exact target executable before replacing it; leave other builds alone.
+while IFS= read -r pid; do
+  executable="$(ps -p "$pid" -o comm=)"
+  if [[ "$executable" == "$BINARY" || "$executable" == "${BINARY/\/private\/tmp/\/tmp}" ]]; then
+    kill -TERM "$pid"
+  fi
+done < <(pgrep -x Kiln || true)
 xcodebuild -project Kiln.xcodeproj -scheme Kiln -configuration Debug -derivedDataPath "$DERIVED_DATA" build
 case "$MODE" in
   run) /usr/bin/open -n "$APP" ;;

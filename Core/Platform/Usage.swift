@@ -1,5 +1,26 @@
 import Foundation
 
+/// Invalid form input must never silently erase a budget or turn an unknown price into zero.
+enum UsageInput {
+    static func budget(tokens: String, dollars: String) -> UsageBudget? {
+        let tokens = tokens.trimmingCharacters(in: .whitespacesAndNewlines)
+        let dollars = dollars.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let count = Int(tokens.isEmpty ? "0" : tokens), count >= 0,
+              let amount = amount(dollars.isEmpty ? "0" : dollars) else { return nil }
+        return UsageBudget(dailyTokens: count, dailyUSD: amount)
+    }
+
+    static func price(input: String, output: String) -> ModelPrice? {
+        guard let input = amount(input), let output = amount(output) else { return nil }
+        return ModelPrice(inputPer1M: input, outputPer1M: output)
+    }
+
+    private static func amount(_ text: String) -> Double? {
+        guard let value = Double(text.trimmingCharacters(in: .whitespacesAndNewlines)), value.isFinite, value >= 0 else { return nil }
+        return value
+    }
+}
+
 /// Tokens and estimated cost, per provider and model, with daily totals and an optional budget that stops a run.
 /// Costs are estimates: Kiln knows tokens, not invoices. On-device and local models cost nothing; a hosted model has a
 /// price only if the person entered one (Usage pane → prices), otherwise its cost shows as unpriced, never guessed.

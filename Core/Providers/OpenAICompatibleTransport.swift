@@ -142,7 +142,8 @@ public enum OpenAICompatibleTransport {
                 do {
                     var wire = URLRequest(url: url)
                     wire.httpMethod = "POST"
-                    wire.timeoutInterval = 120
+                    // The first-reply preference must not be cut short by URLSession's idle timeout.
+                    wire.timeoutInterval = max(120, firstChunkTimeout + 30)
                     wire.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     wire.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     if !apiKey.isEmpty {

@@ -13,7 +13,7 @@ struct ModelLabExperimentsView: View {
     @State private var showsComparison = false
 
     var body: some View {
-        NavigationSplitView {
+        SSMasterDetail(masterWidth: 260) {
             List(selection: $selection) {
                 ForEach(experiments) { experiment in
                     ExperimentRow(experiment: experiment)
@@ -27,7 +27,8 @@ struct ModelLabExperimentsView: View {
             }
             .overlay {
                 if experiments.isEmpty {
-                    ContentUnavailableView("No experiments", systemImage: "flask", description: Text("Create one, or use the built-in demo experiment."))
+                    SSEmptyState(symbol: "flask", title: "No experiments",
+                                 message: "Create one with the + button above, or ask the agent to start a run with lab_create_experiment.")
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -36,12 +37,14 @@ struct ModelLabExperimentsView: View {
                     Button("Compare runs", systemImage: "rectangle.split.2x1") { showsComparison = true }
                 }
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
         } detail: {
             if let experiment = selection {
                 ExperimentDetailView(module: module, experiment: experiment)
             } else {
-                ContentUnavailableView("Select an experiment", systemImage: "flask")
+                SSEmptyState(symbol: "flask", title: "Select an experiment",
+                             message: "Its configuration, training controls, metrics and exported model appear here.")
             }
         }
         .sheet(isPresented: $showsNewSheet) {

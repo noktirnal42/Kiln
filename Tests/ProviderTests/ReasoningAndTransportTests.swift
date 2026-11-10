@@ -54,6 +54,21 @@ struct ReasoningConfigTests {
 }
 
 struct OpenAICompatibleTransportTests {
+    @Test func wireTimeoutAllowsTheEntireConfiguredFirstReplyWait() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [TimeoutEchoProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        for wait: TimeInterval in [90, 180, 600] {
+            let chunks = try await collect(OpenAICompatibleTransport.stream(
+                url: URL(string: "https://timeout.test/chat")!, apiKey: "",
+                request: ChatRequest(messages: [ChatMessage(role: .user, content: "hello")], model: "test"),
+                session: session, firstChunkTimeout: wait))
+            let timeout = try #require(chunks.compactMap { $0.delta?.content }.first.flatMap(Double.init))
+            #expect(timeout > wait)
+            #expect(timeout >= 120)
+        }
+    }
     @Test func requestEncodesMessagesToolsAndReasoning() throws {
         let request = ChatRequest(
             messages: [ChatMessage(role: .user, content: "hi")],
@@ -151,4 +166,17 @@ struct OpenAICompatibleTransportTests {
             #expect(error == .authenticationFailed)
         }
     }
+}
+
+private final class TimeoutEchoProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "text/event-stream"])!
+        let data = "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\(request.timeoutInterval)\"},\"finish_reason\":null}]}\n\ndata: [DONE]\n\n"
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(data.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }

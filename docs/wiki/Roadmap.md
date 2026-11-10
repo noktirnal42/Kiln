@@ -1,20 +1,13 @@
 # Roadmap
 
-Everything below **Built** is planned or in parallel development and is **not shipped**: none of it is in the current release or the integration branch, and none has been seen working in the app. No dates are promised. The tracker is the place for assignments: [issues](https://github.com/noktirnal42/Kiln/issues). The full list with per-module bars is `docs/17-PARITY-AND-BEYOND.md`.
+The integration branch contains eleven registered activities. The latest public preview can lag behind the development branch; see [releases](https://github.com/noktirnal42/Kiln/releases) and the [current state](https://github.com/noktirnal42/Kiln/blob/main/docs/11-CURRENT-STATE.md) for verification limits. Proposals below are not shipped promises.
 
-## Built (integration branch)
+## Built on the integration branch
 
-- Ten activities declared in one registry, with agent tools or a written reason none exists for each capability
-- Agent loop with Ask, Auto and Bypass approvals, compaction, audit chain, loopback MCP server and shared tool configuration
-- Develop editor with language server, build, test and an LLDB launch debugger
-- Analyze (native inspection, optional Ghidra and radare2), Lab (Create ML, MLX), Browser, Devices, Media
-- Voice, and iPhone and Apple Watch companions built from source
-
-## In parallel development (not shipped)
-
-- **Image studio.** A catalog of open image models with licenses and token flags, resumable checksum-verified downloads into the model store, and engines behind one protocol (in-process on Apple silicon, or an installed Draw Things, ComfyUI or AUTOMATIC1111/Forge). A missing backend shows a setup state; nothing fake is shown. Agent and MCP tools (`image_*`).
-- **Agent platform.** Slash commands, hooks, memory files, plan mode, checkpoints and rewind, a sessions list with worktree isolation, a usage and cost view, per-tool and per-path permission rules.
-- **Develop and Analyze upgrades.** Toward an Xcode and Ghidra bar: symbol outline, refactoring, debugger variables and threads, graph view, structures editor, patching, binary diffing.
+- Home, Agent, Swarm, Develop, Analyze, Lab, Audit, Browser, Devices, Media and Images.
+- Agent platform with memory, slash commands, hooks, plans, sessions, checkpoints, usage and schedules, subject to the verification limits in current state.
+- Image studio has generated images with SD-Turbo locally; other models and external engines need separate verification.
+- Develop and Analyze include editor, debugging and reverse-engineering features; important parity gaps remain.
 
 ## Next
 
@@ -34,4 +27,8 @@ A service, a GUI, an agent tool and MCP tool, a palette entry, an audit record, 
 
 ---
 
-**Verified status.** Items are copied from `docs/17-PARITY-AND-BEYOND.md`, `docs/20-APPLE-CAPABILITIES.md` and `docs/18-BROWSER-AUTHENTICATION.md`; the "in parallel" list reflects what other work sessions were doing when this page was written and may have moved. **Not checked:** the state of those parallel branches; check the tracker before relying on any of it.
+**Verified status.** Items are copied from `docs/17-PARITY-AND-BEYOND.md`, `docs/20-APPLE-CAPABILITIES.md` and `docs/18-BROWSER-AUTHENTICATION.md`; check the tracker and current state before relying on a feature.
+
+## Maps proposal
+
+Explore a native MapKit activity with USGS current topography, historical-sheet discovery, georeferenced overlays, source attribution and approval-gated downloads. It is a proposal, not a shipped activity. See the [research and acceptance criteria](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).

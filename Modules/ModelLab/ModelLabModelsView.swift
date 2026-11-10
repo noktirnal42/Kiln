@@ -22,7 +22,7 @@ struct ModelLabModelsView: View {
     @State private var storeScanned = false
 
     var body: some View {
-        NavigationSplitView {
+        SSMasterDetail(masterWidth: 300) {
             List(selection: $selection) {
                 Section("Library") {
                     ForEach(models) { record in
@@ -78,11 +78,14 @@ struct ModelLabModelsView: View {
                 storeModels = await UniversalModelStore().installedOffPool().filter(\.isLanguageModel)
                 storeScanned = true
             }
+            .listStyle(.inset)
+            .scrollContentBackground(.hidden)
         } detail: {
             if let record = selection {
                 ModelArtifactDetailView(module: module, record: record)
             } else {
-                ContentUnavailableView("Select a model", systemImage: "cube")
+                SSEmptyState(symbol: "cube", title: "Select a model",
+                             message: "Models you trained or imported are under Library. Search Hugging Face in the list to add one.")
             }
         }
     }

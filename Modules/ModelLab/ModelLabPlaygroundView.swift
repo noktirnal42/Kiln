@@ -37,8 +37,12 @@ struct ModelLabPlaygroundView: View {
                     Text(candidate.rawValue).tag(candidate)
                 }
             }
-            .pickerStyle(.segmented)
-            .padding(8)
+            // A menu, not segments: four long backend names were clipped at the right edge at the minimum window width.
+            .pickerStyle(.menu)
+            .fixedSize()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, SSSpacing.m).padding(.vertical, SSSpacing.s)
+            Divider()
 
             if backend == .mlxLocal {
                 HStack {
