@@ -34,3 +34,5 @@ A service, a GUI, an agent tool and MCP tool, a palette entry, an audit record, 
 Explore a native MapKit activity with USGS current topography, historical-sheet discovery, georeferenced overlays, source attribution and approval-gated downloads. It is a proposal, not a shipped activity. See the [research and acceptance criteria](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
 
 Maps and News have initial development implementations; routing, location permissions, live feed workflows and complete end-to-end agent/MCP checks need further verification. [Status](https://github.com/noktirnal42/Kiln/blob/main/docs/23-MAPS-AND-NEWS.md) · [Competitive research](https://github.com/noktirnal42/Kiln/blob/main/docs/22-PARITY-RESEARCH-2026-11-10.md).
+
+The [parity research](https://github.com/noktirnal42/Kiln/blob/main/docs/22-PARITY-RESEARCH-2026-11-10.md) tracks current gaps, planned improvements and proposed activities. Maps and News status and verification are documented [here](https://github.com/noktirnal42/Kiln/blob/main/docs/23-MAPS-AND-NEWS.md).

@@ -58,4 +58,4 @@ Not an activity, but part of the Agent: dictation, spoken replies and a hands-fr
 
 ## Maps and News
 
-The development branch includes Maps (MapKit, USGS Topo and historical catalog discovery, pins and driving directions) and News (ModernReader source directory and feed subscriptions). Both expose agent and MCP tools. These activities are not part of the older preview release; see [scope and verification](https://github.com/noktirnal42/Kiln/blob/main/docs/23-MAPS-AND-NEWS.md).
+The development branch includes Maps (MapKit, USGS Topo and historical catalog discovery, pins and driving directions) and News (ModernReader source directory and feed subscriptions and an All stories view with source, topic and text filters). Both expose agent and MCP tools. These activities are not part of the older preview release; see [scope and verification](https://github.com/noktirnal42/Kiln/blob/main/docs/23-MAPS-AND-NEWS.md).

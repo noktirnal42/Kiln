@@ -51,7 +51,7 @@ The sidebar order is also the shortcut order (⌘1 to ⌘9, then ⌘0), and the 
 | ⌘0 | **Media** | Viewer for video, images and audio; text to speech, speech to text, image generation hooks | Image generation needs Apple Image Playground or a configured endpoint (endpoint path unverified) |
 | — | **Images** | Local SD-Turbo generation, history and model catalog; optional external engines | SDXL and external-engine generation remain unverified; see [Image Studio](docs/18-IMAGE-STUDIO.md) |
 | — | **Maps** | MapKit, USGS Topo, historical catalog, pins and driving directions | Development build; location and routes need live QA |
-| — | **News** | ModernReader source directory and RSS/Atom/JSON feed reader | Development build; subscriptions are local and entries are session-only |
+| — | **News** | ModernReader directory, subscriptions, combined stories and RSS/Atom/JSON feeds | Development build; subscriptions are local and entries are session-only |
 
 Details for each are in the [wiki](https://github.com/noktirnal42/Kiln/wiki) (source in [`docs/wiki/`](docs/wiki/Activities.md)) and on the [website](https://noktirnal42.github.io/Kiln/activities.html).
 

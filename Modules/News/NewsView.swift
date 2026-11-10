@@ -7,6 +7,17 @@ struct NewsView: View {
     @State private var customURL = ""
     @State private var category = "All"
     @State private var showDirectory = false
+    @State private var articleQuery = ""
+    @State private var sourceFilter = "All sources"
+    @State private var topicFilter = "All topics"
+    @State private var sortNewest = true
+    private var visibleArticles: [ParsedItem] {
+        state.articles.filter { article in
+            (sourceFilter == "All sources" || state.articleSources[article.id] == sourceFilter) &&
+            (topicFilter == "All topics" || article.categories.contains(topicFilter)) &&
+            (articleQuery.isEmpty || "\(article.title) \(article.summaryHTML)".localizedCaseInsensitiveContains(articleQuery))
+        }.sorted { sortNewest ? ($0.publishedAt ?? .distantPast) > ($1.publishedAt ?? .distantPast) : ($0.publishedAt ?? .distantFuture) < ($1.publishedAt ?? .distantFuture) }
+    }
     private var sources: [DirectorySource] {
         BuiltInSources.all.filter { (category == "All" || $0.category == category) && (query.isEmpty || "\($0.name) \($0.summary) \($0.tags.joined(separator: " "))".localizedCaseInsensitiveContains(query)) }
     }
@@ -18,6 +29,7 @@ struct NewsView: View {
                     HStack { Text("Sources").font(.headline); Spacer(); Button("Discover") { showDirectory = true } }
                     HStack { TextField("Feed URL", text: $customURL).textFieldStyle(.roundedBorder); Button("Add") { add(customURL) }.disabled(customURL.isEmpty) }
                     List(selection: $state.selected) {
+                        Label("All stories", systemImage: "tray.full").tag(NewsState.all)
                         ForEach(state.sources, id: \.self) { source in
                             HStack { Text(BuiltInSources.all.first(where: { $0.url.absoluteString == source })?.name ?? source).lineLimit(2); Spacer()
                                 Button { state.remove(source) } label: { Image(systemName: "minus.circle") }.buttonStyle(.plain).help("Remove subscription")
@@ -29,14 +41,22 @@ struct NewsView: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 0) {
                     HStack { Text(state.title).font(.headline); Spacer(); if state.busy { ProgressView().controlSize(.small) }; Button("Refresh") { if let source = state.selected { refresh(source) } }.disabled(state.selected == nil || state.busy) }.padding(10)
+                    HStack {
+                        TextField("Search stories", text: $articleQuery).textFieldStyle(.roundedBorder)
+                        Picker("Source", selection: $sourceFilter) { Text("All sources").tag("All sources"); ForEach(Array(Set(state.articleSources.values)).sorted(), id: \.self) { Text($0).tag($0) } }.frame(maxWidth: 180)
+                        Picker("Topic", selection: $topicFilter) { Text("All topics").tag("All topics"); ForEach(Array(Set(state.articles.flatMap(\.categories))).sorted(), id: \.self) { Text($0).tag($0) } }.frame(maxWidth: 160)
+                        Picker("Sort", selection: $sortNewest) { Text("Newest").tag(true); Text("Oldest").tag(false) }.frame(maxWidth: 130)
+                    }.padding(10)
+                    if let message = state.message, !state.articles.isEmpty { Text(message).font(.caption).foregroundStyle(.orange).lineLimit(3).padding(.horizontal, 10) }
                     Divider()
                     if state.articles.isEmpty {
                         ContentUnavailableView("No stories loaded", systemImage: "newspaper", description: Text(state.message ?? "Select a source to fetch its latest entries."))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        List(state.articles) { article in
+                        List(visibleArticles) { article in
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(article.title).font(.headline)
+                                if let source = state.articleSources[article.id] { Text(source).font(.caption).foregroundStyle(.secondary) }
                                 if let date = article.publishedAt { Text(date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary) }
                                 Text(article.summaryHTML.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)).font(.callout).lineLimit(4)
                                 if let url = article.link { Link("Open article", destination: url) }
@@ -46,7 +66,7 @@ struct NewsView: View {
                 }
             }
         }
-        .onChange(of: state.selected) { _, value in if let value { refresh(value) } }
+        .onChange(of: state.selected) { _, value in sourceFilter = "All sources"; topicFilter = "All topics"; if let value { refresh(value) } }
         .sheet(isPresented: $showDirectory) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack { Text("Discover sources").font(.headline); Spacer(); Button("Done") { showDirectory = false } }

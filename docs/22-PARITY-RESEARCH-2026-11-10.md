@@ -26,3 +26,9 @@ Kiln needs real document and workbook round trips, source selection and per-conn
 5. **Measure:** define a public, repeatable task suite with fixed fixtures, baseline apps and versions. Measure completion, correctness, recovery, cost, latency, accessibility and number of interventions. A comparison is not a victory claim until independent tests support it.
 
 Further candidate activities and the Maps design are in [the product roadmap](21-EVERYTHING-APP-ROADMAP.md). Prioritize user workflows and reliability over activity count; do not ship placeholder tabs.
+
+## News: improvements toward a complete reader
+
+The first News view provides a source directory, subscriptions, a combined feed and filtering. To approach a mature reader, add persistent articles and read/unread/starred state; folders and smart topic rules; OPML import/export; feed discovery from websites; conditional and scheduled refresh with progress and backoff; article deduplication across sources; full-text extraction where permitted; offline caching; media enclosures; better accessibility and keyboard navigation; bounded network downloads; and source health diagnostics. Agent and MCP actions should use the same stores, expose filterable results with source/date metadata, and retain approval for network access and edits. Validate with RSS, Atom, RDF, JSON Feed, malformed feeds and real publishers; do not claim a feed's availability from its presence in a directory.
+
+Maps needs editable and durable pins, walking/cycling/transit options where supported, route steps and alternatives, saved areas, measured distances, coordinate entry, geospatial exports, historical sheet overlays with verified projections, elevation, offline policy and source attribution. Test real OS location permission, denied/restricted paths, directions and service outages before claiming navigation parity.
