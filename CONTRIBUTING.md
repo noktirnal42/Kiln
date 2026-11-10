@@ -64,6 +64,6 @@ For UI changes, inspect the result in the app. Check narrow and wide windows, li
 
 Use the PR template. Describe the user-visible problem and resulting behavior, link the issue, list the checks performed and their actual results, and state what remains unverified. Avoid unrelated refactors in a bug fix. Draft PRs are welcome when a design needs discussion.
 
-Contributions must be yours to submit or compatible with the project's MIT license. Keep upstream notices for dependencies and imported code. The MIT license does not replace third-party licenses or grant rights to model weights, datasets, provider services, or trademarks. No contributor license agreement is currently required.
+Contributions must be yours to submit or compatible with the project's license (PolyForm Noncommercial, see LICENSE). Keep upstream notices for dependencies and imported code. The MIT license does not replace third-party licenses or grant rights to model weights, datasets, provider services, or trademarks. By submitting a contribution you accept the [contributor agreement](CLA.md); sign off each commit with `git commit -s`. The agreement lets the project owner keep offering Kiln under commercial terms as well as the public license.
 
 Follow the [Code of Conduct](CODE_OF_CONDUCT.md). See [security reporting](SECURITY.md) for sensitive findings.
