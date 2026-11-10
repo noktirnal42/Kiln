@@ -240,3 +240,35 @@ cannot grant. Codex's experimental native computer-use and MCP agent tools are m
   starter prompts; LM Studio and Ollama-directory scanning; a first-run flow (project, one model, one key); consistent
   header chrome for Lab and Analyze, which still carry their own toolbars; auto-title with a model instead of the
   first line; show reasoning/tool calls inline in the thread like the reference apps.
+
+## Agent platform (2026-11-09, `Core/Platform/`)
+
+Parity work against Claude Code Desktop and Codex (doc 17 §2). Each feature is a service in `Core/Platform/`, UI in the chat, tools named
+`kiln_*` (so the in-app agent and MCP clients get them; enabled for the Coding and Workstation profiles) and an audit record for state changes.
+**Unit-tested; not yet seen in the running app.**
+
+- **Memory files** (`MemoryFiles.swift`, `Modules/Chat/MemoryPaneView.swift`): `KILN.md`, `AGENTS.md`, `CLAUDE.md` from `~/.kiln`, `~/.claude`, `~/.codex`
+  and the project root are read when a run starts and appended to the system prompt (32 KiB per file, identical copies sent once; guidance only, never
+  permissions). The brain button beside the context meter shows their token cost and opens an editor. `kiln_memory_read` / `kiln_memory_write`;
+  audit `memory.saved`. Not done: `@import` lines, nested per-directory files.
+- **Slash commands** (`SlashCommands.swift`, `CommandsPaneView.swift`): `.kiln/commands/**/*.md` (also reads `.claude/commands`), user scope
+  `~/.kiln/commands`; frontmatter `description`, `argument-hint`, `model`; `$ARGUMENTS`, `$1`..`$9`; project overrides user; built-ins `/compact /clear /model
+  /memory /commands /hooks /help` always win. Composer shows completions while typing `/…` (Tab completes). Tools `kiln_command_list/expand/write`; audit
+  `command.invoked`, `command.builtin`, `command.saved`. Not done: command-palette (⌘K) entries.
+- **Hooks** (`Hooks.swift`, `HooksPaneView.swift`): `.kiln/hooks/hooks.json` (project) and `~/.kiln/hooks/hooks.json`; events `pre_tool`, `post_tool`,
+  `prompt_submit`, `stop`; script gets JSON on stdin; exit 2 or `{"decision":"deny"}` blocks, `annotate` adds a note to the tool result or prompt, `allow` is only
+  recorded. pre_tool runs after the policy checks and before the approval gate, so a hook can only make a run stricter. A hook that errors or times out is
+  recorded as `failed` and has no effect. Audit `hook.decision`, `hooks.saved`. `kiln_hooks_list`.
+- **Plan mode** (`PlanMode.swift`, plan card in `ChatRootView`): the Plan toggle or `/plan` runs the agent with `AgentMode.plan` (write/execute tools neither offered nor accepted); its final
+  reply becomes a plan card with Approve and run, Edit, Reject. Approval starts a normal run with the (edited) plan. Audit `plan.mode/proposed/approved/rejected`.
+- **Checkpoints and rewind** (`Checkpoints.swift`): before `write_file`/`edit_file`/`delete_file` the old file is saved under `Application Support/Kiln/Checkpoints`, grouped by the user message.
+  Right-click a user message → "Rewind to here (restore files)" or "Rewind conversation only" (hover button when a checkpoint exists). Files outside the project are never touched; a file changed by
+  someone else after the run is left alone and reported; commands (`run_command`, `git_commit`, …) are listed as not undone. The rewound message goes back in the message box. Audit `checkpoint.created/rewound`.
+- **Sessions** (`Sessions.swift`, `/sessions`): every conversation with Running / Waiting for approval / Idle, Open and Fork. Dock badge and a system notification when a run needs approval and Kiln is not in front.
+  **Not done:** runs do not continue in the background while another conversation is open (opening one stops the current run), and worktree-per-task.
+- **Usage and cost** (`Usage.swift`, `/cost`): ledger of tokens per provider, model and day (`Application Support/Kiln/Usage`). Cost is an estimate from prices you enter; local models are 0, hosted
+  models without a price show as unpriced. A daily token and/or USD budget stops a run before its next model call (`UsageBudgetGate`, audit `usage.budget_stop`). Agent runs record a total only (no input/output split).
+- **Scheduled tasks** (`Schedules.swift`, `/schedule`): every N minutes or daily at HH:mm, runs a prompt with a profile in its own conversation while Kiln is open; approvals still apply. Audit `schedule.run/saved`.
+- **Verifier** (`Verifier.swift`): with `defaults write com.kiln.app agent.verifier.model <model id>` a second model checks each final answer against the run's tool results and lists unsupported claims under the reply
+  (audit `verifier.report`). No settings control yet; advisory only.
+- All of the above are unit-tested with stub providers; **none has been seen in the running app** (GUI checks were deferred to the lead).

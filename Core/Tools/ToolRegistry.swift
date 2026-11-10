@@ -19,6 +19,8 @@ public struct ToolServices: Sendable {
     /// A web-search backend key (e.g. Tavily). Nil means search is not
     /// configured, and the tool must say so specifically — never fake it.
     public var webSearchKey: (@Sendable () -> String?)?
+    /// Where tools that change platform state (memory, commands, hooks) record it. Set by the orchestrator per call.
+    public var audit: PlatformAudit?
 
     public init(
         git: GitService? = nil,

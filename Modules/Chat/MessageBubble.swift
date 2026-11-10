@@ -24,6 +24,12 @@ struct MessageBubble: View {
         .contextMenu {
             Button("Copy") { copy() }
             Button("Fork from here") { Task { await session.fork(at: message.id) } }
+            if message.role == .user {
+                Button("Rewind to here (restore files)") { Task { await session.rewind(to: message.id, restoreFiles: true) } }
+                    .disabled(session.isStreaming)
+                Button("Rewind conversation only") { Task { await session.rewind(to: message.id, restoreFiles: false) } }
+                    .disabled(session.isStreaming)
+            }
             Button("Delete", role: .destructive) { Task { await session.deleteMessage(message.id) } }
         }
     }
@@ -106,6 +112,9 @@ struct MessageBubble: View {
                 actionButton("arrow.clockwise", "Regenerate") { Task { await session.regenerate() } }
             }
             actionButton("arrow.triangle.branch", "Fork conversation from here") { Task { await session.fork(at: message.id) } }
+            if message.role == .user, session.checkpointedMessageIDs.contains(message.id) {
+                actionButton("arrow.uturn.backward", "Rewind to before this message, restoring the files the agent changed") { Task { await session.rewind(to: message.id) } }
+            }
             actionButton("trash", "Delete message") { Task { await session.deleteMessage(message.id) } }
             if message.role == .assistant {
                 Text(meta)

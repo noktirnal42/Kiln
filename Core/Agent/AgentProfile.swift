@@ -117,7 +117,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
                     "list_directory", "glob_files", "grep_files", "search_workspace",
                     "run_command", "stream_command", "background_command", "read_command_output",
                     "git_status", "git_diff", "git_commit", "git_branch", "git_log",
-                    "web_fetch", "web_search", "list_skills", "read_skill",
+                    "web_fetch", "web_search", "list_skills", "read_skill", "kiln_*",
                 ],
                 policyByLevel: ToolPermissionSet.conservativeDefaults
             ),

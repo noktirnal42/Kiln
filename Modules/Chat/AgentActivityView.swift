@@ -220,7 +220,7 @@ struct ContextMeterView: View {
                 .help("Compact now: summarise the earlier conversation to free context (same as /compact)")
                 .accessibilityLabel("Compact conversation")
             }
-            .help(Self.tooltip(usage, summarised: session.hasContextSummary))
+            .help(Self.tooltip(usage, summarised: session.hasContextSummary, memoryTokens: session.memory.totalTokens))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Context \(usage.percent) percent used")
         }
@@ -230,9 +230,10 @@ struct ContextMeterView: View {
         usage.fraction >= 0.9 ? SSColor.danger : usage.fraction >= 0.7 ? SSColor.warning : Color.secondary
     }
 
-    static func tooltip(_ usage: ContextUsage, summarised: Bool) -> String {
+    static func tooltip(_ usage: ContextUsage, summarised: Bool, memoryTokens: Int = 0) -> String {
         var text = "Context: about \(usage.used.formatted()) of \(usage.window.formatted()) tokens (\(usage.percent)%). An estimate: it counts the conversation, the system prompt and the tool list."
         text += "\nAt about 70% Kiln clears old tool output, then summarises the earlier conversation, on its own."
+        if memoryTokens > 0 { text += "\nMemory files (KILN.md, AGENTS.md, CLAUDE.md): \(memoryTokens.formatted()) tokens of that." }
         if summarised { text += "\nEarlier messages are already replaced by a summary." }
         text += "\n/compact does it now."
         return text
@@ -300,6 +301,12 @@ struct PermissionModeMenu: View {
 struct AgentModeBar: View {
     @Bindable var session: ChatSession
     @State private var showModelPicker = false
+    @State private var showMemory = false
+    @State private var showCommands = false
+    @State private var showHooks = false
+    @State private var showSessions = false
+    @State private var showUsage = false
+    @State private var showSchedules = false
 
     var body: some View {
         HStack(spacing: SSSpacing.s) {
@@ -323,6 +330,9 @@ struct AgentModeBar: View {
             .disabled(session.orchestrator == nil)
             .help("Let the model use tools. Writes and commands ask for your approval.")
             if session.agentEnabled {
+                Toggle(isOn: $session.planMode) { Label("Plan", systemImage: "list.bullet.clipboard") }
+                    .toggleStyle(.button).controlSize(.small)
+                    .help("Plan mode: the agent explores read-only, then proposes a plan you approve before anything changes (/plan)")
                 Picker("", selection: $session.agentProfileIndex) {
                     ForEach(Array(session.agentProfiles.enumerated()), id: \.offset) { index, profile in
                         Text(profile.name).tag(index)
@@ -337,11 +347,30 @@ struct AgentModeBar: View {
                 }
             }
             Spacer()
+            Button { showMemory = true } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "brain").font(.system(size: 10))
+                    if session.memory.totalTokens > 0 { Text(session.memory.totalTokens.formatted()).font(SSTypography.caption()).monospacedDigit() }
+                }
+            }
+            .buttonStyle(.borderless)
+            .help(session.memory.injected.isEmpty ? "Memory: no KILN.md, AGENTS.md or CLAUDE.md found. Click to create one." : "Memory files in use: \(session.memory.injected.map(\.name).joined(separator: ", ")) (\(session.memory.totalTokens.formatted()) tokens). Click to edit.")
+            .accessibilityLabel("Memory files")
             ContextMeterView(session: session)
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.top, SSSpacing.xs)
         .sheet(isPresented: $showModelPicker) { ModelPickerView(session: session) }
+        .sheet(isPresented: $showMemory) { MemoryPaneView(session: session) }
+        .sheet(isPresented: $showCommands) { CommandsPaneView(session: session) }
+        .sheet(isPresented: $showHooks) { HooksPaneView(session: session) }
+        .sheet(isPresented: $showSessions) { SessionsPaneView(session: session) }
+        .sheet(isPresented: $showUsage) { UsagePaneView(session: session) }
+        .sheet(isPresented: $showSchedules) { SchedulesPaneView(session: session) }
+        .onChange(of: session.requestedPane) { _, pane in
+            switch pane { case .memory: showMemory = true; case .commands: showCommands = true; case .hooks: showHooks = true; case .sessions: showSessions = true; case .usage: showUsage = true; case .schedules: showSchedules = true; case nil: break }
+            session.requestedPane = nil
+        }
     }
 
     private var modelLabel: String {
@@ -349,5 +378,35 @@ struct AgentModeBar: View {
         if id.isEmpty { return "Select model" }
         let bare = id.split(separator: "/").last.map(String.init) ?? id
         return bare.count > 26 ? String(bare.prefix(25)) + "…" : bare
+    }
+}
+
+
+/// The agent's proposed plan, with Approve (runs it), Edit and Reject. Nothing has been changed when this shows.
+struct PlanCardView: View {
+    let session: ChatSession
+    let plan: PlanProposal
+    @State private var editing = false
+    @State private var draft = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SSSpacing.s) {
+            Label("Plan — nothing has been changed yet", systemImage: "list.bullet.clipboard").font(SSTypography.headline())
+            if editing {
+                TextEditor(text: $draft).font(.system(size: 12)).frame(minHeight: 160, maxHeight: 320)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.25)))
+            } else {
+                MarkdownBlockView(text: plan.text)
+            }
+            HStack {
+                Button("Approve and run") { Task { await session.approvePlan(editedText: editing ? draft : nil) } }
+                    .buttonStyle(.borderedProminent).disabled(session.isStreaming)
+                Button(editing ? "Discard edits" : "Edit") { draft = plan.text; editing.toggle() }
+                Button("Reject", role: .destructive) { Task { await session.rejectPlan() } }
+                Spacer()
+            }
+        }
+        .padding(SSSpacing.m)
+        .background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 8))
     }
 }

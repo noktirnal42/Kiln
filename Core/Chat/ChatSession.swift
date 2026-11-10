@@ -108,6 +108,251 @@ public final class ChatSession {
     private var compactionDefaults: UserDefaults?
     nonisolated static let compactionKey = "chat.compaction.v1"
 
+    // MARK: Memory files
+    /// KILN.md / AGENTS.md / CLAUDE.md for the user and the open project, read when a run starts.
+    public private(set) var memory = MemorySnapshot.empty
+    /// The user's home for user-scope memory; nil under tests so a developer's own files never leak in.
+    let memoryHome: URL?
+    var platformAudit: PlatformAudit { PlatformAudit(chain: orchestrator?.auditChain) }
+
+    public func reloadMemory() {
+        memory = MemoryLoader.load(workspaceRoot: workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }, home: memoryHome)
+    }
+
+    /// Saves one memory file from the pane, records it in the audit chain, and re-reads memory.
+    public func saveMemory(path: String, text: String) async throws {
+        let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let existed = FileManager.default.fileExists(atPath: path)
+        try MemoryLoader.save(text, path: path, workspaceRoot: root, home: memoryHome)
+        await platformAudit.record("memory.saved", [
+            "path": .string(path), "bytes": .int(text.utf8.count), "created": .bool(!existed), "source": .string("pane"),
+        ])
+        reloadMemory()
+        updateContextMeter()
+    }
+
+    /// The profile as a run uses it: its own prompt plus the memory files.
+    func effectiveProfile(_ profile: AgentProfile) -> AgentProfile {
+        var profile = profile
+        profile.systemPrompt += memory.promptSection
+        return profile
+    }
+
+    // MARK: Verifier
+    /// The model that re-checks each reply against the tool evidence; empty = off (UserDefaults `agent.verifier.model`).
+    nonisolated static let verifierModelKey = "agent.verifier.model"
+    public private(set) var verifierReport: VerifierReport?
+
+    func verify(answer: String, evidence: [ToolCallRecord], conversationID: UUID) async {
+        let model = UserDefaults.standard.string(forKey: Self.verifierModelKey) ?? ""
+        guard !model.isEmpty, !answer.isEmpty else { verifierReport = nil; return }
+        let registry = registry
+        let items = evidence.map { VerifierEvidence(tool: $0.toolName, arguments: $0.argumentsJSON, status: $0.status.rawValue, excerpt: $0.errorText ?? $0.resultText ?? "") }
+        let report = await ClaimVerifier.verify(answer: answer, evidence: items, model: model) { model, system, prompt in
+            var text = ""
+            let request = ChatRequest(messages: [ChatMessage(role: .system, content: system), ChatMessage(role: .user, content: prompt)], model: model, temperature: 0, maxTokens: 800)
+            for try await chunk in try await registry.streamChat(request, reasoning: nil) { text += chunk.delta?.content ?? "" }
+            return text
+        }
+        verifierReport = report
+        await platformAudit.record("verifier.report", ["model": .string(model), "findings": .int(report.findings.count), "available": .bool(report.unavailable == nil)])
+    }
+
+    // MARK: Scheduled tasks
+    public func platformAuditRecord(_ type: String, _ payload: [String: AuditValue]) async { await platformAudit.record(type, payload) }
+    let scheduleStore: ScheduleStore?
+    private var schedulerTask: Task<Void, Never>?
+
+    /// Checks every 30 seconds for due tasks. Call once at launch.
+    public func startScheduler() {
+        guard schedulerTask == nil, scheduleStore != nil else { return }
+        schedulerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                await self?.runDueTasks()
+            }
+        }
+    }
+
+    /// Runs each due task as a normal agent run in its own conversation, one at a time. A busy session defers them.
+    public func runDueTasks(now: Date = Date()) async {
+        guard let scheduleStore, !isStreaming else { return }
+        for task in scheduleStore.due(now: now) {
+            guard !isStreaming else { return }
+            scheduleStore.markRun(task.id, at: now)
+            await newConversation()
+            await renameConversation(to: "⏱ \(task.name)")
+            if let index = agentProfiles.firstIndex(where: { $0.name == task.profileName }) { agentProfileIndex = index }
+            agentEnabled = true
+            planMode = false
+            await platformAudit.record("schedule.run", ["name": .string(task.name), "profile": .string(task.profileName), "schedule": .string(task.describe)])
+            await send(task.prompt)
+            attention?.scheduledTaskFinished(name: task.name)
+        }
+    }
+
+    // MARK: Usage and budget
+    let usageLedger: UsageLedger?
+    private var modelMeta: [String: (provider: String, local: Bool)] = [:]
+
+    private func providerInfo(for modelID: String) -> (provider: String, local: Bool) {
+        modelMeta[modelID] ?? (modelID.split(separator: "/").first.map(String.init) ?? "unknown", false)
+    }
+
+    private func recordUsage(tokens: Int, model: String, conversationID: UUID) {
+        guard let usageLedger, tokens > 0 else { return }
+        let info = providerInfo(for: model)
+        usageLedger.record(UsageRecord(date: Date(), providerID: info.provider, modelID: model, local: info.local,
+                                       inputTokens: tokens, outputTokens: 0, conversationID: conversationID))
+    }
+
+    // MARK: Sessions
+    /// Per conversation: running, waiting for approval, or idle. Only the open conversation runs here at a time.
+    public private(set) var sessionStates: [UUID: SessionState] = [:]
+    /// Notifies and badges the Dock when a run needs approval. Set by the app; nil under tests unless a test sets one.
+    public var attention: (any AttentionSink)?
+    private var pendingApprovals = 0
+
+    func setSessionState(_ state: SessionState, for id: UUID) {
+        sessionStates[id] = state == .idle ? nil : state
+    }
+
+    public func sessionRows() async -> [SessionRow] {
+        SessionList.rows(await conversations(), states: sessionStates, open: conversationID)
+    }
+
+    /// Fork a session from its latest message and open the fork.
+    public func forkLatest(of id: UUID) async {
+        await loadConversation(id)
+        if let last = messages.last { await fork(at: last.id) }
+    }
+
+    // MARK: Checkpoints and rewind
+    let checkpointStore: CheckpointStore?
+    /// User messages whose run changed files or ran commands, so the thread can offer "Rewind to here".
+    public private(set) var checkpointedMessageIDs: Set<UUID> = []
+
+    func refreshCheckpoints() {
+        guard let checkpointStore, let conversationID else { checkpointedMessageIDs = []; return }
+        checkpointedMessageIDs = Set(checkpointStore.all(conversationID: conversationID).filter { !$0.rewound }.map(\.messageID))
+    }
+
+    /// Rewinds the conversation to just before `messageID` (which must be a user message): later messages are removed and the
+    /// text goes back in the message box. With `restoreFiles`, files the agent changed since then are put back too.
+    @discardableResult
+    public func rewind(to messageID: UUID, restoreFiles: Bool = true) async -> RewindReport? {
+        guard !isStreaming, let conversationID, let index = messages.firstIndex(where: { $0.id == messageID }) else { return nil }
+        var report = RewindReport()
+        if restoreFiles, let checkpointStore, let workspaceRoot {
+            report = checkpointStore.rewind(conversationID: conversationID, messages: messages.map(\.id), from: messageID,
+                                            workspaceRoot: URL(fileURLWithPath: workspaceRoot, isDirectory: true))
+        }
+        let removed = Array(messages[index...])
+        for message in removed { try? await conversations.deleteMessage(message.id) }
+        messages.removeSubrange(index...)
+        if var state = compactions[conversationID] {
+            state.covered = min(state.covered, messages.count)
+            if state.covered == 0 { state.summary = nil }
+            state.notes.removeAll { $0.afterMessageCount > messages.count }
+            compactions[conversationID] = state
+            saveCompactions()
+            contextNotes = state.notes
+        }
+        if removed.first?.role == .user { draft = removed[0].content }
+        agentNotice = restoreFiles ? "Rewound to before this message. " + report.summary : "Rewound the conversation; files were not changed."
+        await platformAudit.record("checkpoint.rewound", [
+            "messages_removed": .int(removed.count), "files_restored": .int(report.restored.count),
+            "files_removed": .int(report.deleted.count), "files_skipped": .int(report.skipped.count),
+            "unrestorable_commands": .int(report.unrestorable.count), "restore_files": .bool(restoreFiles),
+        ])
+        refreshCheckpoints()
+        updateContextMeter()
+        return report
+    }
+
+    // MARK: Plan mode
+    /// While on, runs are read-only and end with a plan for the person to approve.
+    public var planMode = false
+    public private(set) var pendingPlan: PlanProposal?
+
+    public func approvePlan(editedText: String? = nil) async {
+        guard let plan = pendingPlan else { return }
+        let text = (editedText ?? plan.text).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        pendingPlan = nil
+        planMode = false
+        await platformAudit.record("plan.approved", ["characters": .int(text.count), "edited": .bool(text != plan.text.trimmingCharacters(in: .whitespacesAndNewlines))])
+        await send(PlanMode.approvedPrompt(plan: text))
+    }
+
+    public func rejectPlan() async {
+        guard pendingPlan != nil else { return }
+        pendingPlan = nil
+        await platformAudit.record("plan.rejected")
+    }
+
+    // MARK: Slash commands
+    public enum Pane: Equatable { case memory, commands, hooks, sessions, usage, schedules }
+    /// A pane a slash command asked the chat to open.
+    public var requestedPane: Pane?
+
+    public func availableCommands() -> [SlashCommand] {
+        SlashCommands.all(workspaceRoot: workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }, home: memoryHome)
+    }
+
+    /// Runs a built-in command. Returns nothing to send.
+    private func runBuiltIn(_ command: BuiltInCommand, arguments: String) async {
+        switch command {
+        case .compact: await compactNow()
+        case .clear: await newConversation()
+        case .plan:
+            planMode = PlanMode.parse(arguments) ?? !planMode
+            agentNotice = planMode ? "Plan mode on: the agent explores read-only and proposes a plan." : "Plan mode off."
+            await platformAudit.record("plan.mode", ["on": .bool(planMode)])
+        case .cost: requestedPane = .usage
+        case .schedule: requestedPane = .schedules
+        case .memory: reloadMemory(); requestedPane = .memory
+        case .commands: requestedPane = .commands
+        case .hooks: requestedPane = .hooks
+        case .sessions: requestedPane = .sessions
+        case .help:
+            agentNotice = availableCommands().map { "/\($0.name) — \($0.summary)" }.joined(separator: "\n")
+        case .model:
+            let query = arguments.lowercased()
+            guard !query.isEmpty else { agentNotice = "Model: \(selectedModelID.isEmpty ? "none" : selectedModelID). Use /model <part of a name> to switch."; return }
+            let models = await registry.allModels()
+            if let match = models.first(where: { $0.id.lowercased() == query }) ?? models.first(where: { $0.id.lowercased().contains(query) || $0.name.lowercased().contains(query) }) {
+                selectedModelID = match.id
+                recordRecent(modelID: match.id)
+                await refreshContext()
+                agentNotice = "Model: \(match.id)"
+            } else {
+                errorText = "No model matches “\(arguments)”."
+            }
+        }
+        await platformAudit.record("command.builtin", ["name": .string(command.rawValue)])
+    }
+
+    /// Saves a command file from the pane (project or user scope) and records it in the audit chain.
+    public func saveCommandFile(path: String, name: String, text: String) async throws {
+        let url = URL(fileURLWithPath: path)
+        let existed = FileManager.default.fileExists(atPath: path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        await platformAudit.record("command.saved", ["path": .string(path), "name": .string(name), "created": .bool(!existed), "source": .string("pane")])
+    }
+
+    /// Writes `.kiln/hooks/hooks.json` for the project after checking it parses, and records it in the audit chain.
+    public func saveHooksFile(_ text: String) async throws {
+        guard let workspaceRoot else { throw MemoryLoader.SaveError.notAMemoryFile("no project open") }
+        struct File: Decodable { var hooks: [HookDefinition] }
+        let parsed = try JSONDecoder().decode(File.self, from: Data(text.utf8))
+        let url = URL(fileURLWithPath: workspaceRoot).appendingPathComponent(".kiln/hooks/hooks.json")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        await platformAudit.record("hooks.saved", ["path": .string(url.path), "hooks": .int(parsed.hooks.count)])
+    }
+
     public var agentProfiles: [AgentProfile] { AgentProfile.builtIns.filter { !$0.toolPermissions.enabledTools.isEmpty } }
     public var agentProfile: AgentProfile? {
         let all = agentProfiles
@@ -121,10 +366,12 @@ public final class ChatSession {
         guard let url else { WorkspaceStore.shared.clearCurrent(); workspaceRoot = nil; return }
         _ = try? WorkspaceStore.shared.remember(url)
         workspaceRoot = url.path
+        reloadMemory()
+        updateContextMeter()
     }
 
     public func openRecentWorkspace(_ entry: WorkspaceStore.Entry) {
-        if let url = WorkspaceStore.shared.open(path: entry.path) { workspaceRoot = url.path }
+        if let url = WorkspaceStore.shared.open(path: entry.path) { workspaceRoot = url.path; reloadMemory(); updateContextMeter() }
     }
 
     public var selectedModelID: String
@@ -144,8 +391,16 @@ public final class ChatSession {
         fileIndexService: FileIndexService = FileIndexService(),
         workspaceRoot: String? = nil,
         initialModelID: String = "",
-        compactionDefaults: UserDefaults? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil
+        compactionDefaults: UserDefaults? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil,
+        memoryHome: URL? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? FileManager.default.homeDirectoryForCurrentUser : nil,
+        checkpointStore: CheckpointStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil,
+        usageLedger: UsageLedger? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil,
+        scheduleStore: ScheduleStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil
     ) {
+        self.scheduleStore = scheduleStore
+        self.usageLedger = usageLedger
+        self.memoryHome = memoryHome
+        self.checkpointStore = checkpointStore
         self.registry = registry
         self.conversations = conversations
         self.artifacts = artifacts
@@ -206,6 +461,7 @@ public final class ChatSession {
             }
             errorText = page.truncated ? "Showing the last \(page.messages.count) of \(page.total) messages." : nil
             contextNotes = compactions[id]?.notes ?? []
+            refreshCheckpoints()
             await refreshContext()
         } catch {
             errorText = "Could not load conversation: \(error)"
@@ -288,9 +544,17 @@ public final class ChatSession {
     // MARK: Streaming
 
     public func send(_ text: String) async {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isStreaming else { return }
-        if Self.isCompactCommand(trimmed) { await compactNow(); return }
+        switch SlashCommands.resolve(trimmed, commands: availableCommands()) {
+        case .plainMessage: break
+        case .builtIn(let command, let arguments): await runBuiltIn(command, arguments: arguments); return
+        case .unknown(let name): errorText = "Unknown command /\(name). Type /help for the list."; return
+        case .prompt(let expanded, let name, let model):
+            if let model, !model.isEmpty, await registry.allModels().contains(where: { $0.id == model }) { selectedModelID = model }
+            await platformAudit.record("command.invoked", ["name": .string(name), "argument_characters": .int(trimmed.count)])
+            trimmed = expanded
+        }
         guard !selectedModelID.isEmpty else {
             errorText = "No model selected. Pick one in the model picker."
             return
@@ -473,8 +737,19 @@ public final class ChatSession {
         let prompt = messages[promptIndex].content
         let history = Self.agentHistory(messages: messages, upTo: promptIndex, compaction: compactions[conversationID])
         let window = await contextWindow(for: selectedModelID)
-        var profile = profile
+        reloadMemory()
+        var profile = effectiveProfile(profile)
         profile.modelID = selectedModelID
+        let planning = planMode
+        if planning { profile.mode = .plan; profile.systemPrompt += PlanMode.instructions }
+        pendingPlan = nil
+        verifierReport = nil
+        setSessionState(.running, for: conversationID)
+        let recorder: CheckpointRecorder? = {
+            guard let checkpointStore, let rootPath = workspaceRoot, !planning else { return nil }
+            let root = URL(fileURLWithPath: rootPath, isDirectory: true)
+            return CheckpointRecorder(store: checkpointStore, conversationID: conversationID, messageID: messages[promptIndex].id, workspaceRoot: root)
+        }()
         let stop = AgentStopFlag()
         agentStop = stop
         agentActivity = []
@@ -485,6 +760,8 @@ public final class ChatSession {
         let reasoning = reasoning
         let store = conversations
         let model = selectedModelID
+        let hooks = HookRunner.load(workspaceRoot: root, home: memoryHome)
+        let gate = usageLedger.map { UsageBudgetGate(ledger: $0, modelID: model, local: providerInfo(for: model).local) }
 
         let startedAt = Date()
         let task = Task { [weak self] in
@@ -492,7 +769,7 @@ public final class ChatSession {
             var tokens = 0
             var firstTokenAt: Date?
             let stream = orchestrator.run(
-                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop,
+                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop, hooks: hooks, checkpoint: recorder, budgetGate: gate?.isActive == true ? gate : nil,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
             )
             do {
@@ -514,12 +791,20 @@ public final class ChatSession {
                     case .contextCompacted(let compaction):
                         self.recordCompaction(compaction, conversationID: conversationID, promptIndex: promptIndex)
                     case .finished(let summary): finalText = summary.finalText; tokens = summary.totalTokens
+                    case .awaitingApproval(let request):
+                        self.setSessionState(.waitingForApproval, for: conversationID)
+                        self.pendingApprovals += 1
+                        self.attention?.needsApproval(tool: request.toolName, conversation: self.conversationTitle, pending: self.pendingApprovals)
+                    case .approvalResolved:
+                        self.setSessionState(.running, for: conversationID)
+                        self.pendingApprovals = max(0, self.pendingApprovals - 1)
+                        self.attention?.cleared(pending: self.pendingApprovals)
                     default: break
                     }
                     Self.apply(event, to: &self.agentActivity)
                 }
             } catch {
-                self?.errorText = AgentRetry.explain(error)
+                self?.errorText = (error as? AgentRunError)?.description ?? AgentRetry.explain(error)
             }
             self?.lastTiming = ResponseTiming(firstTokenSeconds: firstTokenAt.map { $0.timeIntervalSince(startedAt) },
                                               totalSeconds: Date().timeIntervalSince(startedAt))
@@ -540,6 +825,20 @@ public final class ChatSession {
             ) {
                 self?.messages.append(saved)
             }
+            self?.recordUsage(tokens: tokens, model: model, conversationID: conversationID)
+            if !finalText.isEmpty, let self { await self.verify(answer: finalText, evidence: self.agentActivity, conversationID: conversationID) }
+            if let recorder, let made = recorder.finish() {
+                await self?.platformAudit.record("checkpoint.created", [
+                    "files": .int(made.files.count), "unrestorable_commands": .int(made.unrestorable.count), "message_id": .string(made.messageID.uuidString),
+                ])
+                self?.refreshCheckpoints()
+            }
+            if planning, let self, self.errorText == nil, !finalText.isEmpty, !stop.stopped {
+                self.pendingPlan = PlanProposal(text: finalText, request: prompt)
+                await self.platformAudit.record("plan.proposed", ["characters": .int(finalText.count)])
+            }
+            self?.setSessionState(.idle, for: conversationID)
+            if let self, self.pendingApprovals > 0 { self.pendingApprovals = 0; self.attention?.cleared(pending: 0) }
             self?.updateContextMeter()
             self?.streamingText = ""
             self?.streamingReasoning = ""
@@ -615,12 +914,16 @@ public final class ChatSession {
         if override > 0 { windowCache[modelID] = override; return override }
         if let cached = windowCache[modelID] { return cached }
         let models = await registry.allModels()
-        for model in models { windowCache[model.id] = model.contextWindow }
+        for model in models {
+            windowCache[model.id] = model.contextWindow
+            modelMeta[model.id] = (model.providerID, model.isOnDevice || [.ollama, .mlx, .appleFoundation, .applePCC].contains(model.providerType))
+        }
         return windowCache[modelID]
     }
 
     /// Looks up the model's window and refreshes the meter. Call when the model or conversation changes.
     public func refreshContext() async {
+        reloadMemory()
         _ = await contextWindow(for: selectedModelID)
         updateContextMeter()
     }
@@ -629,7 +932,7 @@ public final class ChatSession {
     public func updateContextMeter() {
         guard let window = windowCache[selectedModelID], let profile = agentProfile else { contextUsage = nil; return }
         let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
-        var tokens = ContextCompactor.estimateTokens(profile.systemPrompt)
+        var tokens = ContextCompactor.estimateTokens(effectiveProfile(profile).systemPrompt)
         tokens += ContextCompactor.estimateTokens(Self.agentHistory(messages: messages, upTo: messages.count,
                                                                     compaction: conversationID.flatMap { compactions[$0] }))
         if let orchestrator {
@@ -652,7 +955,7 @@ public final class ChatSession {
         isCompacting = true
         defer { isCompacting = false }
         errorText = nil
-        var profile2 = profile
+        var profile2 = effectiveProfile(profile)
         profile2.modelID = selectedModelID
         let history = Self.agentHistory(messages: messages, upTo: messages.count, compaction: compactions[conversationID])
         let registry = registry, reasoning = reasoning

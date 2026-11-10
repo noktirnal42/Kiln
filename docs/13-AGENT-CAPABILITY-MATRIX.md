@@ -23,6 +23,8 @@ These activity capabilities currently lack a dedicated agent tool. The IDs corre
 
 - `agent.artifacts` — Create and export artifacts. Gap: artifact creation, rendering and export have no tool yet (docs/13, Chat and artifacts).
 - `agent.new-conversation` — Start a new conversation. Gap: conversation management has no tool yet (docs/13, Chat and artifacts); an agent starting its own fresh context is better served by compaction.
+- `agent.sessions` — List sessions with status; resume and fork them. Gap: the conversation store is not yet reachable from tools; the Sessions pane (`/sessions`) covers it for the person.
+- `agent.verifier` — Check a reply against the tool evidence with a second model. Deliberate that the agent cannot run it; gap: the model is set with the `agent.verifier.model` default, no settings control yet.
 - `analyze.delete-project` — Delete a project. Gap: no delete tool yet; destructive, so it needs an approval-gated adapter before it is offered.
 - `analyze.device-bench` — Device bench: connect, read registers and memory. Gap: device-bench operations need a dedicated adapter with its own limits (docs/13, Reverse engineering).
 - `analyze.select-project` — Choose the open project. Gap: tools take a project id, but there is no tool to list projects or to set the one on screen (docs/13, Reverse engineering).
@@ -83,3 +85,14 @@ A hosted model (Ollama Cloud `gemma4:31b`, Workstation Agent profile, Kiln Debug
 ## Small language model from scratch, driven by the agent (2026-11-02)
 
 With `lab_import_dataset` → `lab_start_small_lm` (100 iterations, 64 dimensions, 2 layers over an 11 KB text corpus) → `lab_get_experiment`, a hosted model (Ollama Cloud `gemma4:31b`, Workstation Agent) trained a small transformer on this Mac's GPU to completion (final training loss 0.493, artifact registered). The GUI and the tool build the job through the same `ModelLabModule.smallLMJob` and validator. `lab_start_lora` now exists behind a download policy (`ModelDownloadPolicy`: valid `org/name`, cached or explicitly allowed); `lab_start_distillation` uses the same policy for its teacher ("apple" or a cached MLX repo) and student.
+
+## Agent platform (memory, commands, hooks)
+
+| Area | Service-backed agent access | Missing application actions |
+| --- | --- | --- |
+| Memory files | `kiln_memory_read` (read), `kiln_memory_write` (write; approval; only KILN.md / AGENTS.md / CLAUDE.md in the project or user folders; audit `memory.saved`) | `@import`, per-directory files |
+| Slash commands | `kiln_command_list`, `kiln_command_expand` (read), `kiln_command_write` (write; approval; built-in names refused; audit `command.saved`) | Palette entries |
+| Hooks | `kiln_hooks_list` (read). Hooks themselves run in every agent run and external MCP call that goes through the orchestrator's `run`; MCP `callTool` does not run hooks yet | Hook editing by the agent (edit `.kiln/hooks/hooks.json` with the file tools, which need approval) |
+| Plan mode, rewind, sessions, budget | Deliberately not agent actions (a plan is approved, rewound and budgeted by the person); `kiln_checkpoint_list`, `kiln_usage_report` read-only | Sessions list has no tool until the conversation store is reachable from tools |
+| Usage | `kiln_usage_report` (read) | Prices and budget are set by the person only |
+| Schedules | `kiln_schedule_list` (read), `kiln_schedule_write` (write; approval; interval ≥ 5 min; audit `schedule.saved`) | |
