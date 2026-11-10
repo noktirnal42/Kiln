@@ -138,6 +138,49 @@ public final class ChatSession {
         return profile
     }
 
+    // MARK: Slash commands
+    public enum Pane: Equatable { case memory, commands }
+    /// A pane a slash command asked the chat to open.
+    public var requestedPane: Pane?
+
+    public func availableCommands() -> [SlashCommand] {
+        SlashCommands.all(workspaceRoot: workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }, home: memoryHome)
+    }
+
+    /// Runs a built-in command. Returns nothing to send.
+    private func runBuiltIn(_ command: BuiltInCommand, arguments: String) async {
+        switch command {
+        case .compact: await compactNow()
+        case .clear: await newConversation()
+        case .memory: reloadMemory(); requestedPane = .memory
+        case .commands: requestedPane = .commands
+        case .help:
+            agentNotice = availableCommands().map { "/\($0.name) — \($0.summary)" }.joined(separator: "\n")
+        case .model:
+            let query = arguments.lowercased()
+            guard !query.isEmpty else { agentNotice = "Model: \(selectedModelID.isEmpty ? "none" : selectedModelID). Use /model <part of a name> to switch."; return }
+            let models = await registry.allModels()
+            if let match = models.first(where: { $0.id.lowercased() == query }) ?? models.first(where: { $0.id.lowercased().contains(query) || $0.name.lowercased().contains(query) }) {
+                selectedModelID = match.id
+                recordRecent(modelID: match.id)
+                await refreshContext()
+                agentNotice = "Model: \(match.id)"
+            } else {
+                errorText = "No model matches “\(arguments)”."
+            }
+        }
+        await platformAudit.record("command.builtin", ["name": .string(command.rawValue)])
+    }
+
+    /// Saves a command file from the pane (project or user scope) and records it in the audit chain.
+    public func saveCommandFile(path: String, name: String, text: String) async throws {
+        let url = URL(fileURLWithPath: path)
+        let existed = FileManager.default.fileExists(atPath: path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        await platformAudit.record("command.saved", ["path": .string(path), "name": .string(name), "created": .bool(!existed), "source": .string("pane")])
+    }
+
     public var agentProfiles: [AgentProfile] { AgentProfile.builtIns.filter { !$0.toolPermissions.enabledTools.isEmpty } }
     public var agentProfile: AgentProfile? {
         let all = agentProfiles
@@ -322,9 +365,17 @@ public final class ChatSession {
     // MARK: Streaming
 
     public func send(_ text: String) async {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isStreaming else { return }
-        if Self.isCompactCommand(trimmed) { await compactNow(); return }
+        switch SlashCommands.resolve(trimmed, commands: availableCommands()) {
+        case .plainMessage: break
+        case .builtIn(let command, let arguments): await runBuiltIn(command, arguments: arguments); return
+        case .unknown(let name): errorText = "Unknown command /\(name). Type /help for the list."; return
+        case .prompt(let expanded, let name, let model):
+            if let model, !model.isEmpty, await registry.allModels().contains(where: { $0.id == model }) { selectedModelID = model }
+            await platformAudit.record("command.invoked", ["name": .string(name), "argument_characters": .int(trimmed.count)])
+            trimmed = expanded
+        }
         guard !selectedModelID.isEmpty else {
             errorText = "No model selected. Pick one in the model picker."
             return

@@ -196,10 +196,18 @@ struct ComposerView: View {
                 Text(voiceError).font(SSTypography.caption()).foregroundStyle(SSColor.danger)
                     .padding(.horizontal, SSSpacing.m).frame(maxWidth: .infinity, alignment: .leading)
             }
+            if !completions.isEmpty {
+                CommandCompletionList(matches: completions) { input = "/\($0.name) " }
+                    .padding(.top, SSSpacing.xs)
+            }
             composer
         }
         .onChange(of: session.draft) { _, text in takeDraft(text) }
         .onAppear { takeDraft(session.draft) }
+    }
+
+    private var completions: [SlashCommand] {
+        SlashCommands.completions(for: input, commands: session.availableCommands())
     }
 
     /// A starter prompt or handed-over context lands in the box for the user to edit and send.
@@ -280,6 +288,11 @@ struct ComposerView: View {
                             .padding(.vertical, 10)
                             .allowsHitTesting(false)
                     }
+                }
+                .onKeyPress(.tab, phases: .down) { _ in
+                    guard let first = completions.first else { return .ignored }
+                    input = "/\(first.name) "
+                    return .handled
                 }
                 .onKeyPress(.return, phases: .down) { press in
                     switch ComposerReturn.decide(modifiers: press.modifiers, text: input, isStreaming: session.isStreaming, hasMarkedText: ComposerReturn.focusedViewIsComposing) {

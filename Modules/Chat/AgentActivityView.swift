@@ -302,6 +302,7 @@ struct AgentModeBar: View {
     @Bindable var session: ChatSession
     @State private var showModelPicker = false
     @State private var showMemory = false
+    @State private var showCommands = false
 
     var body: some View {
         HStack(spacing: SSSpacing.s) {
@@ -354,6 +355,11 @@ struct AgentModeBar: View {
         .padding(.top, SSSpacing.xs)
         .sheet(isPresented: $showModelPicker) { ModelPickerView(session: session) }
         .sheet(isPresented: $showMemory) { MemoryPaneView(session: session) }
+        .sheet(isPresented: $showCommands) { CommandsPaneView(session: session) }
+        .onChange(of: session.requestedPane) { _, pane in
+            switch pane { case .memory: showMemory = true; case .commands: showCommands = true; case nil: break }
+            session.requestedPane = nil
+        }
     }
 
     private var modelLabel: String {
