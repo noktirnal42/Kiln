@@ -19,6 +19,10 @@ Kiln is an open-source Swift and SwiftUI workstation exploring what happens when
 
 ## What exists today
 
+The development branch also includes a tabbed Browser, Devices and Media activities. These changes are
+not necessarily in the published preview. Browser sign-in, password autofill and passkeys still need
+end-to-end verification; see [browser authentication notes](docs/18-BROWSER-AUTHENTICATION.md).
+
 > Current state (2026-11-03): see [`docs/11-CURRENT-STATE.md`](docs/11-CURRENT-STATE.md) for what was verified, how to
 > build/sign/notarize, and what is still open. The full Mac suite (592 tests) passes; the iOS and watchOS companions, the shared remote kit and the relay have their own tests.
 

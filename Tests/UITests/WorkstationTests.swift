@@ -18,6 +18,11 @@ struct WorkstationTests {
 
     // MARK: Activities
 
+    @Test func workstationStartsWithBrowser() {
+        let model = WorkstationModel(defaults: isolatedDefaults())
+        #expect(model.selected == .browser)
+    }
+
     @Test func everyActivityHasAUniqueShortcutInRailOrder() {
         let keys = Activity.allCases.compactMap { $0.shortcutKey.map { String($0) } }
         // ⌘1…⌘9, then ⌘0 for the tenth. A new activity must not fall off the end into a duplicate key.

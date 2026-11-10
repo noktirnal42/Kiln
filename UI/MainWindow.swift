@@ -32,8 +32,13 @@ struct MainWindow: View {
         .navigationTitle("Kiln — \(workstation.selected.title)")
         .overlay { paletteOverlay }
         .background { shortcuts }
+        .onChange(of: app.requestedActivity, initial: true) { _, activity in
+            if let activity {
+                workstation.select(activity, app: app)
+                app.requestedActivity = nil
+            }
+        }
         .onChange(of: focusRequests) { old, new in
-            // A module asked to be shown (the agent used media_open, say): bring its activity forward.
             for (id, count) in new where count > (old[id] ?? 0) && count > 0 { workstation.select(Activity(id), app: app) }
         }
         .modifier(ApprovalSheetHost(center: app.approvalCenter, requested: $workstation.showApprovals))

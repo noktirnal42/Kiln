@@ -39,6 +39,8 @@ public final class AppModel {
     public let editor = EditorWorkspace()
     public let builder = BuildRunner()
     public var activeModuleID: String?
+    var requestedActivity: Activity?
+    private var pendingWebURLs: [URL] = []
     public private(set) var bootstrapError: String?
     /// Bumped whenever providers are registered or reloaded, so screens that show them can refresh. Home loads
     /// before bootstrap has registered anything; without this it kept an empty list forever.
@@ -49,6 +51,7 @@ public final class AppModel {
     public static let appVersion = "0.1.0"
 
     public init() {
+        BundlePreferencesMigration.runIfNeeded()
         LegacyContainerMigration.runIfNeeded()
         BuiltInTools.registerAll()
         let schema = Schema([
@@ -183,9 +186,24 @@ public final class AppModel {
             loadedModule: { identifier in await manager.record(for: identifier)?.module }
         ))
         await syncUIModules()
+        flushPendingWebURLs()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
             await activateModule(firstUI)
         }
+    }
+
+    /// macOS can deliver links before module discovery finishes. Preserve their order until the browser exists.
+    func openWebURL(_ url: URL) {
+        guard BrowserURL.resolveStrict(url.absoluteString) != nil else { return }
+        pendingWebURLs.append(url)
+        requestedActivity = .browser
+        flushPendingWebURLs()
+    }
+
+    private func flushPendingWebURLs() {
+        guard let browser = uiModules[BrowserModule.identifier] as? BrowserModule else { return }
+        for url in pendingWebURLs { browser.newTab(url: url, select: true) }
+        pendingWebURLs.removeAll()
     }
 
     private func registerModelProviders() async {
@@ -204,6 +222,7 @@ public final class AppModel {
         ))
         await registerCustomProvider()
         await registry.register(AppleFoundationProvider())
+        await registry.register(ApplePrivateCloudProvider())
         await registry.register(MLXProvider())
         defer { providersGeneration += 1 }
 

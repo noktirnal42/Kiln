@@ -116,9 +116,8 @@ enum WorkstationStatus {
 final class WorkstationModel {
     private static let dockKey = "workstation.dockVisible"
 
-    /// Opens on the agent: like the apps this sits beside, the conversation is the front door, and the other
-    /// activities are things you reach from it.
-    var selected: Activity = .agent
+    /// The browser presents an address and search field as soon as the workstation opens.
+    var selected: Activity = .browser
     var showPalette = false
     var showApprovals = false
     var showModules = false

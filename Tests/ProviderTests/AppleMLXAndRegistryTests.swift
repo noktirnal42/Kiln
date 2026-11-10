@@ -3,6 +3,15 @@ import Testing
 @testable import Kiln
 
 struct AppleAndMLXProviderTests {
+    @Test func appleCloudAndOnDeviceAreSeparateProviderChoices() {
+        let local = AppleFoundationProvider()
+        let cloud = ApplePrivateCloudProvider()
+        #expect(local.id != cloud.id)
+        #expect(local.capabilities.contains(.onDevice))
+        #expect(!local.capabilities.contains(.privateCloud))
+        #expect(cloud.capabilities.contains(.privateCloud))
+        #expect(!cloud.capabilities.contains(.onDevice))
+    }
     @Test func appleAvailabilityReasonsAreSpecific() {
         if #available(macOS 26.0, *) {
             let notEnabled = AppleFoundationProvider.availability(from: .unavailable(.appleIntelligenceNotEnabled))
