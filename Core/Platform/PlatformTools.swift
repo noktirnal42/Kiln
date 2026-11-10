@@ -4,7 +4,7 @@ import Foundation
 /// agent and external MCP clients can use what the person can. All are named `kiln_*`.
 public enum PlatformTools {
     public static var all: [any ToolExecuting] {
-        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool()]
+        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool()]
     }
 }
 
@@ -146,5 +146,25 @@ public struct HooksListTool: ToolExecuting {
         let hooks = HookRunner.load(workspaceRoot: context.workspaceRoot, home: home)
         if hooks.isEmpty { return "No hooks configured (.kiln/hooks/hooks.json)." }
         return hooks.map { "\($0.scope ?? "project") \($0.event.rawValue)\($0.match.map { " [\($0)]" } ?? "") → \($0.command)" }.joined(separator: "\n")
+    }
+}
+
+public struct CheckpointListTool: ToolExecuting {
+    let store: CheckpointStore
+    public init() { store = .default }
+    init(store: CheckpointStore) { self.store = store }
+    public var spec: ToolSpec {
+        ToolSpec(name: "kiln_checkpoint_list", summary: "List checkpoints of file changes in this project",
+                 detail: "Before the agent changes a file Kiln saves the old contents. Each checkpoint lists the files it can restore and the commands whose effects it cannot undo. Rewinding is done by the person from the conversation.",
+                 parameters: [], permission: .read)
+    }
+    public func execute(argumentsJSON: String, context: ToolExecutionContext) async throws -> String {
+        let root = context.workspaceRoot?.path
+        let list = store.all().filter { root == nil || $0.workspace == root }
+        if list.isEmpty { return "No checkpoints for this project." }
+        return list.suffix(30).map { m in
+            "\(m.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(m.files.count) file(s): \(m.files.prefix(5).map(\.path).joined(separator: ", "))"
+                + (m.unrestorable.isEmpty ? "" : " · not restorable: \(m.unrestorable.prefix(3).joined(separator: "; "))") + (m.rewound ? " · rewound" : "")
+        }.joined(separator: "\n")
     }
 }

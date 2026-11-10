@@ -138,6 +138,49 @@ public final class ChatSession {
         return profile
     }
 
+    // MARK: Checkpoints and rewind
+    let checkpointStore: CheckpointStore?
+    /// User messages whose run changed files or ran commands, so the thread can offer "Rewind to here".
+    public private(set) var checkpointedMessageIDs: Set<UUID> = []
+
+    func refreshCheckpoints() {
+        guard let checkpointStore, let conversationID else { checkpointedMessageIDs = []; return }
+        checkpointedMessageIDs = Set(checkpointStore.all(conversationID: conversationID).filter { !$0.rewound }.map(\.messageID))
+    }
+
+    /// Rewinds the conversation to just before `messageID` (which must be a user message): later messages are removed and the
+    /// text goes back in the message box. With `restoreFiles`, files the agent changed since then are put back too.
+    @discardableResult
+    public func rewind(to messageID: UUID, restoreFiles: Bool = true) async -> RewindReport? {
+        guard !isStreaming, let conversationID, let index = messages.firstIndex(where: { $0.id == messageID }) else { return nil }
+        var report = RewindReport()
+        if restoreFiles, let checkpointStore, let workspaceRoot {
+            report = checkpointStore.rewind(conversationID: conversationID, messages: messages.map(\.id), from: messageID,
+                                            workspaceRoot: URL(fileURLWithPath: workspaceRoot, isDirectory: true))
+        }
+        let removed = Array(messages[index...])
+        for message in removed { try? await conversations.deleteMessage(message.id) }
+        messages.removeSubrange(index...)
+        if var state = compactions[conversationID] {
+            state.covered = min(state.covered, messages.count)
+            if state.covered == 0 { state.summary = nil }
+            state.notes.removeAll { $0.afterMessageCount > messages.count }
+            compactions[conversationID] = state
+            saveCompactions()
+            contextNotes = state.notes
+        }
+        if removed.first?.role == .user { draft = removed[0].content }
+        agentNotice = restoreFiles ? "Rewound to before this message. " + report.summary : "Rewound the conversation; files were not changed."
+        await platformAudit.record("checkpoint.rewound", [
+            "messages_removed": .int(removed.count), "files_restored": .int(report.restored.count),
+            "files_removed": .int(report.deleted.count), "files_skipped": .int(report.skipped.count),
+            "unrestorable_commands": .int(report.unrestorable.count), "restore_files": .bool(restoreFiles),
+        ])
+        refreshCheckpoints()
+        updateContextMeter()
+        return report
+    }
+
     // MARK: Plan mode
     /// While on, runs are read-only and end with a plan for the person to approve.
     public var planMode = false
@@ -257,9 +300,11 @@ public final class ChatSession {
         workspaceRoot: String? = nil,
         initialModelID: String = "",
         compactionDefaults: UserDefaults? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil,
-        memoryHome: URL? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? FileManager.default.homeDirectoryForCurrentUser : nil
+        memoryHome: URL? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? FileManager.default.homeDirectoryForCurrentUser : nil,
+        checkpointStore: CheckpointStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil
     ) {
         self.memoryHome = memoryHome
+        self.checkpointStore = checkpointStore
         self.registry = registry
         self.conversations = conversations
         self.artifacts = artifacts
@@ -320,6 +365,7 @@ public final class ChatSession {
             }
             errorText = page.truncated ? "Showing the last \(page.messages.count) of \(page.total) messages." : nil
             contextNotes = compactions[id]?.notes ?? []
+            refreshCheckpoints()
             await refreshContext()
         } catch {
             errorText = "Could not load conversation: \(error)"
@@ -601,6 +647,11 @@ public final class ChatSession {
         let planning = planMode
         if planning { profile.mode = .plan; profile.systemPrompt += PlanMode.instructions }
         pendingPlan = nil
+        let recorder: CheckpointRecorder? = {
+            guard let checkpointStore, let rootPath = workspaceRoot, !planning else { return nil }
+            let root = URL(fileURLWithPath: rootPath, isDirectory: true)
+            return CheckpointRecorder(store: checkpointStore, conversationID: conversationID, messageID: messages[promptIndex].id, workspaceRoot: root)
+        }()
         let stop = AgentStopFlag()
         agentStop = stop
         agentActivity = []
@@ -619,7 +670,7 @@ public final class ChatSession {
             var tokens = 0
             var firstTokenAt: Date?
             let stream = orchestrator.run(
-                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop, hooks: hooks,
+                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop, hooks: hooks, checkpoint: recorder,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
             )
             do {
@@ -666,6 +717,12 @@ public final class ChatSession {
                 reasoning: nil, tokenCount: tokens, toolCalls: self?.finishedToolCalls() ?? [], modelID: model
             ) {
                 self?.messages.append(saved)
+            }
+            if let recorder, let made = recorder.finish() {
+                await self?.platformAudit.record("checkpoint.created", [
+                    "files": .int(made.files.count), "unrestorable_commands": .int(made.unrestorable.count), "message_id": .string(made.messageID.uuidString),
+                ])
+                self?.refreshCheckpoints()
             }
             if planning, let self, self.errorText == nil, !finalText.isEmpty, !stop.stopped {
                 self.pendingPlan = PlanProposal(text: finalText, request: prompt)

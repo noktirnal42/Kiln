@@ -271,6 +271,7 @@ public final class AgentOrchestrator: Sendable {
         stop: AgentStopFlag = AgentStopFlag(),
         backoffUnitSeconds: Double = 1.0,
         hooks: [HookDefinition] = [],
+        checkpoint: CheckpointRecorder? = nil,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -294,6 +295,7 @@ public final class AgentOrchestrator: Sendable {
                             stop: stop,
                             backoffUnitSeconds: backoffUnitSeconds,
                             hooks: hooks.isEmpty ? nil : HookRunner(hooks: hooks, workspaceRoot: workspaceRoot, audit: PlatformAudit(chain: self.auditChain)),
+                            checkpoint: checkpoint,
                             chat: chat,
                             audit: recorder,
                             rubric: rubricMonitor,
@@ -376,6 +378,7 @@ public final class AgentOrchestrator: Sendable {
         stop: AgentStopFlag,
         backoffUnitSeconds: Double,
         hooks: HookRunner?,
+        checkpoint: CheckpointRecorder?,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>,
         audit: AgentAuditRecorder?,
         rubric: RubricMonitor?,
@@ -541,6 +544,7 @@ public final class AgentOrchestrator: Sendable {
                     audit: audit,
                     findings: findings,
                     hooks: hooks,
+                    checkpoint: checkpoint,
                     yield: yield
                 )
                 switch record.status {
@@ -758,6 +762,7 @@ public final class AgentOrchestrator: Sendable {
         audit: AgentAuditRecorder?,
         findings: RubricFindings?,
         hooks: HookRunner? = nil,
+        checkpoint: CheckpointRecorder? = nil,
         yield: @escaping @Sendable (AgentEvent) -> Void
     ) async throws -> ToolCallRecord {
         var record = ToolCallRecord(
@@ -995,6 +1000,8 @@ public final class AgentOrchestrator: Sendable {
             services: callServices
         )
 
+        checkpoint?.beforeTool(name: call.name, argumentsJSON: call.arguments, callID: call.id)
+        defer { checkpoint?.afterTool(callID: call.id) }
         do {
             let raw = try await withThrowingTimeout(
                 seconds: min(300, toolTimeout),

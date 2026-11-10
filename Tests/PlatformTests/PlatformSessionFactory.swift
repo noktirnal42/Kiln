@@ -26,7 +26,7 @@ enum PlatformSessionFactory {
     }
 
     static func make(project: URL?, home: URL? = nil, chain: AuditChain? = nil, stub: Stub = Stub(),
-                     toolRegistry: ToolRegistry = ToolRegistry(tools: []), autoResolve: ApprovalDecision? = nil) async throws -> ChatSession {
+                     toolRegistry: ToolRegistry = ToolRegistry(tools: []), autoResolve: ApprovalDecision? = nil, checkpoints: CheckpointStore? = nil) async throws -> ChatSession {
         let schema = Schema([Conversation.self, Message.self, Artifact.self, ArtifactVersion.self])
         let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
         let session = ChatSession(
@@ -35,7 +35,8 @@ enum PlatformSessionFactory {
             artifacts: ArtifactStore(container: container),
             workspaceRoot: project?.path,
             compactionDefaults: nil,
-            memoryHome: home
+            memoryHome: home,
+            checkpointStore: checkpoints
         )
         await session.registry.register(stub)
         let (center, _) = try makeTestApprovalCenter(autoResolve: autoResolve)
