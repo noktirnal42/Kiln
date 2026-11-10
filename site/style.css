@@ -177,3 +177,9 @@ ol,ul{padding-left:22px}li{padding-left:4px;margin-bottom:10px}
 
 /* demo video */
 .demo{max-width:720px;margin:0 auto}#demo{padding-block:72px}#demo .section-head{margin-bottom:36px}.demo video{width:100%;height:auto;aspect-ratio:16/9;display:block;border-radius:14px;border:1px solid var(--line-2);box-shadow:0 36px 80px -30px #000;background:#000}.demo figcaption{margin-top:14px;font-size:13.5px;line-height:1.7;color:var(--faint)}
+
+/* docs pages */
+.kbd{font:12px var(--mono);color:var(--muted);border:1px solid var(--line-2);border-radius:6px;padding:2px 7px;vertical-align:middle;margin-left:8px}
+.doc-layout .table td:first-child{white-space:normal}
+.doc-layout .table-wrap{margin:0 0 28px}
+.doc-layout img{border:1px solid var(--line);border-radius:12px;margin:8px 0 20px}
