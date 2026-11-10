@@ -15,6 +15,7 @@ struct REProjectDetail: View {
     @State private var functionQuery = ""
     @State private var analysisError: String?
     @State private var index: REXrefIndex?
+    @State private var scanTab: REFindingsTab = .crypto
     @State private var referenceTarget: ReferenceTarget?
 
     private var selectedFunction: FunctionRecord? {
@@ -57,8 +58,14 @@ struct REProjectDetail: View {
             case .package: REPackageView(module: module) { name in functionQuery = name; tab = .functions }
             case .findings: REFindingsPane(module: module, projectID: project.id, function: selectedFunction)
             case .debug: REDebugView(module: module, projectID: project.id, function: selectedFunction)
-            default:
-                if let finding = tab.finding { REFindingsView(module: module, projectID: project.id, tab: finding) }
+            case .scan:
+                VStack(spacing: 0) {
+                    Picker("", selection: $scanTab) { ForEach(REFindingsTab.scans) { Text($0.rawValue).tag($0) } }
+                        .pickerStyle(.segmented).labelsHidden().padding(SSSpacing.s)
+                    REFindingsView(module: module, projectID: project.id, tab: scanTab, onLink: { handle($0) })
+                }
+            case .strings, .script:
+                if let finding = tab.finding { REFindingsView(module: module, projectID: project.id, tab: finding, onLink: { handle($0) }) }
             }
         }
         .task(id: analysis.revision) { index = try? await module.xrefIndex(projectID: project.id) }
@@ -195,9 +202,8 @@ struct REProjectDetail: View {
 
 /// What the Analyze detail can show: the function browser, or one of the whole-binary analyses.
 enum REViewTab: String, CaseIterable, Identifiable {
-    case functions = "Functions", graph = "Graph", hex = "Hex", types = "Types", strings = "Strings", crypto = "Crypto", formats = "Formats"
-    case gadgets = "Gadgets", rules = "Rules", forensics = "Forensics", patches = "Patches", diff = "Diff", package = "Package"
-    case findings = "Findings", debug = "Debug", script = "Script"
+    case functions = "Functions", graph = "Graph", hex = "Hex", types = "Types", strings = "Strings", scan = "Scan"
+    case patches = "Patches", diff = "Diff", package = "Package", findings = "Findings", debug = "Debug", script = "Script"
     var id: String { rawValue }
     var finding: REFindingsTab? { REFindingsTab(rawValue: rawValue) }
     var symbol: String {
@@ -212,11 +218,7 @@ enum REViewTab: String, CaseIterable, Identifiable {
         case .findings: "flag"
         case .debug: "ladybug"
         case .strings: "textformat"
-        case .crypto: "key"
-        case .formats: "doc.text.magnifyingglass"
-        case .gadgets: "link"
-        case .rules: "checklist"
-        case .forensics: "waveform.path.ecg"
+        case .scan: "checklist"
         case .script: "curlybraces"
         }
     }

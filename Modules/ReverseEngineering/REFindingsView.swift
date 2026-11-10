@@ -12,6 +12,8 @@ enum REFindingsTab: String, CaseIterable, Identifiable {
     case script = "Script"
 
     var id: String { rawValue }
+    /// The whole-binary scans grouped under one Scan tab.
+    static let scans: [REFindingsTab] = [.crypto, .formats, .gadgets, .rules, .forensics]
 }
 
 /// One result line, normalized so every tab renders the same way.
@@ -19,12 +21,15 @@ struct REFindingRow: Identifiable, Equatable {
     let id = UUID()
     let title: String
     let detail: String
+    var link: RELink? = nil
 }
 
 struct REFindingsView: View {
     let module: REModule
     let projectID: String
     let tab: REFindingsTab
+    /// Clicking a row that refers to code or a string opens its references.
+    var onLink: (RELink) -> Void = { _ in }
 
     @State private var query = ""
     @State private var ruleSource = REFindingsView.exampleRule
@@ -50,10 +55,13 @@ struct REFindingsView: View {
             } else {
                 List(rows) { row in
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(row.title).font(.caption.monospaced()).textSelection(.enabled)
+                        Text(row.title).font(.caption.monospaced()).foregroundStyle(row.link == nil ? Color.primary : SSColor.accent).textSelection(.enabled)
                         Text(row.detail).font(.caption2).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 2)
+                    .contentShape(Rectangle())
+                    .onTapGesture { if let link = row.link { onLink(link) } }
+                    .help(row.link == nil ? "" : "Show what refers to this")
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
@@ -163,7 +171,7 @@ struct REFindingsView: View {
             let matches = try await module.searchStrings(projectID: projectID, pattern: trimmed)
             return matches.map {
                 REFindingRow(title: String(format: "0x%llx", UInt64($0.record.offset)),
-                             detail: $0.record.value)
+                             detail: $0.record.value, link: .string($0.record.value))
             }
         case .crypto:
             let hits = try await module.scanCrypto(projectID: projectID)
@@ -182,7 +190,7 @@ struct REFindingsView: View {
         case .gadgets:
             let gadgets = try await module.findGadgets(projectID: projectID)
             return gadgets.map {
-                REFindingRow(title: $0.address, detail: $0.instructions.joined(separator: " ; "))
+                REFindingRow(title: $0.address, detail: $0.instructions.joined(separator: " ; "), link: .address($0.address))
             }
         case .rules:
             let matches = try await module.scanRules(projectID: projectID, source: ruleSource)
