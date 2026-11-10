@@ -23,6 +23,8 @@ These activity capabilities currently lack a dedicated agent tool. The IDs corre
 
 - `agent.artifacts` — Create and export artifacts. Gap: artifact creation, rendering and export have no tool yet (docs/13, Chat and artifacts).
 - `agent.new-conversation` — Start a new conversation. Gap: conversation management has no tool yet (docs/13, Chat and artifacts); an agent starting its own fresh context is better served by compaction.
+- `agent.sessions` — List sessions with status; resume and fork them. Gap: the conversation store is not yet reachable from tools; the Sessions pane (`/sessions`) covers it for the person.
+- `agent.verifier` — Check a reply against the tool evidence with a second model. Deliberate that the agent cannot run it; gap: the model is set with the `agent.verifier.model` default, no settings control yet.
 - `analyze.delete-project` — Delete a project. Gap: no delete tool yet; destructive, so it needs an approval-gated adapter before it is offered.
 - `analyze.device-bench` — Device bench: connect, read registers and memory. Gap: device-bench operations need a dedicated adapter with its own limits (docs/13, Reverse engineering).
 - `analyze.select-project` — Choose the open project. Gap: tools take a project id, but there is no tool to list projects or to set the one on screen (docs/13, Reverse engineering).
