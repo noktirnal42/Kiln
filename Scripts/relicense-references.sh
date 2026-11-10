@@ -21,6 +21,7 @@ for f in $FILES; do
     -e 's#Open source · Native macOS#Source-available · Native macOS#g' \
     -e 's#<strong>MIT</strong>#<strong>Source-available</strong>#g' \
     -e 's#independent open-source project#independent project#g' \
+    -e 's#an experimental open-source project#an experimental source-available project#g' \
     -e 's#open-source native macOS#source-available native macOS#g' \
     -e 's#the project.s MIT license#the project'"'"'s license (PolyForm Noncommercial, see LICENSE)#g' \
     -e 's#The MIT license does not replace#The project license does not replace#g' \
