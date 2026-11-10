@@ -12,10 +12,12 @@ struct MainWindow: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
-                    WorkstationSidebar(workstation: workstation)
-                    Divider()
+                    if workstation.sidebarVisible {
+                        WorkstationSidebar(workstation: workstation)
+                        Divider()
+                    }
                     activityContent
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .background(SSColor.canvas)
                     // The agent panel yields before the work does: below this width the tool in front needs the room.
                     if workstation.dockShown, geometry.size.width >= Self.dockMinimumWindowWidth, let session = app.chatSession {
@@ -102,6 +104,8 @@ struct MainWindow: View {
                 .keyboardShortcut("k", modifiers: .command)
             Button("Toggle Agent Dock") { workstation.toggleDock() }
                 .keyboardShortcut("a", modifiers: [.command, .option])
+            Button("Toggle Sidebar") { workstation.sidebarVisible.toggle() }
+                .keyboardShortcut("s", modifiers: [.command, .control])
             Button("New Conversation") { Task { await app.chatSession?.newConversation() } }
                 .keyboardShortcut("n", modifiers: .command)
         }

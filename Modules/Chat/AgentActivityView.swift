@@ -18,7 +18,8 @@ struct AgentActivityView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else if let notice = session.agentNotice, session.agentEnabled {
-            Text(notice).font(SSTypography.caption()).foregroundStyle(SSColor.warning)
+            // A notice with no run behind it is an answer to a command (/model, /plan, /help), not a warning.
+            Text(notice).font(SSTypography.caption()).foregroundStyle(.secondary).textSelection(.enabled)
         }
     }
 
@@ -395,8 +396,12 @@ struct PlanCardView: View {
             if editing {
                 TextEditor(text: $draft).font(.system(size: 12)).frame(minHeight: 160, maxHeight: 320)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.25)))
-            } else {
+            } else if session.messages.last?.content != plan.text {
+                // The plan is normally the reply right above this card; it is repeated only when it is not.
                 MarkdownBlockView(text: plan.text)
+            } else {
+                Text("The plan is the reply above. Approve it to let the agent make the changes, edit it first, or reject it.")
+                    .font(SSTypography.caption()).foregroundStyle(.secondary)
             }
             HStack {
                 Button("Approve and run") { Task { await session.approvePlan(editedText: editing ? draft : nil) } }

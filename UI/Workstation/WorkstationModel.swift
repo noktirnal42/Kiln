@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Observation
 
 /// The places you work in. Each is a whole screen, not a window onto one module: the agent dock stays
@@ -119,6 +120,7 @@ final class WorkstationModel {
     /// The browser presents an address and search field as soon as the workstation opens.
     var selected: Activity = .browser
     var showPalette = false
+    var sidebarVisible = true
     var showApprovals = false
     var showModules = false
 
@@ -174,9 +176,63 @@ final class WorkstationModel {
                 id: "modules.show", title: "Show loaded modules", subtitle: "Module lifecycle and the event bus",
                 symbol: "puzzlepiece.extension", keywords: ["debug", "events", "bus"], run: { [weak self] in self?.showModules = true }),
         ]
+        list.append(WorkstationCommand(
+            id: "settings.show", title: "Settings…", subtitle: "Provider keys, the local model store and About",
+            symbol: "gearshape", keywords: ["preferences", "api key", "providers", "about"], shortcut: "⌘,",
+            run: { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) }))
+        list += projectCommands(app: app)
+        list += slashCommands(app: app)
         list += DevelopCommands.all(app: app, select: { [weak self] in self?.select(.develop, app: app) })
         list += capabilityCommands { [weak self] activity in self?.select(activity, app: app) }
         return list
+    }
+
+    /// The project folder the agent works in: choose one, or switch to a recent one, without reaching for the sidebar menu.
+    func projectCommands(app: AppModel) -> [WorkstationCommand] {
+        let current = app.chatSession?.workspaceRoot
+        var list = [WorkstationCommand(
+            id: "project.open", title: "Open Project…", subtitle: "Choose the folder the agent works in",
+            symbol: "folder.badge.plus", keywords: ["workspace", "folder", "switch", "choose"],
+            run: {
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.canCreateDirectories = true
+                panel.prompt = "Use Folder"
+                panel.message = "Choose the project folder the agent should work in."
+                if panel.runModal() == .OK, let url = panel.url { app.chatSession?.setWorkspace(url) }
+            })]
+        list += WorkspaceStore.shared.recents().filter { $0.path != current }.prefix(8).map { entry in
+            WorkstationCommand(
+                id: "project.recent.\(entry.path)", title: "Switch Project: \(entry.name)", subtitle: Self.abbreviated(entry.path),
+                symbol: "folder", keywords: ["workspace", "folder", "recent", "open"], searchOnly: true,
+                run: { app.chatSession?.openRecentWorkspace(entry) })
+        }
+        return list
+    }
+
+    /// Home shown as `~`, so a palette row never spells out the user's account name.
+    nonisolated static func abbreviated(_ path: String, home: String = NSHomeDirectory()) -> String {
+        path == home ? "~" : (path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path)
+    }
+
+    /// The chat's built-in slash commands that open a pane or change a mode, so they can be found without knowing to type `/`.
+    func slashCommands(app: AppModel) -> [WorkstationCommand] {
+        let entries: [(BuiltInCommand, String, String)] = [
+            (.cost, "Usage and Cost", "chart.bar"), (.schedule, "Scheduled Tasks", "calendar.badge.clock"),
+            (.sessions, "Sessions", "rectangle.stack"), (.memory, "Memory Files", "brain"),
+            (.commands, "Custom Commands", "slash.circle"), (.hooks, "Hooks", "link"),
+            (.plan, "Toggle Plan Mode", "list.clipboard"), (.compact, "Compact Conversation", "arrow.down.right.and.arrow.up.left"),
+        ]
+        return entries.map { command, title, symbol in
+            WorkstationCommand(
+                id: "slash.\(command.rawValue)", title: title, subtitle: "/\(command.rawValue) · \(command.summary)",
+                symbol: symbol, keywords: ["slash", command.rawValue, "agent", "chat"], searchOnly: true,
+                run: { [weak self] in
+                    self?.select(.agent, app: app)
+                    Task { await app.chatSession?.send("/\(command.rawValue)") }
+                })
+        }
     }
 
     /// Every registered capability is also a palette command that opens its activity. They appear when you search.
@@ -186,7 +242,7 @@ final class WorkstationModel {
             let activity = Activity(capability.module)
             return WorkstationCommand(
                 id: "capability.\(capability.id)", title: "\(activity.title): \(capability.title)",
-                subtitle: capability.agentTool.map { "Agent tool \($0)" } ?? "GUI only: \(capability.permission.rawValue)",
+                subtitle: capability.agentTool.map { "Opens \(activity.title) · the agent does this with \($0)" } ?? "Opens \(activity.title) · in the app only",
                 symbol: activity.symbol, keywords: [capability.id, capability.agentTool ?? "", activity.rawValue],
                 searchOnly: true,
                 run: { open(activity) })

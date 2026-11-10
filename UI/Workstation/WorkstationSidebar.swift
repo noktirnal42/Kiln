@@ -13,12 +13,14 @@ struct WorkstationSidebar: View {
         var messages: Int
         var title: String
         var streaming: Bool
+        var listGeneration: Int
     }
 
     private var refreshKey: RefreshKey {
         let session = app.chatSession
         return RefreshKey(conversation: session?.conversationID, messages: session?.messages.count ?? 0,
-                          title: session?.conversationTitle ?? "", streaming: session?.isStreaming ?? false)
+                          title: session?.conversationTitle ?? "", streaming: session?.isStreaming ?? false,
+                          listGeneration: session?.conversationListGeneration ?? 0)
     }
 
     var body: some View {
@@ -116,8 +118,11 @@ struct WorkstationSidebar: View {
                 .padding(.horizontal, SSSpacing.s).padding(.vertical, 6)
                 .background(selected ? SSColor.accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
                 .foregroundStyle(selected ? Color.primary : .secondary)
+                .contentShape(Rectangle())   // the whole row is the target, not just the title text
         }
         .buttonStyle(.plain)
+        .help(item.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .contextMenu {
             Button("Delete", role: .destructive) { Task { await app.chatSession?.deleteConversation(item.id) } }
         }
@@ -137,8 +142,10 @@ struct WorkstationSidebar: View {
                     }
                     .padding(.horizontal, SSSpacing.s).padding(.vertical, 6)
                     .background(selected ? SSColor.accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
                 .help("\(activity.title) — \(activity.summary)" + (activity.shortcutKey.map { " (⌘\($0))" } ?? ""))
             }
         }
@@ -159,9 +166,11 @@ struct WorkstationSidebar: View {
             }
             .buttonStyle(SSIconButtonStyle(selected: pending > 0))
             .help(pending > 0 ? "\(pending) tool call(s) waiting for you" : "Approvals and standing grants")
+            .accessibilityLabel(pending > 0 ? "Approvals, \(pending) waiting" : "Approvals and standing grants")
             SettingsLink { Image(systemName: "gearshape").frame(width: 28, height: 26) }
                 .buttonStyle(SSIconButtonStyle())
                 .help("Settings and API keys (⌘,)")
+                .accessibilityLabel("Settings")
             Spacer()
             Button { workstation.toggleDock() } label: {
                 Image(systemName: "sidebar.right").frame(width: 28, height: 26)

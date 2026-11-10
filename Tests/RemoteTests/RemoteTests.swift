@@ -285,7 +285,9 @@ struct RemoteRelayTests {
         let backend = FakeBackend()
         _ = await backend.open("c1")
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-relay-\(UUID().uuidString)")
-        let defaults = UserDefaults(suiteName: "kiln.remote.test.\(UUID().uuidString)")!
+        let suiteName = "kiln.remote.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
         let server = RemoteServer(bridge: RemoteBridge(backend: backend), store: RemotePairingStore(directory: dir), hostName: "Test Mac", defaults: defaults)
         let relayURL = URL(string: "ws://127.0.0.1:\(relayPort)")!
         server.setRelay(relayURL)
@@ -360,7 +362,9 @@ struct RemotePushTests {
         configuration.protocolClasses = [StubRelayProtocol.self]
         StubRelayProtocol.requests = []
         StubRelayProtocol.reply = (200, #"{"results":[]}"#)
-        let defaults = UserDefaults(suiteName: "kiln.push.test.\(UUID().uuidString)")!
+        let suiteName = "kiln.push.test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
         let notifier = RemotePushNotifier(store: RemotePushStore(directory: dir), defaults: defaults, session: URLSession(configuration: configuration),
                                           relay: { relay }, pairingKey: { Data(repeating: 9, count: 32) })
         notifier.delay = .milliseconds(30)

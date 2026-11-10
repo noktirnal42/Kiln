@@ -143,4 +143,24 @@ struct WorkstationTests {
         for activity in Activity.allCases { #expect(ids.contains("go.\(activity.rawValue)")) }
         #expect(ids.isSuperset(of: ["agent.new", "dock.toggle", "approvals.show", "modules.show"]))
     }
+
+    @Test func thePaletteOffersSettingsProjectsAndTheChatPanesBySearch() throws {
+        let model = WorkstationModel(defaults: isolatedDefaults())
+        let app = AppModel()
+        let commands = model.commands(app: app)
+        let ids = Set(commands.map(\.id))
+        #expect(ids.isSuperset(of: ["settings.show", "project.open"]))
+        for name in ["cost", "schedule", "sessions", "memory", "commands", "hooks", "plan", "compact"] { #expect(ids.contains("slash.\(name)")) }
+        // The chat panes are found by what they are called and by their slash name, and stay out of the short default list.
+        #expect(CommandRanking.rank(commands, query: "usage").first?.id == "slash.cost")
+        #expect(CommandRanking.rank(commands, query: "schedule").contains { $0.id == "slash.schedule" })
+        #expect(!CommandRanking.rank(commands, query: "").contains { $0.id.hasPrefix("slash.") })
+    }
+
+    @Test func projectPathsInThePaletteNeverSpellOutTheHomeFolder() {
+        #expect(WorkstationModel.abbreviated("/Users/someone/Code/App", home: "/Users/someone") == "~/Code/App")
+        #expect(WorkstationModel.abbreviated("/Users/someone", home: "/Users/someone") == "~")
+        #expect(WorkstationModel.abbreviated("/Volumes/Drive/App", home: "/Users/someone") == "/Volumes/Drive/App")
+        #expect(WorkstationModel.abbreviated("/Users/someone-else/App", home: "/Users/someone") == "/Users/someone-else/App")
+    }
 }

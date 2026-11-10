@@ -22,7 +22,8 @@ struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SSSpacing.l) {
                 hero
-                if GetStarted.shows(getStartedState, dismissed: getStartedDismissed) {
+                // Not before the provider check has answered: the card would claim no model is connected for a moment.
+                if !providers.isEmpty, GetStarted.shows(getStartedState, dismissed: getStartedDismissed) {
                     GetStartedCard(state: getStartedState, chooseProject: chooseProject, openSettings: { openSettings() },
                                    runFirstTask: runFirstTask, dismiss: { getStartedDismissed = true })
                 }

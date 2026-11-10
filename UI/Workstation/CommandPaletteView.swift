@@ -23,22 +23,30 @@ struct CommandPaletteView: View {
                     .onKeyPress(.downArrow) { move(1); return .handled }
                     .onKeyPress(.upArrow) { move(-1); return .handled }
                     .onKeyPress(.escape) { dismiss(); return .handled }
-                SSKeyCap("esc")
+                Button(action: dismiss) { SSKeyCap("esc") }
+                    .buttonStyle(.plain)
+                    .help("Close (esc)")
+                    .accessibilityLabel("Close command palette")
             }
             .padding(SSSpacing.m)
             Divider()
             if results.isEmpty {
-                Text("Nothing matches “\(query)”.")
-                    .font(SSTypography.caption()).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity).padding(SSSpacing.l)
+                VStack(spacing: 4) {
+                    Text("Nothing matches “\(query)”.").font(SSTypography.body())
+                    Text("Try an activity name, an action such as “build”, or a tool name such as “re_”.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity).padding(SSSpacing.l)
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 2) {
                             ForEach(Array(results.enumerated()), id: \.element.id) { index, command in
-                                row(command, selected: index == selection)
+                                Button { run(command) } label: { row(command, selected: index == selection) }
+                                    .buttonStyle(.plain)
                                     .id(command.id)
-                                    .onTapGesture { run(command) }
+                                    .onHover { if $0 { selection = index } }
+                                    .accessibilityLabel("\(command.title). \(command.subtitle)")
                             }
                         }
                         .padding(SSSpacing.xs)
@@ -55,6 +63,7 @@ struct CommandPaletteView: View {
         .overlay(RoundedRectangle(cornerRadius: SSCornerRadius.large).strokeBorder(SSColor.hairline))
         .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
         .onAppear { searchFocused = true }
+        .accessibilityAddTraits(.isModal)
         .onChange(of: query) { _, _ in selection = 0 }
     }
 

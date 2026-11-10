@@ -6,10 +6,17 @@ struct DevicesRootView: View {
     let module: DevicesModule
 
     var body: some View {
-        HStack(spacing: 0) {
-            DeviceListPane(module: module).frame(width: 290)
-            Divider()
-            DeviceDetailPane(module: module).frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 0) {
+            SSActivityHeader(title: "Devices", subtitle: "Apple simulators and Android emulators", symbol: "iphone.gen3", trailing: {
+                if module.isRefreshing { ProgressView().controlSize(.small) }
+                Button { Task { await module.refresh() } } label: { Label("Refresh the device list", systemImage: "arrow.clockwise") }
+                    .help("Refresh the device list")
+            })
+            HStack(spacing: 0) {
+                DeviceListPane(module: module).frame(width: 260)
+                Divider()
+                DeviceDetailPane(module: module).frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .task { await module.refresh() }
         .onAppear { module.startLive() }
@@ -22,15 +29,7 @@ private struct DeviceListPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Devices").font(.headline)
-                Spacer()
-                if module.isRefreshing { ProgressView().controlSize(.small) }
-                Button { Task { await module.refresh() } } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.borderless).help("Refresh the device list")
-            }
-            .padding(12)
-            Divider()
+            SSPaneHeader("Simulators and emulators", count: module.devices.filter { $0.isAvailable || $0.platform == .android }.count)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2, pinnedViews: []) {
                     if let setup = module.setup { SetupBanner(setup: setup) }
@@ -49,8 +48,7 @@ private struct DeviceListPane: View {
     @ViewBuilder
     private func section(_ title: String, _ devices: [DeviceInfo]) -> some View {
         if !devices.isEmpty {
-            Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 2)
+            SSSectionLabel(title).padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 2)
             ForEach(devices) { device in row(device) }
         }
     }
@@ -59,13 +57,23 @@ private struct DeviceListPane: View {
         let isSelected = module.selectedID == device.id
         let busy = module.busyIDs.contains(device.id)
         return HStack(spacing: 8) {
-            Circle().fill(color(device.state)).frame(width: 8, height: 8)
-            Image(systemName: device.symbol).frame(width: 18).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(device.name).font(.system(size: 13, weight: isSelected ? .semibold : .regular)).lineLimit(1)
-                Text("\(device.runtime) · \(device.state.rawValue)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Button {
+                module.selectedID = device.id
+                Task { await module.captureFrame() }
+            } label: {
+                HStack(spacing: 8) {
+                    Circle().fill(color(device.state)).frame(width: 8, height: 8)
+                    Image(systemName: device.symbol).frame(width: 18).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(device.name).font(.system(size: 13, weight: isSelected ? .semibold : .regular)).lineLimit(1)
+                        Text("\(device.runtime) · \(device.state.rawValue)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }.contentShape(Rectangle())
             }
-            Spacer()
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(device.name), \(device.runtime), \(device.state.rawValue)")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
             if busy { ProgressView().controlSize(.small) }
             else if device.canBoot {
                 Button { Task { await module.boot(device) } } label: { Image(systemName: "play.fill") }
@@ -79,7 +87,6 @@ private struct DeviceListPane: View {
         .background(isSelected ? Color.accentColor.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
         .padding(.horizontal, 4)
         .contentShape(Rectangle())
-        .onTapGesture { module.selectedID = device.id; Task { await module.captureFrame() } }
     }
 
     private func color(_ state: DeviceInfo.State) -> Color {
@@ -138,8 +145,8 @@ private struct DeviceDetailPane: View {
             }
             .sheet(isPresented: $showLogs) { logsSheet }
         } else {
-            ContentUnavailableView("Select a device", systemImage: "iphone.gen3",
-                                   description: Text("Boot a simulator or emulator, or pick a running one, to see its screen here."))
+            SSEmptyState(symbol: "iphone.gen3", title: "Select a device",
+                         message: "Boot a simulator or emulator, or pick a running one, to see its screen here. The agent uses the same devices through device_* tools.")
         }
     }
 
@@ -214,7 +221,8 @@ private struct DeviceDetailPane: View {
     private func controls(_ device: DeviceInfo) -> some View {
         let booted = device.state == .booted
         return VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            ScrollView(.horizontal) {
+              HStack {
                 Toggle("Live", isOn: Binding(get: { module.liveRefresh }, set: { module.liveRefresh = $0 })).toggleStyle(.switch).controlSize(.small)
                 Button("Screenshot") {
                     Task { if let url = await module.saveScreenshot(device) { NSWorkspace.shared.activateFileViewerSelecting([url]) } }
@@ -232,6 +240,7 @@ private struct DeviceDetailPane: View {
                     Button { Task { await module.send(device, input: .key("KEYCODE_HOME")) } } label: { Image(systemName: "circle") }.help("Home")
                     Button { Task { await module.send(device, input: .key("KEYCODE_APP_SWITCH")) } } label: { Image(systemName: "square") }.help("Recent apps")
                 }
+              }.fixedSize(horizontal: true, vertical: false)
             }
             HStack {
                 TextField(device.platform == .apple ? "Bundle id, e.g. com.apple.mobilesafari" : "Package name, e.g. com.android.chrome", text: $appID)

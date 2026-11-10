@@ -83,7 +83,10 @@ struct SSEmptyState: View {
             Text(message).font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .padding(SSSpacing.l)
-        .frame(maxWidth: .infinity)
+        // Fills the pane it stands in for. Without the height, a pane whose only content is an empty state
+        // shrinks to its text and the stack around it centres, pushing the activity header down the window.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
     }
 }
 

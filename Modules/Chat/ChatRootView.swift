@@ -146,6 +146,8 @@ struct ChatRootView: View {
 
     private func send() {
         voice.stopSpeaking()
+        // A reply is still running (or still stopping): keep what was typed instead of dropping it unsent.
+        guard !session.isStreaming else { return }
         let text = input
         input = ""
         Task { await session.send(text) }

@@ -124,7 +124,8 @@ struct REGraphView: View {
 
     private func minimap(_ graph: ControlFlowGraph, pad: CGFloat) -> some View {
         let box = CGSize(width: 150, height: 110)
-        let scale = min(box.width / max(graph.size.width + 60, 1), box.height / max(graph.size.height, 1))
+        // Capped so a one-block function is a small mark in the corner, not a solid slab the size of the minimap.
+        let scale = min(0.22, box.width / max(graph.size.width + 60, 1), box.height / max(graph.size.height, 1))
         return Canvas { context, _ in
             for edge in graph.edges {
                 guard let a = graph.nodes.first(where: { $0.address == edge.from }), let b = graph.nodes.first(where: { $0.address == edge.to }) else { continue }

@@ -215,11 +215,11 @@ struct REPatchView: View {
             }
             VStack(alignment: .leading, spacing: SSSpacing.s) {
                 HStack {
-                    TextField("Address", text: $address).textFieldStyle(.roundedBorder).frame(width: 150)
-                    Picker("", selection: $mode) { Text("Assembly").tag(0); Text("Hex bytes").tag(1); Text("NOP bytes").tag(2) }.pickerStyle(.segmented).frame(width: 260).labelsHidden()
+                    TextField("Address", text: $address).textFieldStyle(.roundedBorder).frame(width: 120)
+                    Picker("", selection: $mode) { Text("Assembly").tag(0); Text("Hex bytes").tag(1); Text("NOP bytes").tag(2) }.pickerStyle(.segmented).fixedSize().labelsHidden().accessibilityLabel("Patch input kind")
                     TextField(mode == 0 ? "e.g. mov w0, #0" : mode == 1 ? "1f 20 03 d5" : "4", text: $input).textFieldStyle(.roundedBorder)
-                    TextField("Note", text: $note).textFieldStyle(.roundedBorder).frame(width: 160)
-                    Button("Add") { Task { await add() } }.buttonStyle(.borderedProminent).tint(SSColor.accent)
+                    TextField("Note", text: $note).textFieldStyle(.roundedBorder).frame(minWidth: 70, maxWidth: 160)
+                    Button("Add") { Task { await add() } }.buttonStyle(.borderedProminent).tint(SSColor.accent).fixedSize()
                 }.controlSize(.small)
                 Text("Patches are recorded here and written only to a copy. The original binary is never modified, and the copy is not re-signed or run.")
                     .font(SSTypography.caption()).foregroundStyle(.secondary)
@@ -235,6 +235,7 @@ struct REPatchView: View {
                     Spacer()
                     if p.applied { SSBadge(text: "exported", tint: SSColor.success) }
                     Button { try? module.removePatch(projectID: projectID, id: p.id); reload() } label: { Image(systemName: "trash") }.buttonStyle(.borderless)
+                        .help("Remove this patch").accessibilityLabel("Remove patch at 0x\(p.address)")
                 }
             }.listStyle(.plain)
         }

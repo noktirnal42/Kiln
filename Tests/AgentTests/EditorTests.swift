@@ -146,7 +146,9 @@ struct EditorDocumentTests {
 @MainActor
 struct EditorSettingsAndSplitTests {
     @Test func settingsPersistAndAreClamped() {
-        let defaults = UserDefaults(suiteName: "kiln-settings-\(UUID().uuidString)")!
+        let suiteName = "kiln-settings-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
         let a = EditorSettings(defaults: defaults)
         #expect(a.fontSize == 13 && a.tabWidth == 4 && a.insertSpaces && !a.softWrap && a.showLineNumbers)
         a.fontSize = 18; a.tabWidth = 2; a.softWrap = true; a.insertSpaces = false
@@ -158,7 +160,9 @@ struct EditorSettingsAndSplitTests {
     }
 
     @Test func fontFamilyAndThemePersistAndFallBack() {
-        let defaults = UserDefaults(suiteName: "kiln-settings-\(UUID().uuidString)")!
+        let suiteName = "kiln-settings-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
         let a = EditorSettings(defaults: defaults)
         #expect(a.fontFamily == .system && a.theme == .system)
         a.fontFamily = .menlo; a.theme = .dark
@@ -404,7 +408,9 @@ struct ProjectCommandTests {
     }
 
     @Test func selectionIsRememberedPerProject() {
-        let defaults = UserDefaults(suiteName: "kiln-sel-\(UUID().uuidString)")!
+        let suite = "kiln-sel-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }   // every run used to leave a plist in ~/Library/Preferences
         let root = URL(fileURLWithPath: "/tmp/proj-a")
         BuildSelection(scheme: "S", configuration: "Release").save(for: root, defaults: defaults)
         #expect(BuildSelection.load(for: root, defaults: defaults) == BuildSelection(scheme: "S", configuration: "Release"))

@@ -67,27 +67,30 @@ struct SSTabStrip<Tab: Hashable & Identifiable>: View {
     var body: some View {
         // Full labels when they fit; otherwise only the selected tab keeps its label and the rest
         // collapse to their icons (never truncated text, never a hidden overflow).
+        // Full labels with icons when they fit; then labels alone, packed tighter (words read faster than a row of
+        // icons); then only the selected tab keeps its label; then scroll. Never truncated text, never a hidden overflow.
         ViewThatFits(in: .horizontal) {
             strip(allLabels: true)
+            if symbol != nil { strip(allLabels: true, icons: false) }
             if symbol != nil { strip(allLabels: false) }
             ScrollView(.horizontal, showsIndicators: false) { strip(allLabels: true) }
         }
         .frame(height: SSChrome.headerHeight - 8)
     }
 
-    private func strip(allLabels: Bool) -> some View {
+    private func strip(allLabels: Bool, icons: Bool = true) -> some View {
         HStack(spacing: 2) {
             ForEach(tabs) { tab in
                 let selected = tab == selection
                 Button { selection = tab } label: {
                     HStack(spacing: 5) {
-                        if let symbol { Image(systemName: symbol(tab)).font(.system(size: 11)) }
+                        if let symbol, icons { Image(systemName: symbol(tab)).font(.system(size: 11)) }
                         if allLabels || selected || symbol == nil {
                             Text(title(tab)).font(.system(size: 12, weight: selected ? .semibold : .regular)).lineLimit(1)
                         }
                     }
                     .foregroundStyle(selected ? Color.primary : Color.secondary)
-                    .padding(.horizontal, allLabels || selected ? 10 : 7).padding(.vertical, 5)
+                    .padding(.horizontal, !icons ? 7 : (allLabels || selected ? 10 : 7)).padding(.vertical, 5)
                     .background(selected ? SSColor.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: SSCornerRadius.small))
                     .overlay(alignment: .bottom) {
                         if selected { Capsule().fill(SSColor.accent).frame(height: 2).padding(.horizontal, 8).offset(y: 3) }

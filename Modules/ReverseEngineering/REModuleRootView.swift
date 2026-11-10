@@ -46,6 +46,8 @@ struct REProjectBrowser: View {
     @State private var importError: String?
     @State private var showBench = false
     @State private var showPackageIntake = false
+    @State private var deleting: REModule.REProject?
+    @State private var hovered: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -84,6 +86,11 @@ struct REProjectBrowser: View {
             }
         }
         .background(SSColor.surface)
+        .confirmationDialog("Delete “\(deleting?.binaryURL.lastPathComponent ?? "")”?",
+                            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { project in
+            Button("Delete Project", role: .destructive) { Task { try? await module.deleteProject(id: project.id) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in Text("The analysis, annotations, patches and findings of this project are removed. The original file you imported is not touched.") }
         .sheet(isPresented: $showBench) { REDeviceBenchView(bench: module.deviceBench) }
         .sheet(isPresented: $showPackageIntake) { REPackageIntakeView(module: module) }
         .fileImporter(isPresented: $importer, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
@@ -97,24 +104,35 @@ struct REProjectBrowser: View {
 
     private func projectRow(_ project: REModule.REProject) -> some View {
         let selected = module.selected?.id == project.id
-        return Button { module.select(projectID: project.id) } label: {
-            HStack(spacing: SSSpacing.s) {
-                Image(systemName: "cube").foregroundStyle(selected ? SSColor.accent : .secondary).frame(width: 18)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(project.binaryURL.lastPathComponent).font(.system(size: 12.5, weight: .medium)).lineLimit(1)
-                    Text(functionSummary(for: project)).font(SSTypography.caption()).foregroundStyle(.secondary)
+        return HStack(spacing: 2) {
+            Button { module.select(projectID: project.id) } label: {
+                HStack(spacing: SSSpacing.s) {
+                    Image(systemName: "cube").foregroundStyle(selected ? SSColor.accent : .secondary).frame(width: 18)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(project.binaryURL.lastPathComponent).font(.system(size: 12.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                        Text(functionSummary(for: project)).font(SSTypography.caption()).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, SSSpacing.s).padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected ? SSColor.accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(selected ? .isSelected : [])
+            // Shown for the selected or hovered row so the list stays quiet; asks before anything is removed.
+            if selected || hovered == project.id {
+                Button { deleting = project } label: { Image(systemName: "trash").font(.system(size: 11)) }
+                    .buttonStyle(.borderless)
+                    .help("Delete this project…")
+                    .accessibilityLabel("Delete project \(project.binaryURL.lastPathComponent)")
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, SSSpacing.s).padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(selected ? SSColor.accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
+        .onHover { hovered = $0 ? project.id : (hovered == project.id ? nil : hovered) }
         .help(project.binaryURL.path)
         .contextMenu {
-            Button("Delete Project", role: .destructive) { Task { try? await module.deleteProject(id: project.id) } }
+            Button("Delete Project…", role: .destructive) { deleting = project }
         }
     }
 

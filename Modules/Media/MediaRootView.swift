@@ -10,25 +10,24 @@ struct MediaRootView: View {
     enum Section: String, CaseIterable, Identifiable {
         case viewer = "Viewer", gallery = "Gallery", image = "Image", voice = "Voice"
         var id: String { rawValue }
+        var symbol: String {
+            switch self { case .viewer: "play.rectangle"; case .gallery: "square.grid.2x2"; case .image: "photo"; case .voice: "waveform" }
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Picker("Media", selection: $section) {
-                    ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
-                Spacer()
+            SSActivityHeader(title: "Media", subtitle: "Play and view files, generate images, speak and transcribe", symbol: "play.rectangle", tabs: {
+                SSTabStrip(tabs: Section.allCases, selection: $section, title: { $0.rawValue }, symbol: { $0.symbol })
+            }, trailing: {
                 if let busy = module.busy {
                     ProgressView().controlSize(.small)
-                    Text(busy).font(SSTypography.caption()).foregroundStyle(.secondary)
+                    Text(busy).font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
                 }
-                Button { openPanel() } label: { Label("Open…", systemImage: "folder") }
+                Button { openPanel() } label: { Label("Open a media file…", systemImage: "folder") }
                     .keyboardShortcut("o", modifiers: [.command, .shift])
-            }
-            .padding(SSSpacing.s)
-            Divider()
+                    .help("Open a video, image or audio file (⇧⌘O)")
+            })
             Group {
                 switch section {
                 case .viewer: ViewerPane(module: module)

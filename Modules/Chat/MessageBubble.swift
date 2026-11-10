@@ -106,26 +106,37 @@ struct MessageBubble: View {
     // MARK: Actions
 
     private var actionRow: some View {
-        HStack(spacing: 2) {
-            actionButton("doc.on.doc", "Copy") { copy() }
-            if message.role == .assistant {
-                actionButton("arrow.clockwise", "Regenerate") { Task { await session.regenerate() } }
-            }
-            actionButton("arrow.triangle.branch", "Fork conversation from here") { Task { await session.fork(at: message.id) } }
+        HStack(spacing: 6) {
+            // A message whose run changed files always shows that it can be undone; the rest appear on hover.
             if message.role == .user, session.checkpointedMessageIDs.contains(message.id) {
-                actionButton("arrow.uturn.backward", "Rewind to before this message, restoring the files the agent changed") { Task { await session.rewind(to: message.id) } }
+                Button { Task { await session.rewind(to: message.id) } } label: {
+                    Label("Rewind", systemImage: "arrow.uturn.backward").font(.system(size: 11))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(hovering ? Color.primary : Color.secondary)
+                .help("Rewind to before this message, restoring the files the agent changed")
+                .accessibilityLabel("Rewind to before this message and restore files")
             }
-            actionButton("trash", "Delete message") { Task { await session.deleteMessage(message.id) } }
-            if message.role == .assistant {
-                Text(meta)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .padding(.leading, 6)
-                    .lineLimit(1)
+            HStack(spacing: 2) {
+                actionButton("doc.on.doc", "Copy") { copy() }
+                if message.role == .assistant {
+                    actionButton("arrow.clockwise", "Regenerate") { Task { await session.regenerate() } }
+                }
+                actionButton("arrow.triangle.branch", "Fork conversation from here") { Task { await session.fork(at: message.id) } }
+                actionButton("trash", "Delete message") { Task { await session.deleteMessage(message.id) } }
+                if message.role == .assistant {
+                    Text(meta)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .padding(.leading, 6)
+                        .lineLimit(1)
+                }
             }
+            // Never fully transparent: SwiftUI drops opacity-0 controls from the accessibility tree, which left these
+            // actions unreachable for VoiceOver and keyboard users. To the eye they still appear only on hover.
+            .opacity(hovering ? 1 : 0.01)
+            .animation(.easeOut(duration: 0.12), value: hovering)
         }
-        .opacity(hovering ? 1 : 0)
-        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 
     private var meta: String {

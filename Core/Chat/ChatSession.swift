@@ -518,8 +518,12 @@ public final class ChatSession {
         return renamed
     }
 
+    /// Bumped whenever a conversation is deleted, so lists of conversations (sidebar, Sessions) know to reload.
+    public private(set) var conversationListGeneration = 0
+
     public func deleteConversation(_ id: UUID) async {
         try? await conversations.deleteConversation(id)
+        conversationListGeneration += 1
         compactions[id] = nil
         saveCompactions()
         if conversationID == id {
@@ -548,7 +552,10 @@ public final class ChatSession {
         guard !trimmed.isEmpty, !isStreaming else { return }
         switch SlashCommands.resolve(trimmed, commands: availableCommands()) {
         case .plainMessage: break
-        case .builtIn(let command, let arguments): await runBuiltIn(command, arguments: arguments); return
+        case .builtIn(let command, let arguments):
+            errorText = nil
+            await runBuiltIn(command, arguments: arguments)
+            return
         case .unknown(let name): errorText = "Unknown command /\(name). Type /help for the list."; return
         case .prompt(let expanded, let name, let model):
             if let model, !model.isEmpty, await registry.allModels().contains(where: { $0.id == model }) { selectedModelID = model }

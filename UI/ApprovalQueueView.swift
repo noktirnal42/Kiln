@@ -23,8 +23,9 @@ struct ApprovalQueueView: View {
                 pendingList
             }
             Divider()
+            // With nothing waiting, the open grants list gets the sheet; with requests waiting it stays a short strip under them.
             grantsSection
-                .frame(maxHeight: showGrants ? 260 : nil)
+                .frame(maxHeight: showGrants ? (center.pending.isEmpty ? .infinity : 220) : nil)
         }
         .frame(minWidth: 480, idealWidth: 560, minHeight: 420, idealHeight: 520)
         .background(SSColor.background)
@@ -37,7 +38,7 @@ struct ApprovalQueueView: View {
             Image(systemName: "checkmark.shield")
                 .foregroundStyle(SSColor.accent)
             VStack(alignment: .leading, spacing: 1) {
-                Text("Approval Queue")
+                Text("Approvals and Permissions")
                     .font(SSTypography.headline())
                 Text(center.pending.isEmpty
                      ? "Nothing is waiting on you"
@@ -77,8 +78,9 @@ struct ApprovalQueueView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: showGrants ? 130 : .infinity)
         .padding(SSSpacing.m)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Grants
@@ -104,6 +106,9 @@ struct ApprovalQueueView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, SSSpacing.m)
             .padding(.vertical, SSSpacing.s)
+            .help("What you answered “Always Allow” to. Each one can be revoked.")
+            .accessibilityLabel("Standing grants, \(center.grants.all().count)")
+            .accessibilityHint(showGrants ? "Collapses the list" : "Expands the list")
 
             if showGrants {
                 ScrollView { GrantList(center: center) }
@@ -242,6 +247,7 @@ private struct ApprovalRequestRow: View {
 private struct GrantList: View {
     @MainActor
     let center: ApprovalCenter
+    @State private var confirmRevokeAll = false
 
     var body: some View {
         let grants = center.grants.all().sorted { $0.createdAt < $1.createdAt }
@@ -258,9 +264,11 @@ private struct GrantList: View {
                         GrantRow(center: center, grant: grant)
                         Divider().padding(.leading, SSSpacing.m)
                     }
-                    Button("Revoke All", role: .destructive) {
-                        center.grants.revokeAll()
-                    }
+                    Button("Revoke All…", role: .destructive) { confirmRevokeAll = true }
+                    .confirmationDialog("Revoke all \(grants.count) standing grants?", isPresented: $confirmRevokeAll) {
+                        Button("Revoke All", role: .destructive) { center.grants.revokeAll() }
+                        Button("Cancel", role: .cancel) {}
+                    } message: { Text("The agent will ask again before using these tools, commands and hosts.") }
                     .font(SSTypography.caption())
                     .buttonStyle(.borderless)
                     .padding(.horizontal, SSSpacing.m)
@@ -285,7 +293,7 @@ private struct GrantRow: View {
                     .font(.system(size: 11, design: .monospaced))
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Text("\(kindLabel) · since \(grant.createdAt.formatted(date: .omitted, time: .shortened))")
+                Text("\(kindLabel) · since \(grant.createdAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(SSTypography.caption())
                     .foregroundStyle(.secondary)
             }
@@ -295,9 +303,11 @@ private struct GrantRow: View {
             }
             .font(SSTypography.caption())
             .buttonStyle(.borderless)
+            .accessibilityLabel("Revoke \(kindLabel) \(grant.value)")
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.vertical, SSSpacing.s)
+        .help(grant.value)
     }
 
     private var kindSymbol: String {
