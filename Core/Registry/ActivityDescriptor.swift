@@ -14,6 +14,8 @@ struct StarterPrompt: Identifiable, Equatable, Sendable {
 struct ToolRegistrationContext {
     let registry: ToolRegistry
     let loadedModule: @MainActor (String) async -> Any?
+    /// The Develop IDE service, for the `ide_*` tools (Develop is built into the shell, not a module).
+    var develop: DevelopController?
 
     func module<M>(_ identifier: String, as type: M.Type = M.self) async -> M? {
         await loadedModule(identifier) as? M

@@ -38,6 +38,7 @@ public final class AppModel {
     /// Open files and the folder navigator; here, not in a view, so unsaved edits survive switching tools.
     public let editor = EditorWorkspace()
     public let builder = BuildRunner()
+    @ObservationIgnored public lazy var develop = DevelopController(editor: editor, builder: builder)
     public var activeModuleID: String?
     var requestedActivity: Activity?
     private var pendingWebURLs: [URL] = []
@@ -183,7 +184,8 @@ public final class AppModel {
         let manager = self.manager
         await ActivityRegistry.standard.registerTools(ToolRegistrationContext(
             registry: .shared,
-            loadedModule: { identifier in await manager.record(for: identifier)?.module }
+            loadedModule: { identifier in await manager.record(for: identifier)?.module },
+            develop: develop
         ))
         await syncUIModules()
         flushPendingWebURLs()

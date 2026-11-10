@@ -44,6 +44,8 @@ public final class EditorWorkspace {
     public var pendingLine: (id: UUID, line: Int, column: Int)?
     public var message: String?
     public var showHidden = false
+    /// Caret of the active editor (1-based), kept here so commands and agent tools can act "at the caret".
+    public var caret = (line: 1, column: 1)
 
     private var pollTask: Task<Void, Never>?
     private let recovery: EditorRecoveryStore
@@ -88,6 +90,7 @@ public final class EditorWorkspace {
             if root != nil { languageServer.stop(); debug.reset() }
             root = nil
             debug.breakpoints = [:]
+            debug.breakpointConditions = [:]
             return
         }
         let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
@@ -189,6 +192,8 @@ public final class EditorWorkspace {
 
     private func loadBreakpoints() {
         let stored = UserDefaults.standard.dictionary(forKey: breakpointsKey) as? [String: [Int]] ?? [:]
+        debug.breakpointConditions = (UserDefaults.standard.dictionary(forKey: conditionsKey) as? [String: [String: String]] ?? [:])
+            .mapValues { Dictionary(uniqueKeysWithValues: $0.compactMap { key, value in Int(key).map { ($0, value) } }) }
         debug.breakpoints = stored.mapValues(Set.init)
     }
 
@@ -196,6 +201,14 @@ public final class EditorWorkspace {
         debug.toggleBreakpoint(path: url.path, line: line)
         UserDefaults.standard.set(debug.breakpoints.mapValues { $0.sorted() }, forKey: breakpointsKey)
     }
+
+    public func setBreakpointCondition(_ url: URL, line: Int, condition: String?) {
+        debug.setCondition(path: url.path, line: line, condition: condition)
+        let stored = debug.breakpointConditions.mapValues { Dictionary(uniqueKeysWithValues: $0.map { (String($0.key), $0.value) }) }
+        UserDefaults.standard.set(stored, forKey: conditionsKey)
+    }
+
+    private var conditionsKey: String { "debug.conditions." + (root?.path ?? "") }
 
     public func breakpointLines(for url: URL) -> Set<Int> { debug.breakpoints[url.path] ?? [] }
 

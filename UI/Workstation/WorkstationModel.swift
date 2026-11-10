@@ -174,6 +174,7 @@ final class WorkstationModel {
                 id: "modules.show", title: "Show loaded modules", subtitle: "Module lifecycle and the event bus",
                 symbol: "puzzlepiece.extension", keywords: ["debug", "events", "bus"], run: { [weak self] in self?.showModules = true }),
         ]
+        list += DevelopCommands.all(app: app, select: { [weak self] in self?.select(.develop, app: app) })
         list += capabilityCommands { [weak self] activity in self?.select(activity, app: app) }
         return list
     }

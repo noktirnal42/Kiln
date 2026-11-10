@@ -6,13 +6,17 @@ import SwiftUI
 struct EditorView: View {
     @Environment(AppModel.self) private var app
     @State private var caret = (line: 1, column: 1)
-    @State private var showProblems = true
+    @State private var renaming: String?
+    @State private var blame: [Int: GitBlameLine] = [:]
+    private var showProblems: Bool {
+        get { develop.showBottom }
+        nonmutating set { develop.showBottom = newValue }
+    }
     @State private var showQuickOpen = false
     @State private var showGoToLine = false
     @State private var goToLineText = ""
     @State private var closing: EditorDocument?
     @State private var treeVersion = 0
-    @State private var navigatorMode = NavigatorMode.files
     @State private var searchQuery = ""
     @State private var searchHits: [ProjectHit] = []
     @State private var searching = false
@@ -23,13 +27,11 @@ struct EditorView: View {
     @State private var showBuildOptions = false
     @State private var debugPane = DebugPane.variables
     enum DebugPane: String, CaseIterable { case stack = "Stack", variables = "Variables", console = "Console" }
-    @State private var preparingDebugger = false
     @State private var bottomMode = BottomMode.problems
     enum BottomMode: String, CaseIterable { case problems = "Problems", debug = "Debug" }
     private var debug: DebugSession { editor.debug }
     private var settings: EditorSettings { EditorSettings.shared }
 
-    enum NavigatorMode: String, CaseIterable { case files = "Files", search = "Find", changes = "Changes" }
     @State private var changed: [GitFileStatus] = []
     @State private var discarding: GitFileStatus?
 
@@ -43,25 +45,37 @@ struct EditorView: View {
 
     private var editor: EditorWorkspace { app.editor }
     private var builder: BuildRunner { app.builder }
+    private var develop: DevelopController { app.develop }
+    private var preparingDebugger: Bool { develop.preparingDebugger }
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar
             Divider()
             HSplitView {
-                navigator
-                    .frame(minWidth: 160, idealWidth: 200, maxWidth: 280, maxHeight: .infinity, alignment: .top)
-                    .background(SSColor.surface)
+                if develop.showNavigator {
+                    navigator
+                        .frame(minWidth: 180, idealWidth: 230, maxWidth: 340, maxHeight: .infinity, alignment: .top)
+                        .background(SSColor.surface)
+                }
                 VStack(spacing: 0) {
                     tabBar
                     Divider()
                     banners
+                    if let document = editor.active, document.isEditable {
+                        DevelopJumpBar(develop: develop, document: document)
+                    }
                     editorArea
                     Divider()
                     statusBar
                     if showProblems { problemsPanel }
                 }
                 .frame(minWidth: 320, maxHeight: .infinity, alignment: .top)
+                if develop.showInspector {
+                    inspector
+                        .frame(minWidth: 200, idealWidth: 240, maxWidth: 340, maxHeight: .infinity, alignment: .top)
+                        .background(SSColor.surface)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -100,8 +114,107 @@ struct EditorView: View {
                 editor.open(URL(fileURLWithPath: location.path), line: location.line)
             }
         }
+        .onChange(of: develop.request) { _, request in
+            guard let request else { return }
+            develop.request = nil
+            switch request {
+            case .quickOpen: showQuickOpen = true
+            case .goToLine: showGoToLine = true
+            case .rename: beginRename()
+            case .showProblems: develop.showBottom = true; bottomMode = .problems
+            case .showDebug: develop.showBottom = true; bottomMode = .debug
+            case .quickHelp: develop.showInspector = true; Task { await develop.showQuickHelp() }
+            }
+        }
+        .onChange(of: develop.error) { _, message in
+            if let message { fileError = message; develop.error = nil }
+        }
+        .task(id: outlineKey) {
+            guard let document = editor.active, document.isEditable else { return }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            await develop.refreshOutline(for: document)
+        }
+        .task(id: blameKey) { await loadBlame() }
+        .popover(isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }), arrowEdge: .top) {
+            DevelopRenameForm(develop: develop, currentName: renaming ?? "") { renaming = nil }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in editor.writeRecovery() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in editor.tick() }
+    }
+
+    // MARK: Develop actions
+
+    private var outlineKey: String {
+        guard let document = editor.active else { return "" }
+        return "\(document.id)-\(document.text.hashValue)-\(editor.languageServer.state == .running)"
+    }
+
+    private var blameKey: String {
+        guard let document = editor.active else { return "" }
+        return "\(document.id)-\(document.savedText.hashValue)-\(document.gitBase?.hashValue ?? 0)"
+    }
+
+    private func loadBlame() async {
+        guard let document = editor.active, document.isEditable, !document.isDirty else { return }
+        let path = document.url.path
+        guard let root = editor.root, path.hasPrefix(root.path + "/") else { blame = [:]; return }
+        let lines = (try? await develop.blame(path: path)) ?? []
+        guard editor.active?.url.path == path else { return }
+        blame = Dictionary(lines.map { ($0.lineNumber, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    private func beginRename() {
+        guard let document = editor.active else { return }
+        guard let word = DevelopController.word(in: document.text, line: editor.caret.line, column: editor.caret.column) else {
+            fileError = "Put the caret on a symbol to rename it."
+            return
+        }
+        renaming = word
+    }
+
+    /// Xcode's right-hand inspector, reduced to what Kiln can answer: Quick Help, the file, and who last changed the line.
+    private var inspector: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SSPaneHeader("Inspector")
+            ScrollView {
+                VStack(alignment: .leading, spacing: SSSpacing.m) {
+                    inspectorSection("Quick Help") {
+                        if let help = develop.quickHelp {
+                            Text(help).font(SSTypography.mono(10)).textSelection(.enabled)
+                        } else {
+                            Text("Right-click a symbol and choose Quick Help.").font(SSTypography.caption()).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let document = editor.active {
+                        inspectorSection("File") {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(editor.displayPath(document.url)).font(SSTypography.mono(10)).textSelection(.enabled)
+                                Text("\(document.text.components(separatedBy: "\n").count) lines · \(SyntaxHighlighter.language(for: document.url).rawValue)")
+                                    .font(SSTypography.caption()).foregroundStyle(.secondary)
+                                if !document.gitHunks.isEmpty { Text("\(document.gitHunks.count) change(s) since the last commit").font(SSTypography.caption()).foregroundStyle(SSColor.accent) }
+                            }
+                        }
+                        if let line = blame[caret.line] {
+                            inspectorSection("Line \(caret.line)") {
+                                Text("\(line.author)\n\(line.hash)").font(SSTypography.mono(10)).textSelection(.enabled)
+                            }
+                        }
+                        let symbols = LSPSymbol.trail(at: caret.line - 1, in: develop.outlines[document.id] ?? [])
+                        if !symbols.isEmpty {
+                            inspectorSection("Symbol") {
+                                Text(symbols.map { "\($0.kind.label) \($0.name)" }.joined(separator: "\n")).font(SSTypography.mono(10))
+                            }
+                        }
+                    }
+                }
+                .padding(SSSpacing.m).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func inspectorSection<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) { SSSectionLabel(title); content() }
     }
 
     // MARK: Toolbar
@@ -157,15 +270,7 @@ struct EditorView: View {
                     .padding(SSSpacing.m).frame(width: 300)
                 }
             Spacer()
-            if builder.isRunning {
-                ProgressView().controlSize(.small)
-            } else if let status = builder.lastExitStatus {
-                Label(status == 0 ? "\(builder.currentKind == .build ? "Build" : builder.currentKind == .test ? "Tests" : "Run") succeeded"
-                                  : "\(builder.currentKind == .build ? "Build" : builder.currentKind == .test ? "Tests" : "Run") failed",
-                      systemImage: status == 0 ? "checkmark.circle.fill" : "xmark.octagon.fill")
-                    .foregroundStyle(status == 0 ? SSColor.success : SSColor.danger)
-                    .font(SSTypography.caption())
-            }
+            if builder.isRunning { ProgressView().controlSize(.small) }
             if let document = editor.active, let hunk = LineDiff.hunk(at: caret.line - 1, in: document.gitHunks) {
                 Button { document.text = LineDiff.revert(hunk, in: document.text) } label: { Label("Revert Change", systemImage: "arrow.uturn.backward") }
                     .help("Put the lines at the caret back to the committed version")
@@ -177,6 +282,13 @@ struct EditorView: View {
             if editor.secondary != nil {
                 Button { editor.closeSplit() } label: { Label("Unsplit", systemImage: "rectangle") }
             }
+            Divider().frame(height: 16)
+            Button { develop.showNavigator.toggle() } label: { Image(systemName: "sidebar.left") }
+                .help("Show or hide the navigator (⌥⌘1)").accessibilityLabel("Toggle navigator")
+            Button { develop.showBottom.toggle() } label: { Image(systemName: "rectangle.bottomthird.inset.filled") }
+                .help("Show or hide the debug area (⇧⌘Y)").accessibilityLabel("Toggle debug area")
+            Button { develop.showInspector.toggle() } label: { Image(systemName: "sidebar.right") }
+                .help("Show or hide the inspector (⌥⌘0)").accessibilityLabel("Toggle inspector")
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.borderless)
@@ -205,13 +317,7 @@ struct EditorView: View {
         .padding(SSSpacing.m).frame(width: 280)
     }
 
-    private var buildPlan: BuildRunner.Plan? {
-        if !builder.customCommand.trimmingCharacters(in: .whitespaces).isEmpty {
-            return BuildRunner.Plan(title: "Custom", command: builder.customCommand)
-        }
-        if let plan = ProjectCommands.build(info: builder.info, selection: builder.selection) { return plan }
-        return editor.root.flatMap { BuildRunner.detectPlan(in: $0) }
-    }
+    private var buildPlan: BuildRunner.Plan? { develop.buildPlan }
 
     private var buildCommand: String? { buildPlan?.command }
 
@@ -232,29 +338,15 @@ struct EditorView: View {
 
     /// Builds with the selected scheme, resolves the executable, then runs it under lldb.
     private func startDebugging() {
-        guard !preparingDebugger, !builder.isRunning, !debug.isActive,
-              let root = editor.root, let plan = buildPlan else { return }
-        guard editor.saveProjectDocuments() else {
-            fileError = "Save all changes before starting the debugger."
-            return
-        }
-        let info = builder.info
-        let selection = builder.selection
-        preparingDebugger = true
+        guard !preparingDebugger, !builder.isRunning, !debug.isActive else { return }
         bottomMode = .debug
         showProblems = true
         Task {
-            defer { preparingDebugger = false }
-            builder.run(command: plan.command, in: root, kind: .build)
-            while builder.isRunning { try? await Task.sleep(nanoseconds: 100_000_000) }
-            guard editor.root == root else { return }
-            guard builder.lastExitStatus == 0 else { bottomMode = .problems; return }
-            guard let program = await ProgramResolver.resolve(info: info, selection: selection, root: root) else {
-                fileError = "Kiln could not find the built executable to debug."
-                return
+            do { try await develop.startDebugging() }
+            catch {
+                if builder.lastExitStatus != 0 { bottomMode = .problems }
+                fileError = error.localizedDescription
             }
-            guard editor.root == root else { return }
-            await debug.start(program: program, workingDirectory: root)
         }
     }
 
@@ -268,29 +360,13 @@ struct EditorView: View {
         editor.toggleBreakpoint(document.url, line: caret.line)
     }
 
-    private func runBuild() {
-        guard !debug.isActive, !preparingDebugger else { return }
-        guard let root = editor.root, let command = buildCommand else { return }
-        guard editor.saveProjectDocuments() else { return }
-        builder.run(command: command, in: root, kind: .build)
-        showProblems = true
+    private func perform(_ body: () throws -> Void) {
+        do { try body(); showProblems = true } catch { fileError = error.localizedDescription }
     }
 
-    private func runTests(filter: String? = nil) {
-        guard !debug.isActive, !preparingDebugger else { return }
-        guard let root = editor.root, let plan = ProjectCommands.test(info: builder.info, selection: builder.selection, filter: filter) else { return }
-        guard editor.saveProjectDocuments() else { return }
-        builder.run(command: plan.command, in: root, kind: .test)
-        showProblems = true
-    }
-
-    private func runApp() {
-        guard !debug.isActive, !preparingDebugger else { return }
-        guard let root = editor.root, let plan = ProjectCommands.run(info: builder.info, selection: builder.selection) else { return }
-        guard editor.saveProjectDocuments() else { return }
-        builder.run(command: plan.command, in: root, kind: .run)
-        showProblems = true
-    }
+    private func runBuild() { perform { try develop.startBuild() } }
+    private func runTests(filter: String? = nil) { perform { try develop.startTests(filter: filter) } }
+    private func runApp() { perform { try develop.startRun() } }
 
     /// Scheme and configuration pickers, shown when the toolchain reported choices.
     @ViewBuilder
@@ -328,6 +404,15 @@ struct EditorView: View {
             Button("") { runApp() }.keyboardShortcut("r", modifiers: .command)
             Button("") { requestClose(editor.active) }.keyboardShortcut("w", modifiers: .command)
             Button("") { showGoToLine = true }.keyboardShortcut("l", modifiers: .command)
+            Button("") { Task { await develop.goToDefinition() } }.keyboardShortcut("j", modifiers: [.command, .control])
+            Button("") { Task { await develop.findReferences() } }.keyboardShortcut("u", modifiers: [.command, .control])
+            Button("") { beginRename() }.keyboardShortcut("e", modifiers: [.command, .control])
+            Button("") { develop.goBack() }.keyboardShortcut(.leftArrow, modifiers: [.command, .control])
+            Button("") { develop.goForward() }.keyboardShortcut(.rightArrow, modifiers: [.command, .control])
+            Button("") { develop.showNavigator.toggle() }.keyboardShortcut("1", modifiers: [.command, .option])
+            Button("") { develop.showInspector.toggle() }.keyboardShortcut("0", modifiers: [.command, .option])
+            Button("") { develop.showBottom.toggle() }.keyboardShortcut("y", modifiers: [.command, .shift])
+            Button("") { develop.navigator = .find; develop.showNavigator = true }.keyboardShortcut("f", modifiers: [.command, .shift])
         }
         .buttonStyle(.plain).frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
         .popover(isPresented: $showGoToLine) { goToLine }
@@ -485,15 +570,28 @@ struct EditorView: View {
 
     private var navigator: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $navigatorMode) {
-                ForEach(NavigatorMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            Picker("", selection: Bindable(develop).navigator) {
+                ForEach(DevelopController.Navigator.allCases, id: \.self) { mode in
+                    Image(systemName: mode.symbolName).tag(mode).help(mode.rawValue).accessibilityLabel(mode.rawValue)
+                }
             }
             .pickerStyle(.segmented).labelsHidden().padding(SSSpacing.xs)
             .accessibilityLabel("Navigator view")
-            if navigatorMode == .search {
-                projectSearch
-            } else if navigatorMode == .changes {
+            if develop.navigator == .find {
+                if let references = develop.references {
+                    DevelopReferencesList(develop: develop, title: references.title, places: references.places)
+                } else {
+                    projectSearch
+                }
+            } else if develop.navigator == .changes {
                 changesList
+            } else if develop.navigator == .symbols {
+                if let document = editor.active { DevelopSymbolList(develop: develop, document: document) }
+                else { SSEmptyState(symbol: "list.bullet.indent", title: "No file open", message: "Open a file to see its symbols.") }
+            } else if develop.navigator == .issues {
+                DevelopIssuesList(develop: develop, onAskAgent: askAgentToFix)
+            } else if develop.navigator == .tests {
+                DevelopTestsList(develop: develop) { runTests(filter: $0) }
             } else if let root = editor.root {
                 HStack {
                     Image(systemName: "folder").foregroundStyle(.secondary)
@@ -643,17 +741,22 @@ struct EditorView: View {
                 language: SyntaxHighlighter.language(for: document.url),
                 jump: editor.pendingLine.flatMap { $0.id == document.id ? ($0.line, $0.column) : nil },
                 onJumpDone: { editor.pendingLine = nil },
-                onCaretMove: { if tracksCaret { caret = ($0, $1) } },
+                onCaretMove: { if tracksCaret { caret = ($0, $1); editor.caret = ($0, $1) } },
                 diagnostics: editor.languageServer.diagnostics[document.url.path] ?? [],
                 onEdited: { editor.noteEdited(document) },
                 breakpointLines: editor.breakpointLines(for: document.url),
                 executionLine: debug.currentLocation.flatMap { DebugSession.canonicalSourcePath($0.path) == DebugSession.canonicalSourcePath(document.url.path) ? $0.line : nil },
                 onToggleBreakpoint: { editor.toggleBreakpoint(document.url, line: $0) },
                 onDefinition: { line, column in
-                    Task {
-                        if let target = await editor.languageServer.definition(url: document.url, line: line, column: column) {
-                            editor.open(URL(fileURLWithPath: target.path), line: target.line + 1, column: target.column + 1)
-                        }
+                    Task { await develop.goToDefinition(path: document.url.path, line: line + 1, column: column + 1) }
+                },
+                onSymbolAction: { action, line, column in
+                    editor.caret = (line + 1, column + 1)
+                    switch action {
+                    case .definition: Task { await develop.goToDefinition(path: document.url.path, line: line + 1, column: column + 1) }
+                    case .references: Task { await develop.findReferences(path: document.url.path, line: line + 1, column: column + 1) }
+                    case .rename: beginRename()
+                    case .quickHelp: develop.showInspector = true; Task { await develop.showQuickHelp(path: document.url.path, line: line + 1, column: column + 1) }
                     }
                 },
                 onComplete: { line, column in
@@ -685,10 +788,13 @@ struct EditorView: View {
 
     private var statusBar: some View {
         HStack(spacing: SSSpacing.m) {
+            DevelopActivityStrip(develop: develop)
             if let document = editor.active {
-                Text(editor.displayPath(document.url)).lineLimit(1).truncationMode(.head)
                 Spacer()
                 if document.isEditable {
+                    if let line = blame[caret.line] {
+                        Text("\(line.author) · \(line.hash.prefix(7))").lineLimit(1).help("Last changed by \(line.author) in \(line.hash)")
+                    }
                     Text("Ln \(caret.line), Col \(caret.column)")
                     Text(SyntaxHighlighter.language(for: document.url).rawValue.capitalized)
                     Text(document.isDirty ? "Edited" : "Saved").foregroundStyle(document.isDirty ? SSColor.accent : .secondary)

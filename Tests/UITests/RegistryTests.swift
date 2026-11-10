@@ -38,7 +38,7 @@ struct ActivityRegistryTests {
 
     @Test func policyPrefixesComeFromTheRegistryAndMatchTheOldList() {
         #expect(Set(ExecutionPolicy.moduleToolPrefixes) ==
-                ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_"])
+                ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_", "ide_"])
         #expect(ExecutionPolicy.isModuleTool("media_open") && !ExecutionPolicy.isModuleTool("read_file"))
     }
 
@@ -97,7 +97,8 @@ struct CapabilityRegistryTests {
             DevicesModule.identifier: DevicesModule(),
             MediaModule.identifier: MediaModule(),
         ]
-        await ActivityRegistry.standard.registerTools(ToolRegistrationContext(registry: registry, loadedModule: { modules[$0] }))
+        await ActivityRegistry.standard.registerTools(ToolRegistrationContext(registry: registry, loadedModule: { modules[$0] },
+            develop: DevelopController(editor: EditorWorkspace(), builder: BuildRunner())))
         return registry
     }
 

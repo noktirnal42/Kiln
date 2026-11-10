@@ -20,6 +20,9 @@ struct CodeTextView: NSViewRepresentable {
     var onToggleBreakpoint: (_ line: Int) -> Void = { _ in }
     /// ⌘-click: 0-based line and UTF-16 column.
     var onDefinition: (_ line: Int, _ column: Int) -> Void = { _, _ in }
+    /// Context-menu actions on the symbol under the pointer (0-based line and UTF-16 column).
+    var onSymbolAction: (_ action: SymbolAction, _ line: Int, _ column: Int) -> Void = { _, _, _ in }
+    enum SymbolAction { case definition, references, rename, quickHelp }
     /// ⌥Esc / F5: asks the server, then shows the system completion popup.
     var onComplete: (_ line: Int, _ column: Int) async -> [String] = { _, _ in [] }
 
@@ -59,6 +62,7 @@ struct CodeTextView: NSViewRepresentable {
         textView.insertionPointColor = .controlAccentColor
         textView.textContainerInset = NSSize(width: 4, height: 6)
         textView.delegate = context.coordinator
+        textView.onSymbolAction = { [weak coordinator = context.coordinator] action, index in coordinator?.symbolAction(action, at: index) }
         textView.onCommandClick = { [weak coordinator = context.coordinator] index in coordinator?.commandClick(at: index) }
         textView.fetchCompletions = { [weak coordinator = context.coordinator] done in coordinator?.fetchCompletions(done) }
         textView.string = document.text
@@ -283,6 +287,12 @@ struct CodeTextView: NSViewRepresentable {
             guard let textView else { return }
             let (line, column) = position(of: index, in: textView.string as NSString)
             parent.onDefinition(line, column)
+        }
+
+        func symbolAction(_ action: SymbolAction, at index: Int) {
+            guard let textView else { return }
+            let (line, column) = position(of: index, in: textView.string as NSString)
+            parent.onSymbolAction(action, line, column)
         }
 
         func fetchCompletions(_ done: @escaping () -> Void) {
@@ -624,6 +634,8 @@ enum MultiCursor {
 /// NSTextView with ⌘-click (go to definition) and server-backed completion.
 final class CodeNSTextView: NSTextView {
     var onCommandClick: ((Int) -> Void)?
+    var onSymbolAction: ((CodeTextView.SymbolAction, Int) -> Void)?
+    private var menuIndex = 0
     var fetchCompletions: ((@escaping () -> Void) -> Void)?
     /// ⌘⌥[ (true) folds, ⌘⌥] (false) unfolds at the caret.
     var onFold: ((Bool) -> Void)?
@@ -635,6 +647,32 @@ final class CodeNSTextView: NSTextView {
             return
         }
         super.mouseDown(with: event)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+        guard onSymbolAction != nil else { return menu }
+        menuIndex = characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
+        let items: [(String, CodeTextView.SymbolAction)] = [
+            ("Jump to Definition", .definition), ("Find References", .references),
+            ("Rename Symbol…", .rename), ("Quick Help", .quickHelp),
+        ]
+        for (offset, entry) in items.enumerated() {
+            let item = NSMenuItem(title: entry.0, action: #selector(runSymbolAction(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = offset
+            menu.insertItem(item, at: offset)
+        }
+        menu.insertItem(.separator(), at: items.count)
+        symbolActions = items.map(\.1)
+        return menu
+    }
+
+    private var symbolActions: [CodeTextView.SymbolAction] = []
+
+    @objc private func runSymbolAction(_ sender: NSMenuItem) {
+        guard symbolActions.indices.contains(sender.tag) else { return }
+        onSymbolAction?(symbolActions[sender.tag], menuIndex)
     }
 
     /// ⌘D adds the next occurrence of the selection as another cursor; typing then edits all of them.

@@ -9,6 +9,12 @@ public struct DebugFrame: Identifiable, Equatable, Sendable {
     public var column: Int
 }
 
+public struct DebugThread: Identifiable, Equatable, Sendable {
+    public var id: Int
+    public var selected: Bool
+    public var summary: String
+}
+
 public struct DebugVariable: Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var name: String
@@ -52,6 +58,16 @@ public enum LLDBOutput {
         return Int(line["Breakpoint ".endIndex..<colon])
     }
 
+    /// `* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1` (the `*` marks the selected thread).
+    public static func thread(_ line: String) -> DebugThread? {
+        let pattern = #"^\s*(\*)?\s*thread #(\d+)[,:]?\s*(.*)$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+              let number = Range(match.range(at: 2), in: line), let id = Int(line[number]),
+              let rest = Range(match.range(at: 3), in: line) else { return nil }
+        return DebugThread(id: id, selected: match.range(at: 1).location != NSNotFound, summary: String(line[rest]))
+    }
+
     /// `* thread #1, queue = '…', stop reason = breakpoint 1.1` → "breakpoint 1.1"
     public static func stopReason(_ line: String) -> String? {
         guard line.contains("thread #"), let range = line.range(of: "stop reason = ") else { return nil }
@@ -70,10 +86,39 @@ public final class DebugSession {
     public private(set) var state: State = .idle
     public private(set) var frames: [DebugFrame] = []
     public private(set) var variables: [DebugVariable] = []
+    public private(set) var threads: [DebugThread] = []
     public private(set) var console = ""
     public private(set) var selectedFrameID: Int?
     public var breakpoints: [String: Set<Int>] = [:] {
         didSet { reconcileSoon() }
+    }
+    /// Optional condition per breakpoint (path → line → expression); the program stops there only when it is true.
+    public var breakpointConditions: [String: [Int: String]] = [:]
+
+    public func setCondition(path: String, line: Int, condition: String?) {
+        let text = condition?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var lines = breakpointConditions[path] ?? [:]
+        if let text, !text.isEmpty { lines[line] = text } else { lines[line] = nil }
+        breakpointConditions[path] = lines.isEmpty ? nil : lines
+        guard process != nil, state == .starting || isPaused, let id = applied[path]?[line], id > 0 else { return }
+        send("breakpoint modify -c \(Self.quote(lines[line] ?? "")) \(id)")
+    }
+
+    /// Evaluates an expression in the selected frame (lldb `expression`); the result lands in the console.
+    public func evaluate(_ expression: String) {
+        let text = expression.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isPaused, !text.isEmpty else { return }
+        console += "(lldb) \(text)\n"
+        send("expression -- \(text)")
+    }
+
+    public func selectThread(_ id: Int) {
+        guard isPaused else { return }
+        frames = []; variables = []; selectedFrameID = nil
+        send("thread select \(id)")
+        send("bt")
+        send("frame variable")
+        send("thread list")
     }
 
     /// Where execution is stopped (the selected frame, or the first with source), for highlighting in the editor.
@@ -92,7 +137,7 @@ public final class DebugSession {
     private var process: Process?
     private var input: FileHandle?
     private var pendingText = ""
-    private enum Section { case none, backtrace, variables }
+    private enum Section { case none, backtrace, variables, threads }
     private var section: Section = .none
     private var lastEchoed = ""
     private var expectStopReasonLine = false
@@ -126,7 +171,7 @@ public final class DebugSession {
         let generation = UUID()
         self.generation = generation
         signal(SIGPIPE, SIG_IGN)      // writing a command to a debugger that just exited must not kill Kiln
-        frames = []; variables = []; console = ""; selectedFrameID = nil
+        frames = []; variables = []; threads = []; console = ""; selectedFrameID = nil
         section = .none; pendingText = ""; applied = [:]; awaitingBreakpoints = []; launched = false
         self.program = program
         state = .starting
@@ -234,7 +279,7 @@ public final class DebugSession {
     private func go(_ command: String) {
         guard isPaused else { return }
         state = .running
-        frames = []; variables = []
+        frames = []; variables = []; threads = []
         send(command)
     }
 
@@ -268,7 +313,8 @@ public final class DebugSession {
                 && !awaitingBreakpoints.contains(where: { $0.path == path && $0.line == line }) {
                 applied[path, default: [:]][line] = -1
                 awaitingBreakpoints.append((path, line))
-                send("breakpoint set -f \(Self.quote(name)) -l \(line)")
+                let condition = breakpointConditions[path]?[line].map { " -c " + Self.quote($0) } ?? ""
+                send("breakpoint set -f \(Self.quote(name)) -l \(line)\(condition)")
             }
         }
         for (path, byLine) in applied {
@@ -299,6 +345,7 @@ public final class DebugSession {
             lastEchoed = echoed
             if echoed == "bt" || echoed.hasPrefix("thread backtrace") { section = .backtrace }
             else if echoed.hasPrefix("frame variable") { section = .variables }
+            else if echoed == "thread list" { section = .threads; threads = [] }
             else { section = .none }
             return
         }
@@ -350,6 +397,7 @@ public final class DebugSession {
             reconcile()
             send("bt")
             send("frame variable")
+            send("thread list")
             return
         }
         if line.hasPrefix("Target 0:") && line.hasSuffix("stopped.") { return }
@@ -361,6 +409,8 @@ public final class DebugSession {
                     selectedFrameID = line.contains("* frame") ? frame.id : (selectedFrameID ?? frame.id)
                 }
             }
+        case .threads:
+            if let thread = LLDBOutput.thread(line) { threads.append(thread) }
         case .variables:
             if let variable = LLDBOutput.variable(line) {
                 variables.append(variable)
