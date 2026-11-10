@@ -138,6 +138,27 @@ public final class ChatSession {
         return profile
     }
 
+    // MARK: Sessions
+    /// Per conversation: running, waiting for approval, or idle. Only the open conversation runs here at a time.
+    public private(set) var sessionStates: [UUID: SessionState] = [:]
+    /// Notifies and badges the Dock when a run needs approval. Set by the app; nil under tests unless a test sets one.
+    public var attention: (any AttentionSink)?
+    private var pendingApprovals = 0
+
+    func setSessionState(_ state: SessionState, for id: UUID) {
+        sessionStates[id] = state == .idle ? nil : state
+    }
+
+    public func sessionRows() async -> [SessionRow] {
+        SessionList.rows(await conversations(), states: sessionStates, open: conversationID)
+    }
+
+    /// Fork a session from its latest message and open the fork.
+    public func forkLatest(of id: UUID) async {
+        await loadConversation(id)
+        if let last = messages.last { await fork(at: last.id) }
+    }
+
     // MARK: Checkpoints and rewind
     let checkpointStore: CheckpointStore?
     /// User messages whose run changed files or ran commands, so the thread can offer "Rewind to here".
@@ -203,7 +224,7 @@ public final class ChatSession {
     }
 
     // MARK: Slash commands
-    public enum Pane: Equatable { case memory, commands, hooks }
+    public enum Pane: Equatable { case memory, commands, hooks, sessions }
     /// A pane a slash command asked the chat to open.
     public var requestedPane: Pane?
 
@@ -223,6 +244,7 @@ public final class ChatSession {
         case .memory: reloadMemory(); requestedPane = .memory
         case .commands: requestedPane = .commands
         case .hooks: requestedPane = .hooks
+        case .sessions: requestedPane = .sessions
         case .help:
             agentNotice = availableCommands().map { "/\($0.name) — \($0.summary)" }.joined(separator: "\n")
         case .model:
@@ -647,6 +669,7 @@ public final class ChatSession {
         let planning = planMode
         if planning { profile.mode = .plan; profile.systemPrompt += PlanMode.instructions }
         pendingPlan = nil
+        setSessionState(.running, for: conversationID)
         let recorder: CheckpointRecorder? = {
             guard let checkpointStore, let rootPath = workspaceRoot, !planning else { return nil }
             let root = URL(fileURLWithPath: rootPath, isDirectory: true)
@@ -692,6 +715,14 @@ public final class ChatSession {
                     case .contextCompacted(let compaction):
                         self.recordCompaction(compaction, conversationID: conversationID, promptIndex: promptIndex)
                     case .finished(let summary): finalText = summary.finalText; tokens = summary.totalTokens
+                    case .awaitingApproval(let request):
+                        self.setSessionState(.waitingForApproval, for: conversationID)
+                        self.pendingApprovals += 1
+                        self.attention?.needsApproval(tool: request.toolName, conversation: self.conversationTitle, pending: self.pendingApprovals)
+                    case .approvalResolved:
+                        self.setSessionState(.running, for: conversationID)
+                        self.pendingApprovals = max(0, self.pendingApprovals - 1)
+                        self.attention?.cleared(pending: self.pendingApprovals)
                     default: break
                     }
                     Self.apply(event, to: &self.agentActivity)
@@ -728,6 +759,8 @@ public final class ChatSession {
                 self.pendingPlan = PlanProposal(text: finalText, request: prompt)
                 await self.platformAudit.record("plan.proposed", ["characters": .int(finalText.count)])
             }
+            self?.setSessionState(.idle, for: conversationID)
+            if let self, self.pendingApprovals > 0 { self.pendingApprovals = 0; self.attention?.cleared(pending: 0) }
             self?.updateContextMeter()
             self?.streamingText = ""
             self?.streamingReasoning = ""

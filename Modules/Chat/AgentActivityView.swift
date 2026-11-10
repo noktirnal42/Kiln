@@ -304,6 +304,7 @@ struct AgentModeBar: View {
     @State private var showMemory = false
     @State private var showCommands = false
     @State private var showHooks = false
+    @State private var showSessions = false
 
     var body: some View {
         HStack(spacing: SSSpacing.s) {
@@ -361,8 +362,9 @@ struct AgentModeBar: View {
         .sheet(isPresented: $showMemory) { MemoryPaneView(session: session) }
         .sheet(isPresented: $showCommands) { CommandsPaneView(session: session) }
         .sheet(isPresented: $showHooks) { HooksPaneView(session: session) }
+        .sheet(isPresented: $showSessions) { SessionsPaneView(session: session) }
         .onChange(of: session.requestedPane) { _, pane in
-            switch pane { case .memory: showMemory = true; case .commands: showCommands = true; case .hooks: showHooks = true; case nil: break }
+            switch pane { case .memory: showMemory = true; case .commands: showCommands = true; case .hooks: showHooks = true; case .sessions: showSessions = true; case nil: break }
             session.requestedPane = nil
         }
     }

@@ -31,6 +31,8 @@ enum AgentActivity {
             .tool("kiln_checkpoint_list", "List file checkpoints", .read),
             .exempt("agent.rewind", "Rewind files and conversation to an earlier message", .write,
                     because: "Deliberate: rewinding discards work, so the person does it from the conversation; the agent can list checkpoints."),
+            .exempt("agent.sessions", "List sessions with status; resume and fork them", .read,
+                    because: "Gap: the conversation store is not yet reachable from tools (docs/13, Chat and artifacts); the Sessions pane (/sessions) covers it for the person."),
             .exempt("agent.plan", "Approve or reject a proposed plan", .write,
                     because: "Deliberate: a plan is approved by the person; an agent approving its own plan would defeat plan mode."),
             .exempt("agent.new-conversation", "Start a new conversation", .write,
