@@ -15,5 +15,7 @@ enum ActivityCatalog {
         DevicesActivity.descriptor,
         MediaActivity.descriptor,
         ImageStudioActivity.descriptor,
+        MapsActivity.descriptor,
+        NewsActivity.descriptor,
     ]
 }

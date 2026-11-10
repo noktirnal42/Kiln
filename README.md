@@ -50,12 +50,14 @@ The sidebar order is also the shortcut order (⌘1 to ⌘9, then ⌘0), and the 
 | ⌘9 | **Devices** | iOS simulators and Android emulators: boot, view, install, launch, logs, record | Apple simulator input is not possible through `simctl`; Windows/Linux is design only |
 | ⌘0 | **Media** | Viewer for video, images and audio; text to speech, speech to text, image generation hooks | Image generation needs Apple Image Playground or a configured endpoint (endpoint path unverified) |
 | — | **Images** | Local SD-Turbo generation, history and model catalog; optional external engines | SDXL and external-engine generation remain unverified; see [Image Studio](docs/18-IMAGE-STUDIO.md) |
+| — | **Maps** | MapKit, USGS Topo, historical catalog, pins and driving directions | Development build; location and routes need live QA |
+| — | **News** | ModernReader source directory and RSS/Atom/JSON feed reader | Development build; subscriptions are local and entries are session-only |
 
 Details for each are in the [wiki](https://github.com/noktirnal42/Kiln/wiki) (source in [`docs/wiki/`](docs/wiki/Activities.md)) and on the [website](https://noktirnal42.github.io/Kiln/activities.html).
 
 ## Product direction
 
-See the [feature and Maps roadmap](docs/21-EVERYTHING-APP-ROADMAP.md) for reliability priorities, cross-activity workflows, and a proposed MapKit and USGS topographic and historical-map activity. These are proposals, not shipped features.
+See the [feature and Maps roadmap](docs/21-EVERYTHING-APP-ROADMAP.md) and [competitive research](docs/22-PARITY-RESEARCH-2026-11-10.md) for reliability priorities, cross-activity workflows, and a proposed MapKit and USGS topographic and historical-map activity. Future features in those roadmaps remain proposals; the current Maps and News development scope is described in [Maps and News](docs/23-MAPS-AND-NEWS.md).
 
 ## Agent and MCP integration
 

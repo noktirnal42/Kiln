@@ -629,6 +629,15 @@ struct EditorView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 1) {
                 ForEach(editor.documents) { document in
+                    documentTab(document)
+                }
+            }
+            .padding(.horizontal, SSSpacing.s).padding(.vertical, 3)
+        }
+        .frame(height: 30)
+    }
+
+    private func documentTab(_ document: EditorDocument) -> some View {
                     HStack(spacing: 4) {
                         Image(systemName: document.isDirty ? "circle.fill" : "doc.text")
                             .font(.system(size: document.isDirty ? 7 : 11))
@@ -659,11 +668,6 @@ struct EditorView: View {
                         Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([document.url]) }
                     }
                     .help(editor.displayPath(document.url))
-                }
-            }
-            .padding(.horizontal, SSSpacing.s).padding(.vertical, 3)
-        }
-        .frame(height: 30)
     }
 
     @ViewBuilder

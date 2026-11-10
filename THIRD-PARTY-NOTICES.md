@@ -2509,3 +2509,7 @@ SOFTWARE.
 ## Tools Kiln can drive but does not bundle
 
 Ghidra (Apache-2.0), radare2 (LGPL-3.0), lldb/LLVM (Apache-2.0 with LLVM exceptions), `adb` and the Android emulator (Android SDK terms), and Xcode command-line tools (Apple terms) are separate programs the user installs. Kiln runs them as separate processes and does not redistribute them.
+
+## ModernReader RSSReaderCore
+
+The bundled `Packages/RSSReaderCore` is from ModernReader, Copyright (c) 2026 Jeremy McVay, under the MIT License. Its full license is in `Packages/RSSReaderCore/LICENSE`.

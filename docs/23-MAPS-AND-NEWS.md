@@ -1,0 +1,19 @@
+# Maps and News — development status
+
+This describes the development branch, not a published release. Verification is scoped below.
+
+## Maps
+
+The Maps activity uses MapKit for an interactive map, Apple place search, standard and imagery views, and driving directions from the current map center to a selected search result. It can drop a pin at the center. The USGS Topo tile layer uses The National Map; historical search queries the USGS product catalog for the current viewport and lists up to 50 records with links to source products. Historical sheets are not rendered as overlays. Pins and routes are session-only; route modes, persisted projects, offline downloads, elevation and historical georeferencing remain work.
+
+**My Location** requests a one-shot Core Location update. macOS controls the location permission; the app does not grant itself access. The agent/MCP `maps_location` tool requests approval and reads only the last explicitly requested location, including its timestamp and accuracy. It does not trigger the OS permission prompt. Map search and routing send queries or coordinates to Apple; USGS layer and historical search send the viewed area to USGS. Agent and MCP actions use the same registry: `maps_viewport` and `maps_pins` (read), `maps_navigate`, `maps_set_layer`, `maps_add_pin`, `maps_remove_pin` and `maps_clear_route` (write), and `maps_location`, `maps_search_places`, `maps_search_historical`, `maps_directions` (execute/network or sensitive location, approval gated).
+
+**Evidence:** initial MapKit view rendered on screen. A USGS tile request and a separate historical product API query returned data. Registry, tool-permission and decoding tests cover the initial integration. The combined build showed Maps, News, the source directory, and the My Location control. On this Mac, a location request before the hardened-runtime location entitlement was added returned a denied error. The entitlement is now present in the signed Debug build; the permission prompt and successful acquisition have not yet been verified. Pin and route behavior and actual agent/MCP calls still need end-to-end checks. The News directory opened and a live Apple Newsroom feed displayed entries on screen. Registry and MCP tool-list tests pass for both activities. No offline, routing accuracy or historical-overlay claim is made.
+
+## News
+
+News uses the user's ModernReader RSSReaderCore and its full curated source directory, searchable by category, name and tags. Users can add a directory source or a custom HTTP(S) URL, select a subscription, refresh it and open article links. The copied parser supports RSS, Atom, RDF and JSON Feed. Subscriptions are stored in local preferences; entries are held in memory for the selected source. There is no background refresh, persistent archive, read/star state, OPML UI, or full article extraction yet. The copied package retains its MIT license.
+
+Agent/MCP tools `news_directory`, `news_subscriptions`, and `news_articles` read existing state; `news_subscribe` and `news_unsubscribe` write subscriptions; `news_refresh` makes a network request. Writes and network actions use existing approval policy. Feed content and remote metadata are untrusted, and feed-host requests may disclose the user's IP address. Sources are not individually verified current merely because they appear in the directory.
+
+The activity is a first integration, not parity with every ModernReader feature. Test real sources, unreachable and malformed feeds, selection during refresh, privacy and full agent/MCP execution before claiming end-to-end coverage.

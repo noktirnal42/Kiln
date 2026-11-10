@@ -1,6 +1,6 @@
 # Roadmap
 
-The integration branch contains eleven registered activities. The latest public preview can lag behind the development branch; see [releases](https://github.com/noktirnal42/Kiln/releases) and the [current state](https://github.com/noktirnal42/Kiln/blob/main/docs/11-CURRENT-STATE.md) for verification limits. Proposals below are not shipped promises.
+The integration branch contains thirteen registered activities. The latest public preview can lag behind the development branch; see [releases](https://github.com/noktirnal42/Kiln/releases) and the [current state](https://github.com/noktirnal42/Kiln/blob/main/docs/11-CURRENT-STATE.md) for verification limits. Proposals below are not shipped promises.
 
 ## Built on the integration branch
 
@@ -32,3 +32,5 @@ A service, a GUI, an agent tool and MCP tool, a palette entry, an audit record, 
 ## Maps proposal
 
 Explore a native MapKit activity with USGS current topography, historical-sheet discovery, georeferenced overlays, source attribution and approval-gated downloads. It is a proposal, not a shipped activity. See the [research and acceptance criteria](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
+
+Maps and News have initial development implementations; routing, location permissions, live feed workflows and complete end-to-end agent/MCP checks need further verification. [Status](https://github.com/noktirnal42/Kiln/blob/main/docs/23-MAPS-AND-NEWS.md) · [Competitive research](https://github.com/noktirnal42/Kiln/blob/main/docs/22-PARITY-RESEARCH-2026-11-10.md).

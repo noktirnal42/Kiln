@@ -299,3 +299,7 @@ Parity work against Claude Code Desktop and Codex (doc 17 §2). Each feature is 
 - **Verifier** (`Verifier.swift`): with `defaults write com.kiln.app agent.verifier.model <model id>` a second model checks each final answer against the run's tool results and lists unsupported claims under the reply
   (audit `verifier.report`). No settings control yet; advisory only.
 - All of the above are unit-tested with stub providers; **none has been seen in the running app** (GUI checks were deferred to the lead).
+
+## Maps and News development activities
+
+See [Maps and News status](23-MAPS-AND-NEWS.md) for capabilities, agent/MCP permissions, verification and remaining gaps. These activities have not been included in a public release.

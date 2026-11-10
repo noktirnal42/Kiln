@@ -1,6 +1,6 @@
 # Activities
 
-Kiln has ten activities, declared once in the activity registry (`Core/Registry/`). The sidebar order is also the shortcut order. Each opens with the same header and tab strip; the agent panel stays beside every activity except Agent.
+Kiln has thirteen development activities, declared once in the activity registry (`Core/Registry/`). The sidebar order is also the shortcut order. Each opens with the same header and tab strip; the agent panel stays beside every activity except Agent.
 
 | Shortcut | Activity | One line |
 |---|---|---|
@@ -55,3 +55,7 @@ Not an activity, but part of the Agent: dictation, spoken replies and a hands-fr
 ---
 
 **Verified status.** Activity names, order and shortcuts match the registry; behavior and limits come from `docs/11-CURRENT-STATE.md`, `docs/KNOWN-ISSUES.md` and `docs/13-AGENT-CAPABILITY-MATRIX.md`. The registry's own 12 tests passed on 2026-11-09 and the integration branch reported 772 passing tests. **Not checked:** a visual pass of all ten activities in one signed build; the registry is not proof of end-to-end operation.
+
+## Maps and News
+
+The development branch includes Maps (MapKit, USGS Topo and historical catalog discovery, pins and driving directions) and News (ModernReader source directory and feed subscriptions). Both expose agent and MCP tools. These activities are not part of the older preview release; see [scope and verification](https://github.com/noktirnal42/Kiln/blob/main/docs/23-MAPS-AND-NEWS.md).

@@ -1,6 +1,6 @@
 # Kiln: product gaps and Maps proposal
 
-Research snapshot: 2026-11-10. This is a proposal, not a claim that these features ship or have been tested. The current implementation and its verification limits are in [Current state](11-CURRENT-STATE.md); work items are in the [issue tracker](https://github.com/noktirnal42/Kiln/issues).
+Research snapshot: 2026-11-10. This is a roadmap. Maps and News now have initial development implementations; see [their status](23-MAPS-AND-NEWS.md) for verification and gaps. Other ideas remain proposals. The current implementation and its verification limits are in [Current state](11-CURRENT-STATE.md); work items are in the [issue tracker](https://github.com/noktirnal42/Kiln/issues).
 
 ## Product direction
 
@@ -22,7 +22,7 @@ The opportunity is a single native workstation where a person can move evidence,
 
 **Later:** 3DEP elevation profiles and terrain, hydrography, imagery, GeoJSON/KML/GPX and GeoTIFF import/export, region bookmarks, geospatial analysis and reproducible layer manifests. Investigate source coverage, usage terms, rate limits, cache policy, accessibility and coordinate precision per provider. Offline behavior must distinguish user-downloaded USGS products from Apple map content; do not promise offline caching until its terms and implementation are verified.
 
-**Acceptance:** test locations inside and outside USGS coverage, tile failures and recovery, large historical sheets, date/scale attribution, coordinate/projection alignment against known points, keyboard and VoiceOver, local artifact round trips and approval behavior. No map integration is implemented or verified by this proposal.
+**Acceptance:** test locations inside and outside USGS coverage, tile failures and recovery, large historical sheets, date/scale attribution, coordinate/projection alignment against known points, keyboard and VoiceOver, local artifact round trips and approval behavior. The initial map integration and its verification limits are tracked in [Maps and News status](23-MAPS-AND-NEWS.md).
 
 ## Further activity ideas
 
