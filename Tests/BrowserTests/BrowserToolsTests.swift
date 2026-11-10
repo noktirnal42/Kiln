@@ -152,6 +152,21 @@ struct BrowserToolsTests {
         #expect(!textOnly.contains("--- Outline"))
     }
 
+    @Test func formValuesDoNotAppearInAgentOutlineOrClickResults() async throws {
+        let module = makeModule()
+        _ = await loadPage("""
+        <input aria-label="Account" value="private-account">
+        <textarea aria-label="Notes">private-notes</textarea>
+        <input aria-label="Code" value="private-code">
+        """, into: module)
+        let page = try await module.readPage(tab: nil)
+        for secret in ["private-account", "private-notes", "private-code"] {
+            #expect(!page.outline.contains(secret))
+        }
+        let clicked = try await module.click(ref: 1, tab: nil)
+        #expect(!clicked.contains("private-account"))
+    }
+
     @Test func typeAndClickDriveTheFormAndCredentialFieldsAreRefused() async throws {
         let module = makeModule()
         let tab = await loadPage(Self.form, into: module)

@@ -3,6 +3,11 @@
 Read this first. It says what exists, how it was checked, how to build and ship it, and what is still open.
 Older docs describe the plan; this describes the app.
 
+On the integration-registry worktree, activity descriptors provide sidebar and palette metadata,
+agent-tool registration and capability declarations. The registry's 12 focused tests passed on
+2026-11-09. This worktree is not merged or visually verified; consult the capability matrix for
+declared gaps and do not treat its descriptors as proof of end-to-end operation.
+
 ## Build, test, sign, notarize
 
 - **`project.yml` is the source of truth.** `Kiln.xcodeproj` is generated (`xcodegen generate`) and gitignored.

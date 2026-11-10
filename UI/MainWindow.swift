@@ -32,9 +32,14 @@ struct MainWindow: View {
         .navigationTitle("Kiln — \(workstation.selected.title)")
         .overlay { paletteOverlay }
         .background { shortcuts }
-        .onChange(of: (app.uiModules[MediaModule.identifier] as? MediaModule)?.openRequests) { old, new in
-            // The agent asked to show a file (media_open): bring the viewer forward.
-            if let new, new != old, new > 0 { workstation.select(.media, app: app) }
+        .onChange(of: app.requestedActivity, initial: true) { _, activity in
+            if let activity {
+                workstation.select(activity, app: app)
+                app.requestedActivity = nil
+            }
+        }
+        .onChange(of: focusRequests) { old, new in
+            for (id, count) in new where count > (old[id] ?? 0) && count > 0 { workstation.select(Activity(id), app: app) }
         }
         .modifier(ApprovalSheetHost(center: app.approvalCenter, requested: $workstation.showApprovals))
         .sheet(isPresented: $workstation.showModules) {
@@ -51,17 +56,22 @@ struct MainWindow: View {
         }
     }
 
+    /// How many times each module has asked to be brought forward, for modules that can ask.
+    private var focusRequests: [String: Int] {
+        var counts: [String: Int] = [:]
+        for descriptor in ActivityRegistry.standard.descriptors {
+            if let count = descriptor.focusRequestCount { counts[descriptor.id] = count(app) }
+        }
+        return counts
+    }
+
     @ViewBuilder
     private var activityContent: some View {
-        switch workstation.selected {
-        case .home: HomeView(workstation: workstation)
-        case .swarm: SwarmView()
-        case .develop: DevelopView()
-        case .audit: AuditActivityView()
-        case .agent, .analyze, .lab, .browser, .devices, .media:
-            if let identifier = workstation.selected.moduleIdentifier {
-                ModuleActivityView(identifier: identifier)
-            }
+        let descriptor = workstation.selected.descriptor
+        switch descriptor.content {
+        case .custom(let make): make(workstation)
+        case .module:
+            if let identifier = descriptor.moduleIdentifier { ModuleActivityView(identifier: identifier) }
         }
     }
 
@@ -82,9 +92,11 @@ struct MainWindow: View {
     /// Window-wide shortcuts that have no visible button of their own.
     private var shortcuts: some View {
         Group {
-            ForEach(Activity.allCases) { activity in
-                Button(activity.title) { workstation.select(activity, app: app) }
-                    .keyboardShortcut(KeyEquivalent(activity.shortcutKey), modifiers: .command)
+            ForEach(Activity.allCases.filter { $0.shortcutKey != nil }) { activity in
+                if let key = activity.shortcutKey {
+                    Button(activity.title) { workstation.select(activity, app: app) }
+                        .keyboardShortcut(KeyEquivalent(key), modifiers: .command)
+                }
             }
             Button("Command Palette") { workstation.showPalette.toggle() }
                 .keyboardShortcut("k", modifiers: .command)
