@@ -108,6 +108,36 @@ public final class ChatSession {
     private var compactionDefaults: UserDefaults?
     nonisolated static let compactionKey = "chat.compaction.v1"
 
+    // MARK: Memory files
+    /// KILN.md / AGENTS.md / CLAUDE.md for the user and the open project, read when a run starts.
+    public private(set) var memory = MemorySnapshot.empty
+    /// The user's home for user-scope memory; nil under tests so a developer's own files never leak in.
+    let memoryHome: URL?
+    var platformAudit: PlatformAudit { PlatformAudit(chain: orchestrator?.auditChain) }
+
+    public func reloadMemory() {
+        memory = MemoryLoader.load(workspaceRoot: workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }, home: memoryHome)
+    }
+
+    /// Saves one memory file from the pane, records it in the audit chain, and re-reads memory.
+    public func saveMemory(path: String, text: String) async throws {
+        let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        let existed = FileManager.default.fileExists(atPath: path)
+        try MemoryLoader.save(text, path: path, workspaceRoot: root, home: memoryHome)
+        await platformAudit.record("memory.saved", [
+            "path": .string(path), "bytes": .int(text.utf8.count), "created": .bool(!existed), "source": .string("pane"),
+        ])
+        reloadMemory()
+        updateContextMeter()
+    }
+
+    /// The profile as a run uses it: its own prompt plus the memory files.
+    func effectiveProfile(_ profile: AgentProfile) -> AgentProfile {
+        var profile = profile
+        profile.systemPrompt += memory.promptSection
+        return profile
+    }
+
     public var agentProfiles: [AgentProfile] { AgentProfile.builtIns.filter { !$0.toolPermissions.enabledTools.isEmpty } }
     public var agentProfile: AgentProfile? {
         let all = agentProfiles
@@ -121,10 +151,12 @@ public final class ChatSession {
         guard let url else { WorkspaceStore.shared.clearCurrent(); workspaceRoot = nil; return }
         _ = try? WorkspaceStore.shared.remember(url)
         workspaceRoot = url.path
+        reloadMemory()
+        updateContextMeter()
     }
 
     public func openRecentWorkspace(_ entry: WorkspaceStore.Entry) {
-        if let url = WorkspaceStore.shared.open(path: entry.path) { workspaceRoot = url.path }
+        if let url = WorkspaceStore.shared.open(path: entry.path) { workspaceRoot = url.path; reloadMemory(); updateContextMeter() }
     }
 
     public var selectedModelID: String
@@ -144,8 +176,10 @@ public final class ChatSession {
         fileIndexService: FileIndexService = FileIndexService(),
         workspaceRoot: String? = nil,
         initialModelID: String = "",
-        compactionDefaults: UserDefaults? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil
+        compactionDefaults: UserDefaults? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil,
+        memoryHome: URL? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? FileManager.default.homeDirectoryForCurrentUser : nil
     ) {
+        self.memoryHome = memoryHome
         self.registry = registry
         self.conversations = conversations
         self.artifacts = artifacts
@@ -473,7 +507,8 @@ public final class ChatSession {
         let prompt = messages[promptIndex].content
         let history = Self.agentHistory(messages: messages, upTo: promptIndex, compaction: compactions[conversationID])
         let window = await contextWindow(for: selectedModelID)
-        var profile = profile
+        reloadMemory()
+        var profile = effectiveProfile(profile)
         profile.modelID = selectedModelID
         let stop = AgentStopFlag()
         agentStop = stop
@@ -621,6 +656,7 @@ public final class ChatSession {
 
     /// Looks up the model's window and refreshes the meter. Call when the model or conversation changes.
     public func refreshContext() async {
+        reloadMemory()
         _ = await contextWindow(for: selectedModelID)
         updateContextMeter()
     }
@@ -629,7 +665,7 @@ public final class ChatSession {
     public func updateContextMeter() {
         guard let window = windowCache[selectedModelID], let profile = agentProfile else { contextUsage = nil; return }
         let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
-        var tokens = ContextCompactor.estimateTokens(profile.systemPrompt)
+        var tokens = ContextCompactor.estimateTokens(effectiveProfile(profile).systemPrompt)
         tokens += ContextCompactor.estimateTokens(Self.agentHistory(messages: messages, upTo: messages.count,
                                                                     compaction: conversationID.flatMap { compactions[$0] }))
         if let orchestrator {
@@ -652,7 +688,7 @@ public final class ChatSession {
         isCompacting = true
         defer { isCompacting = false }
         errorText = nil
-        var profile2 = profile
+        var profile2 = effectiveProfile(profile)
         profile2.modelID = selectedModelID
         let history = Self.agentHistory(messages: messages, upTo: messages.count, compaction: compactions[conversationID])
         let registry = registry, reasoning = reasoning

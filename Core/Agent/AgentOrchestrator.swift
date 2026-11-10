@@ -954,11 +954,13 @@ public final class AgentOrchestrator: Sendable {
 
         if stop.stopped { throw AgentRunError.stopped }
 
+        var callServices = services
+        callServices.audit = PlatformAudit(chain: auditChain)
         let context = ToolExecutionContext(
             workspaceRoot: workspaceRoot,
             conversationID: profile.id,
             redactSecrets: profile.redactSecrets,
-            services: services
+            services: callServices
         )
 
         do {

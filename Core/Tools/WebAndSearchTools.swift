@@ -197,7 +197,7 @@ public enum BuiltInTools {
             WebFetchTool(), WebSearchTool(),
             SearchWorkspaceTool(),
             ListSkillsTool(), ReadSkillTool(), MCPListTools(), MCPCallTool(), ComputerUseTool(),
-        ]
+        ] + PlatformTools.all
         for tool in tools { registry.register(tool) }
     }
 }

@@ -220,7 +220,7 @@ struct ContextMeterView: View {
                 .help("Compact now: summarise the earlier conversation to free context (same as /compact)")
                 .accessibilityLabel("Compact conversation")
             }
-            .help(Self.tooltip(usage, summarised: session.hasContextSummary))
+            .help(Self.tooltip(usage, summarised: session.hasContextSummary, memoryTokens: session.memory.totalTokens))
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Context \(usage.percent) percent used")
         }
@@ -230,9 +230,10 @@ struct ContextMeterView: View {
         usage.fraction >= 0.9 ? SSColor.danger : usage.fraction >= 0.7 ? SSColor.warning : Color.secondary
     }
 
-    static func tooltip(_ usage: ContextUsage, summarised: Bool) -> String {
+    static func tooltip(_ usage: ContextUsage, summarised: Bool, memoryTokens: Int = 0) -> String {
         var text = "Context: about \(usage.used.formatted()) of \(usage.window.formatted()) tokens (\(usage.percent)%). An estimate: it counts the conversation, the system prompt and the tool list."
         text += "\nAt about 70% Kiln clears old tool output, then summarises the earlier conversation, on its own."
+        if memoryTokens > 0 { text += "\nMemory files (KILN.md, AGENTS.md, CLAUDE.md): \(memoryTokens.formatted()) tokens of that." }
         if summarised { text += "\nEarlier messages are already replaced by a summary." }
         text += "\n/compact does it now."
         return text
@@ -300,6 +301,7 @@ struct PermissionModeMenu: View {
 struct AgentModeBar: View {
     @Bindable var session: ChatSession
     @State private var showModelPicker = false
+    @State private var showMemory = false
 
     var body: some View {
         HStack(spacing: SSSpacing.s) {
@@ -337,11 +339,21 @@ struct AgentModeBar: View {
                 }
             }
             Spacer()
+            Button { showMemory = true } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "brain").font(.system(size: 10))
+                    if session.memory.totalTokens > 0 { Text(session.memory.totalTokens.formatted()).font(SSTypography.caption()).monospacedDigit() }
+                }
+            }
+            .buttonStyle(.borderless)
+            .help(session.memory.injected.isEmpty ? "Memory: no KILN.md, AGENTS.md or CLAUDE.md found. Click to create one." : "Memory files in use: \(session.memory.injected.map(\.name).joined(separator: ", ")) (\(session.memory.totalTokens.formatted()) tokens). Click to edit.")
+            .accessibilityLabel("Memory files")
             ContextMeterView(session: session)
         }
         .padding(.horizontal, SSSpacing.m)
         .padding(.top, SSSpacing.xs)
         .sheet(isPresented: $showModelPicker) { ModelPickerView(session: session) }
+        .sheet(isPresented: $showMemory) { MemoryPaneView(session: session) }
     }
 
     private var modelLabel: String {
