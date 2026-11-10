@@ -3,9 +3,9 @@
 <p align="center"><strong>One native Mac workspace. Many ways to make.</strong><br>AI agents · development tools · reverse engineering · model experimentation</p>
 <p align="center"><a href="https://github.com/noktirnal42/Kiln/releases">Download the preview</a> · <a href="https://noktirnal42.github.io/Kiln/">Project website</a> · <a href="https://noktirnal42.github.io/Kiln/docs.html">Get started</a> · <a href="docs/KNOWN-ISSUES.md">Known issues</a> · <a href="https://github.com/noktirnal42/Kiln/issues">Help build it</a></p>
 <p align="center"><img src="site/assets/kiln-approval-loop.gif" width="640" alt="Screen recording: Kiln on the Mac stops at an approval gate for a shell command, and the same approval appears in the iPhone companion (iOS Simulator)"><br><sub>Real Kiln 0.1.1 on the Mac; the phone is the iOS Simulator companion answering a real approval. Preview software.</sub></p>
-<p align="center"><a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-d8b38a"></a> <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-25231e"> <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-e89b61"></p>
+<p align="center"><a href="LICENSE"><img alt="License: PolyForm Noncommercial" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-d8b38a"></a> <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-25231e"> <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-e89b61"></p>
 
-Kiln is an open-source Swift and SwiftUI workstation exploring what happens when conversation, tools, binary analysis, and model creation share a common foundation. Move between disciplines while keeping project context, agent activity, approvals, and audit evidence close to the work.
+Kiln is a source-available Swift and SwiftUI workstation exploring what happens when conversation, tools, binary analysis, and model creation share a common foundation. Move between disciplines while keeping project context, agent activity, approvals, and audit evidence close to the work.
 
 **This is an ambitious early-stage project.** It has real working capabilities and substantial unfinished areas. It does not yet replace Xcode, Ghidra, or a production model platform. We welcome contributors who want to help close those gaps with reproducible evidence.
 
@@ -15,9 +15,13 @@ Kiln is an open-source Swift and SwiftUI workstation exploring what happens when
 - **Move across disciplines.** Terminal, Git, workspace search, reverse engineering, and Model Lab live within the same app.
 - **Give agents real tools.** File, shell, Git, RE, and selected Lab actions use shared services with policy checks, approvals, and audit records. A loopback MCP server lets external clients use supported actions too.
 - **Talk to it, and take it with you.** Dictate to the model, hear replies read aloud, or hold a hands-free spoken conversation. Pair an iPhone or Apple Watch to read the conversation, speak to the agent and approve its tool calls from across the room.
-- **Build in the open.** Read the specifications, inspect the implementation, reproduce the tests, and help shape the roadmap. MIT licensed.
+- **Build in the open.** Read the specifications, inspect the implementation, reproduce the tests, and help shape the roadmap. Source-available (PolyForm Noncommercial; commercial use needs a license).
 
 ## What exists today
+
+The development branch also includes a tabbed Browser, Devices and Media activities. These changes are
+not necessarily in the published preview. Browser sign-in, password autofill and passkeys still need
+end-to-end verification; see [browser authentication notes](docs/18-BROWSER-AUTHENTICATION.md).
 
 > Current state (2026-11-03): see [`docs/11-CURRENT-STATE.md`](docs/11-CURRENT-STATE.md) for what was verified, how to
 > build/sign/notarize, and what is still open. The full Mac suite (592 tests) passes; the iOS and watchOS companions, the shared remote kit and the relay have their own tests.
@@ -94,4 +98,4 @@ Contributions and donations can help sustain development, test hardware, provide
 
 ## License and attribution
 
-[MIT](LICENSE). Respect the licenses and terms of third-party libraries, models, datasets, and services; the project’s license does not override theirs. Kiln is independent and is not affiliated with Apple, Anthropic, OpenAI, or the Ghidra project.
+[PolyForm Noncommercial License 1.0.0](LICENSE) for source and builds from the relicensing onward; releases up to v0.1.1 remain MIT (see [LICENSE-HISTORY.md](LICENSE-HISTORY.md)). Commercial use: see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md). Third-party licenses: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Respect the licenses and terms of third-party libraries, models, datasets, and services; the project’s license does not override theirs. Kiln is independent and is not affiliated with Apple, Anthropic, OpenAI, or the Ghidra project.

@@ -121,8 +121,8 @@ public final class BrowserModule: @preconcurrency Module, ModuleDefinition, Modu
     // MARK: Tabs
 
     @discardableResult
-    func newTab(url: URL?, select: Bool) -> BrowserTab {
-        let tab = BrowserTab(configuration: configuration, owner: self)
+    func newTab(url: URL?, select: Bool, configuration popupConfiguration: WKWebViewConfiguration? = nil) -> BrowserTab {
+        let tab = BrowserTab(configuration: popupConfiguration ?? configuration, owner: self)
         tabs.append(tab)
         if select || selectedTabID == nil { selectedTabID = tab.id }
         if let url { tab.load(url) }

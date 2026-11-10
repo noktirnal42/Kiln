@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import AppIntents
 
 @main
 struct KilnApp: App {
@@ -8,6 +9,7 @@ struct KilnApp: App {
 
     init() {
         let model = AppModel()
+        AppDependencyManager.shared.add(dependency: model)
         _appModel = State(initialValue: model)
         appDelegate.appModel = model
     }
@@ -16,6 +18,7 @@ struct KilnApp: App {
         WindowGroup {
             MainWindow()
                 .environment(appModel)
+                .onOpenURL { appModel.openWebURL($0) }
                 .task {
                     await appModel.bootstrap()
                 }
