@@ -1,0 +1,16 @@
+{
+  "identifier": "com.kiln.imagestudio",
+  "displayName": "Images",
+  "version": "1.0.0",
+  "minAppVersion": "0.1.0",
+  "maxAppVersion": null,
+  "author": "Kiln Team",
+  "description": "Image studio: generate, edit and upscale images with MLX on this Mac or Draw Things, ComfyUI and Forge; a model catalogue with resumable downloads; history with settings embedded in each PNG; all also available to agents as image_* tools.",
+  "category": "media",
+  "icon": "photo.artframe",
+  "dependencies": [],
+  "requiredCapabilities": ["fileSystem.readWrite", "network.client"],
+  "optionalCapabilities": [],
+  "provides": ["imageGeneration", "imageModelCatalog"],
+  "entryPoint": "ImageStudioModule"
+}

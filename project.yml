@@ -21,6 +21,8 @@ packages:
     path: Packages/AxiomCore
   KilnRemoteKit:
     path: Packages/KilnRemoteKit
+  KilnDiffusion:
+    path: Packages/KilnDiffusion
 
 settings:
   base:
@@ -130,6 +132,8 @@ targets:
         product: AxiomCore
       - package: KilnRemoteKit
         product: KilnRemoteKit
+      - package: KilnDiffusion
+        product: KilnDiffusion
 
   KilnTests:
     type: bundle.unit-test

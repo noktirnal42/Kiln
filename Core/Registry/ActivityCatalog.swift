@@ -14,5 +14,6 @@ enum ActivityCatalog {
         BrowserActivity.descriptor,
         DevicesActivity.descriptor,
         MediaActivity.descriptor,
+        ImageStudioActivity.descriptor,
     ]
 }
