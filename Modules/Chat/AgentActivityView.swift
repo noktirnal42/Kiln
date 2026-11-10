@@ -327,6 +327,9 @@ struct AgentModeBar: View {
             .disabled(session.orchestrator == nil)
             .help("Let the model use tools. Writes and commands ask for your approval.")
             if session.agentEnabled {
+                Toggle(isOn: $session.planMode) { Label("Plan", systemImage: "list.bullet.clipboard") }
+                    .toggleStyle(.button).controlSize(.small)
+                    .help("Plan mode: the agent explores read-only, then proposes a plan you approve before anything changes (/plan)")
                 Picker("", selection: $session.agentProfileIndex) {
                     ForEach(Array(session.agentProfiles.enumerated()), id: \.offset) { index, profile in
                         Text(profile.name).tag(index)
@@ -369,5 +372,35 @@ struct AgentModeBar: View {
         if id.isEmpty { return "Select model" }
         let bare = id.split(separator: "/").last.map(String.init) ?? id
         return bare.count > 26 ? String(bare.prefix(25)) + "…" : bare
+    }
+}
+
+
+/// The agent's proposed plan, with Approve (runs it), Edit and Reject. Nothing has been changed when this shows.
+struct PlanCardView: View {
+    let session: ChatSession
+    let plan: PlanProposal
+    @State private var editing = false
+    @State private var draft = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SSSpacing.s) {
+            Label("Plan — nothing has been changed yet", systemImage: "list.bullet.clipboard").font(SSTypography.headline())
+            if editing {
+                TextEditor(text: $draft).font(.system(size: 12)).frame(minHeight: 160, maxHeight: 320)
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.25)))
+            } else {
+                MarkdownBlockView(text: plan.text)
+            }
+            HStack {
+                Button("Approve and run") { Task { await session.approvePlan(editedText: editing ? draft : nil) } }
+                    .buttonStyle(.borderedProminent).disabled(session.isStreaming)
+                Button(editing ? "Discard edits" : "Edit") { draft = plan.text; editing.toggle() }
+                Button("Reject", role: .destructive) { Task { await session.rejectPlan() } }
+                Spacer()
+            }
+        }
+        .padding(SSSpacing.m)
+        .background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 8))
     }
 }

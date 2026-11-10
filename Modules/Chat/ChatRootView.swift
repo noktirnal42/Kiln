@@ -26,6 +26,7 @@ struct ChatRootView: View {
                             ContextNoteView(note: $0)
                         }
                         AgentActivityView(session: session)
+                        if let plan = session.pendingPlan, !session.isStreaming { PlanCardView(session: session, plan: plan) }
                         if session.isStreaming {
                             MessageBubble(
                                 session: session,

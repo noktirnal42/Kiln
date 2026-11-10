@@ -28,6 +28,8 @@ enum AgentActivity {
             .tool("kiln_command_expand", "Expand a custom slash command", .read),
             .tool("kiln_command_write", "Create or replace a custom slash command", .write),
             .tool("kiln_hooks_list", "List configured hooks", .read),
+            .exempt("agent.plan", "Approve or reject a proposed plan", .write,
+                    because: "Deliberate: a plan is approved by the person; an agent approving its own plan would defeat plan mode."),
             .exempt("agent.new-conversation", "Start a new conversation", .write,
                     because: "Gap: conversation management has no tool yet (docs/13, Chat and artifacts); an agent starting its own fresh context is better served by compaction."),
             .exempt("agent.choose-model", "Choose the model and agent profile", .admin,

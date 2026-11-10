@@ -138,6 +138,27 @@ public final class ChatSession {
         return profile
     }
 
+    // MARK: Plan mode
+    /// While on, runs are read-only and end with a plan for the person to approve.
+    public var planMode = false
+    public private(set) var pendingPlan: PlanProposal?
+
+    public func approvePlan(editedText: String? = nil) async {
+        guard let plan = pendingPlan else { return }
+        let text = (editedText ?? plan.text).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        pendingPlan = nil
+        planMode = false
+        await platformAudit.record("plan.approved", ["characters": .int(text.count), "edited": .bool(text != plan.text.trimmingCharacters(in: .whitespacesAndNewlines))])
+        await send(PlanMode.approvedPrompt(plan: text))
+    }
+
+    public func rejectPlan() async {
+        guard pendingPlan != nil else { return }
+        pendingPlan = nil
+        await platformAudit.record("plan.rejected")
+    }
+
     // MARK: Slash commands
     public enum Pane: Equatable { case memory, commands, hooks }
     /// A pane a slash command asked the chat to open.
@@ -152,6 +173,10 @@ public final class ChatSession {
         switch command {
         case .compact: await compactNow()
         case .clear: await newConversation()
+        case .plan:
+            planMode = PlanMode.parse(arguments) ?? !planMode
+            agentNotice = planMode ? "Plan mode on: the agent explores read-only and proposes a plan." : "Plan mode off."
+            await platformAudit.record("plan.mode", ["on": .bool(planMode)])
         case .memory: reloadMemory(); requestedPane = .memory
         case .commands: requestedPane = .commands
         case .hooks: requestedPane = .hooks
@@ -573,6 +598,9 @@ public final class ChatSession {
         reloadMemory()
         var profile = effectiveProfile(profile)
         profile.modelID = selectedModelID
+        let planning = planMode
+        if planning { profile.mode = .plan; profile.systemPrompt += PlanMode.instructions }
+        pendingPlan = nil
         let stop = AgentStopFlag()
         agentStop = stop
         agentActivity = []
@@ -638,6 +666,10 @@ public final class ChatSession {
                 reasoning: nil, tokenCount: tokens, toolCalls: self?.finishedToolCalls() ?? [], modelID: model
             ) {
                 self?.messages.append(saved)
+            }
+            if planning, let self, self.errorText == nil, !finalText.isEmpty, !stop.stopped {
+                self.pendingPlan = PlanProposal(text: finalText, request: prompt)
+                await self.platformAudit.record("plan.proposed", ["characters": .int(finalText.count)])
             }
             self?.updateContextMeter()
             self?.streamingText = ""

@@ -19,13 +19,14 @@ public struct SlashCommand: Identifiable, Equatable, Sendable {
 }
 
 public enum BuiltInCommand: String, CaseIterable, Sendable {
-    case compact, clear, model, memory, commands, hooks, help
+    case compact, clear, model, plan, memory, commands, hooks, help
 
     public var summary: String {
         switch self {
         case .compact: return "Summarise the conversation to free context"
         case .clear: return "Start a new conversation"
         case .model: return "Show or switch the model"
+        case .plan: return "Plan mode: explore read-only, then approve a plan"
         case .memory: return "Open the memory files (KILN.md, AGENTS.md, CLAUDE.md)"
         case .commands: return "List and edit custom commands"
         case .hooks: return "Show and edit the hooks in .kiln/hooks"
@@ -35,6 +36,7 @@ public enum BuiltInCommand: String, CaseIterable, Sendable {
     public var argumentHint: String? {
         switch self {
         case .model: return "<model id or part of its name>"
+        case .plan: return "[on|off]"
         default: return nil
         }
     }
