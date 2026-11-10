@@ -145,7 +145,7 @@ private func record(prompt: String = "a fox", seed: Int64 = 42) -> GenerationRec
 
     /// Serves `org/tiny` at one commit with the given file contents; LFS-style (sha256) for `big.bin`.
     private func serve(_ server: LoopbackServer, files: [String: Data], commit: String = "c0ffee", badSHA: Bool = false, cutFirst: Int? = nil) {
-        let counter = Counter()
+        let counter = ImgStudioCallCounter()
         server.handler = { request in
             let path = request.path.removingPercentEncoding ?? request.path
             if path == "/api/models/org/tiny" { return .init(body: Data(#"{"sha":"\#(commit)"}"#.utf8)) }
@@ -262,7 +262,7 @@ private func record(prompt: String = "a fox", seed: Int64 = 42) -> GenerationRec
 
 // MARK: Queue, service, outpaint, upscale
 
-private final class Counter: @unchecked Sendable {
+private final class ImgStudioCallCounter: @unchecked Sendable {
     private var value = 0; private let lock = NSLock()
     func next() -> Int { lock.lock(); defer { lock.unlock() }; value += 1; return value }
 }
@@ -339,7 +339,7 @@ private struct StubEngine: ImageEngine {
         #expect(out.width == 128 && out.height == 64)
         let mask = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithData(out.mask as CFData, nil)!, 0, nil)!
         func gray(_ x: Int, _ y: Int) -> UInt8 {
-            let data = mask.dataProvider!.data as Data
+            let data = (mask.dataProvider!.data! as Data)
             let bytesPerPixel = mask.bitsPerPixel / 8
             return data[y * mask.bytesPerRow + x * bytesPerPixel]
         }

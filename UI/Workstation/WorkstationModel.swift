@@ -3,79 +3,34 @@ import Observation
 
 /// The places you work in. Each is a whole screen, not a window onto one module: the agent dock stays
 /// beside all of them except Agent itself, so the same agent can drive whatever is on screen.
-enum Activity: String, CaseIterable, Identifiable, Sendable {
-    case home, agent, swarm, develop, analyze, lab, audit, browser, devices, media, images
+///
+/// An `Activity` is a handle on an `ActivityDescriptor`; everything about it (title, symbol, shortcut, prompts,
+/// tools) comes from the registry. Each module declares its own handle next to its descriptor
+/// (`extension Activity { static let browser = Activity("browser") }`) so views and tests can name it.
+struct Activity: Hashable, Identifiable, Sendable {
+    let id: String
+    init(_ id: String) { self.id = id }
 
-    var id: String { rawValue }
+    var rawValue: String { id }
 
-    var title: String {
-        switch self {
-        case .home: "Home"
-        case .agent: "Agent"
-        case .swarm: "Swarm"
-        case .develop: "Develop"
-        case .analyze: "Analyze"
-        case .lab: "Lab"
-        case .audit: "Audit"
-        case .browser: "Browser"
-        case .devices: "Devices"
-        case .media: "Media"
-        case .images: "Images"
+    /// Every registered activity, in catalog order.
+    static var allCases: [Activity] { ActivityRegistry.standard.descriptors.map { Activity($0.id) } }
+
+    var descriptor: ActivityDescriptor {
+        guard let descriptor = ActivityRegistry.standard.descriptor(id) else {
+            preconditionFailure("Activity '\(id)' is not in ActivityCatalog")
         }
+        return descriptor
     }
 
-    var symbol: String {
-        switch self {
-        case .home: "square.grid.2x2"
-        case .agent: "sparkles"
-        case .swarm: "person.3.sequence"
-        case .develop: "chevron.left.forwardslash.chevron.right"
-        case .analyze: "magnifyingglass.circle"
-        case .lab: "brain.head.profile"
-        case .audit: "checkmark.seal"
-        case .browser: "globe"
-        case .devices: "iphone.gen3"
-        case .media: "play.rectangle"
-        case .images: "photo.artframe"
-        }
-    }
+    var title: String { descriptor.title }
+    var symbol: String { descriptor.symbol }
+    var summary: String { descriptor.summary }
+    var moduleIdentifier: String? { descriptor.moduleIdentifier }
+    var showsAgentDock: Bool { descriptor.showsAgentDock }
 
-    var summary: String {
-        switch self {
-        case .home: "Overview of your workstation"
-        case .agent: "Converse with a model, with tools"
-        case .swarm: "Give a goal to a team of agents working in parallel"
-        case .develop: "Terminal, git, search and MCP servers"
-        case .analyze: "Reverse engineering and decryption"
-        case .lab: "Datasets, training, evaluation and models"
-        case .audit: "What agents did, and whether the record is intact"
-        case .browser: "Tabbed web browser the agent can read"
-        case .devices: "iOS simulators and Android emulators: boot, view, install, drive"
-        case .media: "Video, images and audio: view, generate, speak and transcribe"
-        case .images: "Generate, edit and upscale images; download FLUX, SDXL and other models"
-        }
-    }
-
-    /// The module that renders this activity, when one does. Home, Develop and Audit are built in.
-    var moduleIdentifier: String? {
-        switch self {
-        case .agent: ChatModule.identifier
-        case .analyze: REModule.identifier
-        case .lab: ModelLabModule.identifier
-        case .browser: BrowserModule.identifier
-        case .devices: DevicesModule.identifier
-        case .media: MediaModule.identifier
-        case .images: ImageStudioModule.identifier
-        case .home, .swarm, .develop, .audit: nil
-        }
-    }
-
-    /// ⌘1…⌘9 in declaration order, then ⌘0 for the tenth. Later activities share ⌘0 until the shell gets a better scheme.
-    var shortcutKey: Character {
-        let number = (Activity.allCases.firstIndex(of: self) ?? 0) + 1
-        // ⌘1…⌘9, ⌘0 for the tenth, ⌘- for the eleventh.
-        return number < 10 ? Character(String(number)) : (number == 10 ? "0" : "-")
-    }
+    /// ⌘1…⌘9 in catalog order, then ⌘0 for the tenth. Activities past the tenth have none.
+    var shortcutKey: Character? { ActivityRegistry.standard.shortcutKey(for: id) }
 }
 
 /// One thing the command palette can do.
@@ -86,6 +41,8 @@ struct WorkstationCommand: Identifiable {
     let symbol: String
     var keywords: [String] = []
     var shortcut: String?
+    /// Listed only once the user types something, so the long capability list never crowds the default palette.
+    var searchOnly = false
     let run: @MainActor () -> Void
 }
 
@@ -107,7 +64,9 @@ enum CommandRanking {
     }
 
     static func rank(_ commands: [WorkstationCommand], query: String) -> [WorkstationCommand] {
-        commands.enumerated().compactMap { index, command -> (Int, Int, WorkstationCommand)? in
+        let searching = !query.trimmingCharacters(in: .whitespaces).isEmpty
+        return commands.enumerated().compactMap { index, command -> (Int, Int, WorkstationCommand)? in
+            if command.searchOnly && !searching { return nil }
             guard let score = score(title: command.title, subtitle: command.subtitle,
                                     keywords: command.keywords, query: query) else { return nil }
             return (score, index, command)
@@ -157,9 +116,8 @@ enum WorkstationStatus {
 final class WorkstationModel {
     private static let dockKey = "workstation.dockVisible"
 
-    /// Opens on the agent: like the apps this sits beside, the conversation is the front door, and the other
-    /// activities are things you reach from it.
-    var selected: Activity = .agent
+    /// The browser presents an address and search field as soon as the workstation opens.
+    var selected: Activity = .browser
     var showPalette = false
     var showApprovals = false
     var showModules = false
@@ -177,7 +135,7 @@ final class WorkstationModel {
     }
 
     /// The dock is the agent beside your work; on the Agent activity it would just be a second copy.
-    var dockShown: Bool { dockVisible && selected != .agent }
+    var dockShown: Bool { dockVisible && selected.showsAgentDock }
 
     func select(_ activity: Activity, app: AppModel) {
         selected = activity
@@ -194,7 +152,7 @@ final class WorkstationModel {
             WorkstationCommand(
                 id: "go.\(activity.rawValue)", title: "Go to \(activity.title)", subtitle: activity.summary,
                 symbol: activity.symbol, keywords: ["open", "switch", activity.rawValue],
-                shortcut: "⌘\(activity.shortcutKey)",
+                shortcut: activity.shortcutKey.map { "⌘\($0)" },
                 run: { [weak self] in self?.select(activity, app: app) })
         }
         list += [
@@ -216,6 +174,21 @@ final class WorkstationModel {
                 id: "modules.show", title: "Show loaded modules", subtitle: "Module lifecycle and the event bus",
                 symbol: "puzzlepiece.extension", keywords: ["debug", "events", "bus"], run: { [weak self] in self?.showModules = true }),
         ]
+        list += capabilityCommands { [weak self] activity in self?.select(activity, app: app) }
         return list
+    }
+
+    /// Every registered capability is also a palette command that opens its activity. They appear when you search.
+    func capabilityCommands(open: @escaping @MainActor (Activity) -> Void) -> [WorkstationCommand] {
+        CapabilityRegistry.all.compactMap { capability in
+            guard ActivityRegistry.standard.descriptor(capability.module) != nil else { return nil }
+            let activity = Activity(capability.module)
+            return WorkstationCommand(
+                id: "capability.\(capability.id)", title: "\(activity.title): \(capability.title)",
+                subtitle: capability.agentTool.map { "Agent tool \($0)" } ?? "GUI only: \(capability.permission.rawValue)",
+                symbol: activity.symbol, keywords: [capability.id, capability.agentTool ?? "", activity.rawValue],
+                searchOnly: true,
+                run: { open(activity) })
+        }
     }
 }

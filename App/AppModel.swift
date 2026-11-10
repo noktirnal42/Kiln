@@ -39,6 +39,8 @@ public final class AppModel {
     public let editor = EditorWorkspace()
     public let builder = BuildRunner()
     public var activeModuleID: String?
+    var requestedActivity: Activity?
+    private var pendingWebURLs: [URL] = []
     public private(set) var bootstrapError: String?
     /// Bumped whenever providers are registered or reloaded, so screens that show them can refresh. Home loads
     /// before bootstrap has registered anything; without this it kept an empty list forever.
@@ -49,6 +51,7 @@ public final class AppModel {
     public static let appVersion = "0.1.0"
 
     public init() {
+        BundlePreferencesMigration.runIfNeeded()
         LegacyContainerMigration.runIfNeeded()
         BuiltInTools.registerAll()
         let schema = Schema([
@@ -90,7 +93,6 @@ public final class AppModel {
         factories.register(BrowserModule.self)
         factories.register(DevicesModule.self)
         factories.register(MediaModule.self)
-        factories.register(ImageStudioModule.self)
 
         var manifestDirs: [URL] = []
         if let bundled = Bundle.main.resourceURL?.appendingPathComponent("ModuleManifests") {
@@ -177,55 +179,31 @@ public final class AppModel {
             try? await manager.activate(record.id)
         }
         await refreshRecords()
-        if let re = (await manager.record(for: REModule.identifier))?.module as? REModule {
-            REAgentTools.register(module: re)
-            #if DEBUG
-            // Visual-QA hook, compiled out of release builds:
-            //   open Kiln.app --args -KilnImportFixture /usr/bin/true
-            // imports the binary at launch so analysis views can be checked without the file picker.
-            // Skips a fixture already imported on an earlier launch, so relaunches don't pile up copies.
-            if let fixture = UserDefaults.standard.string(forKey: "KilnImportFixture") {
-                let name = URL(fileURLWithPath: fixture).lastPathComponent
-                let alreadyImported = re.projects.contains { $0.binaryURL.lastPathComponent == name }
-                if !alreadyImported {
-                    _ = try? await re.importBinary(at: URL(fileURLWithPath: fixture))
-                }
-            }
-            #endif
-        }
-        if let lab = (await manager.record(for: ModelLabModule.identifier))?.module as? ModelLabModule {
-            ModelLabAgentTools.register(module: lab)
-        }
-        if let browser = (await manager.record(for: BrowserModule.identifier))?.module as? BrowserModule {
-            BrowserAgentTools.register(module: browser)
-            // A download is only handed to Analyze when the user presses "Analyze in Kiln".
-            let re = (await manager.record(for: REModule.identifier))?.module as? REModule
-            browser.importPackage = { [weak re] url in
-                guard let re else { throw BrowserToolError.page("Analyze is not available.") }
-                _ = try await re.importBinary(at: url)
-                return url.lastPathComponent
-            }
-        }
-        if let devices = (await manager.record(for: DevicesModule.identifier))?.module as? DevicesModule {
-            DeviceAgentTools.register(service: devices.service)
-        }
-        if let media = (await manager.record(for: MediaModule.identifier))?.module as? MediaModule {
-            MediaAgentTools.register(module: media)
-            #if DEBUG
-            // Visual-QA hook, compiled out of release builds: open Kiln.app --args -KilnOpenMedia /path/to/file
-            // shows the file in the Media viewer at launch.
-            if let path = UserDefaults.standard.string(forKey: "KilnOpenMedia") {
-                _ = try? media.openForAgent(URL(fileURLWithPath: path))
-            }
-            #endif
-        }
-        if let images = (await manager.record(for: ImageStudioModule.identifier))?.module as? ImageStudioModule {
-            ImageAgentTools.register(module: images)
-        }
+        // Each activity registers its own agent tools (and so its MCP tools); see ActivityCatalog.
+        let manager = self.manager
+        await ActivityRegistry.standard.registerTools(ToolRegistrationContext(
+            registry: .shared,
+            loadedModule: { identifier in await manager.record(for: identifier)?.module }
+        ))
         await syncUIModules()
+        flushPendingWebURLs()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
             await activateModule(firstUI)
         }
+    }
+
+    /// macOS can deliver links before module discovery finishes. Preserve their order until the browser exists.
+    func openWebURL(_ url: URL) {
+        guard BrowserURL.resolveStrict(url.absoluteString) != nil else { return }
+        pendingWebURLs.append(url)
+        requestedActivity = .browser
+        flushPendingWebURLs()
+    }
+
+    private func flushPendingWebURLs() {
+        guard let browser = uiModules[BrowserModule.identifier] as? BrowserModule else { return }
+        for url in pendingWebURLs { browser.newTab(url: url, select: true) }
+        pendingWebURLs.removeAll()
     }
 
     private func registerModelProviders() async {
@@ -244,6 +222,7 @@ public final class AppModel {
         ))
         await registerCustomProvider()
         await registry.register(AppleFoundationProvider())
+        await registry.register(ApplePrivateCloudProvider())
         await registry.register(MLXProvider())
         defer { providersGeneration += 1 }
 

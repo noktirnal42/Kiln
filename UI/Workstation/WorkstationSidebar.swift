@@ -126,7 +126,7 @@ struct WorkstationSidebar: View {
     private var tools: some View {
         VStack(alignment: .leading, spacing: 2) {
             SSSectionLabel("Workstation").padding(.horizontal, SSSpacing.s).padding(.bottom, 2)
-            ForEach([Activity.swarm, .develop, .analyze, .lab, .audit, .browser, .devices, .media, .images]) { activity in
+            ForEach(Activity.allCases.filter(\.descriptor.showsInSidebar)) { activity in
                 let selected = workstation.selected == activity
                 Button { workstation.select(activity, app: app) } label: {
                     HStack(spacing: SSSpacing.s) {
@@ -139,7 +139,7 @@ struct WorkstationSidebar: View {
                     .background(selected ? SSColor.accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
                 }
                 .buttonStyle(.plain)
-                .help("\(activity.title) — \(activity.summary) (⌘\(String(activity.shortcutKey)))")
+                .help("\(activity.title) — \(activity.summary)" + (activity.shortcutKey.map { " (⌘\($0))" } ?? ""))
             }
         }
     }

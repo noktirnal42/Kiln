@@ -6,7 +6,7 @@ public struct AppleFoundationProvider: ModelProvider {
     public let id = "apple-foundation"
     public let name = "Apple Foundation Models"
     public let providerType: ProviderType = .appleFoundation
-    public let capabilities: ProviderCapabilities = [.streaming, .onDevice, .privateCloud]
+    public let capabilities: ProviderCapabilities = [.streaming, .onDevice]
 
     public init() {}
 
@@ -98,6 +98,65 @@ public struct AppleFoundationProvider: ModelProvider {
                 } catch {
                     continuation.finish(throwing: error)
                 }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
+/// An explicit cloud choice; on-device requests never fall back to this provider automatically.
+public struct ApplePrivateCloudProvider: ModelProvider {
+    public let id = "apple-private-cloud"
+    public let name = "Apple Private Cloud Compute"
+    public let providerType: ProviderType = .appleFoundation
+    public let capabilities: ProviderCapabilities = [.streaming, .privateCloud]
+
+    public init() {}
+
+    public func checkAvailability() async -> ProviderAvailability {
+        guard #available(macOS 27.0, *) else {
+            return .unavailable("Private Cloud Compute requires macOS 27 or later.")
+        }
+        switch PrivateCloudComputeLanguageModel().availability {
+        case .available: return .available()
+        case .unavailable(.deviceNotEligible): return .unavailable("This Mac is not eligible for Private Cloud Compute.")
+        case .unavailable(.systemNotReady): return .unavailable("Private Cloud Compute is not ready. Check Apple Intelligence, network access, and the app's entitlement.")
+        case .unavailable: return .unavailable("Private Cloud Compute is unavailable on this Mac.")
+        }
+    }
+
+    public func fetchModels() async throws -> [ModelDescriptor] {
+        let status = await checkAvailability()
+        guard status.isAvailable else { throw ProviderError.engineUnavailable(status.reason ?? "Private Cloud Compute unavailable") }
+        return [ModelDescriptor(id: "apple-private-cloud-model", name: "Private Cloud Compute", providerID: id,
+                                providerType: .appleFoundation, contextWindow: 32768, isOnDevice: false,
+                                tags: ["apple", "private-cloud"])]
+    }
+
+    public func streamChat(_ request: ChatRequest, reasoning: ReasoningConfig?) async throws -> AsyncThrowingStream<ChatChunk, Error> {
+        guard #available(macOS 27.0, *) else { throw ProviderError.engineUnavailable("Private Cloud Compute requires macOS 27 or later.") }
+        let model = PrivateCloudComputeLanguageModel()
+        guard model.isAvailable else {
+            let status = await checkAvailability()
+            throw ProviderError.engineUnavailable(status.reason ?? "Private Cloud Compute unavailable")
+        }
+        let instructions = request.messages.filter { $0.role == .system }.map(\.content).joined(separator: "\n")
+        let session = LanguageModelSession(model: model, instructions: instructions.isEmpty ? nil : instructions)
+        let prompt = request.messages.filter { $0.role != .system }.map { "\($0.role.rawValue.capitalized):\n\($0.content)" }.joined(separator: "\n\n")
+        let options = GenerationOptions(temperature: request.temperature, maximumResponseTokens: min(request.maxTokens, 4096))
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    var emitted = ""
+                    for try await snapshot in session.streamResponse(to: prompt, options: options) {
+                        try Task.checkCancellation()
+                        let complete = snapshot.content
+                        let delta = complete.hasPrefix(emitted) ? String(complete.dropFirst(emitted.count)) : complete
+                        emitted = complete
+                        if !delta.isEmpty { continuation.yield(ChatChunk(delta: ChatMessage(role: .assistant, content: delta))) }
+                    }
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
             }
             continuation.onTermination = { _ in task.cancel() }
         }

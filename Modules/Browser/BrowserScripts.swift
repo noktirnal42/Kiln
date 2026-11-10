@@ -40,7 +40,8 @@ enum BrowserScripts {
         if (e.getAttribute('aria-label')) return clean(e.getAttribute('aria-label'));
         if (e.id) { const l = document.querySelector('label[for="' + CSS.escape(e.id) + '"]'); if (l) return clean(l.innerText); }
         const wrap = e.closest('label'); if (wrap) return clean(wrap.innerText);
-        return clean(e.innerText || (sensitive(e) ? '' : e.value) || e.getAttribute('placeholder') || e.getAttribute('title') || e.alt || '');
+        const text = (e.matches('input,textarea,[contenteditable]') ? '' : e.innerText);
+        return clean(text || e.getAttribute('placeholder') || e.getAttribute('title') || e.alt || '');
     };
     const selector = 'h1,h2,h3,h4,h5,h6,a[href],button,input,select,textarea,summary,[role=button],[role=link],[role=textbox],[role=checkbox],[role=tab],[role=menuitem],nav,main,form,[role=search]';
     const lines = [];
@@ -60,9 +61,8 @@ enum BrowserScripts {
             const type = (e.type || 'text').toLowerCase();
             kind = ['button','submit','reset','image'].includes(type) ? 'button' : (['checkbox','radio'].includes(type) ? type : 'textbox');
             extra = ' (type=' + type + (sensitive(e) ? ', sensitive: Kiln will not type here' : '') + ')';
-            if (!sensitive(e) && kind === 'textbox' && e.value) extra += ' value="' + clean(e.value) + '"';
             if (type === 'checkbox' || type === 'radio') extra += e.checked ? ' [checked]' : ' [unchecked]';
-        } else if (tag === 'textarea') { kind = 'textbox'; if (e.value) extra = ' value="' + clean(e.value) + '"'; }
+        } else if (tag === 'textarea') { kind = 'textbox'; }
         else if (tag === 'select') { kind = 'combobox'; extra = ' value="' + clean(e.options[e.selectedIndex] ? e.options[e.selectedIndex].text : '') + '"'; }
         if (e.disabled) extra += ' [disabled]';
         lines.push('[' + ref + '] ' + kind + ' "' + labelOf(e) + '"' + extra);
@@ -75,7 +75,8 @@ enum BrowserScripts {
     if (!e) return JSON.stringify({ ok: false, error: 'No element with ref ' + ref + '. Read the page again (browser_read_page) for current refs.' });
     if (e.disabled) return JSON.stringify({ ok: false, error: 'Element ' + ref + ' is disabled.' });
     e.scrollIntoView({ block: 'center', inline: 'center' });
-    const what = (e.tagName.toLowerCase() + ' "' + (e.getAttribute('aria-label') || e.innerText || e.value || '').replace(/\\s+/g, ' ').trim().slice(0, 80) + '"');
+    const text = e.matches('input,textarea,[contenteditable]') ? '' : e.innerText;
+    const what = (e.tagName.toLowerCase() + ' "' + (e.getAttribute('aria-label') || text || '').replace(/\\s+/g, ' ').trim().slice(0, 80) + '"');
     e.click();
     return JSON.stringify({ ok: true, clicked: what });
     """

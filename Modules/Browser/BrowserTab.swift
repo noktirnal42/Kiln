@@ -146,13 +146,12 @@ extension BrowserTab: WKNavigationDelegate {
 }
 
 extension BrowserTab: WKUIDelegate {
-    /// `target=_blank` and `window.open` become a new tab. The page gets no handle to it (no `window.opener`).
+    /// WebKit must own the returned web view's first navigation and configuration. Returning nil
+    /// breaks popup-based sign-in flows that communicate with their opener.
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        if let url = navigationAction.request.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-            owner?.newTab(url: url, select: true)
-        }
-        return nil
+        guard let owner else { return nil }
+        return owner.newTab(url: nil, select: true, configuration: configuration).webView
     }
 }
 

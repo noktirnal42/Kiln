@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Kiln: a native Mac workshop for AI agents you can supervise</title>
-<meta name="description" content="Kiln is an open-source Mac app where AI agents do real work (code, reverse engineering, model training) and every consequential step waits for your approval, at your desk or from your iPhone and Apple Watch.">
+<meta name="description" content="Kiln is a source-available Mac app where AI agents do real work (code, reverse engineering, model training) and every consequential step waits for your approval, at your desk or from your iPhone and Apple Watch.">
 <meta name="theme-color" content="#121110">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Kiln: agents that work, hands that stay on the controls">
-<meta property="og:description" content="A native Mac workshop for AI agents you can supervise. Approve their actions from your iPhone or Apple Watch. Open source, notarized, in preview.">
+<meta property="og:description" content="A native Mac workshop for AI agents you can supervise. Approve their actions from your iPhone or Apple Watch. Source-available, notarized, in preview.">
 <meta property="og:image" content="https://noktirnal42.github.io/Kiln/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/icon.png">
@@ -20,7 +20,7 @@
   <div class="bar">
     <a class="brand" href="index.html"><img src="assets/icon.png" alt="">Kiln<span>/</span></a>
     <nav aria-label="Main navigation">
-      <a href="#demo">Demo</a><a href="#why">Why Kiln</a><a href="#safety">Safety</a><a href="#remote">Remote</a><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a>
+      <a href="#demo">Demo</a><a href="#why">Why Kiln</a><a href="#safety">Safety</a><a href="#remote">Remote</a><a href="activities.html">Activities</a><a href="agent.html">Agent &amp; MCP</a><a href="docs.html">Docs</a><a href="roadmap.html">Roadmap</a>
       <a class="source" href="https://github.com/noktirnal42/Kiln">GitHub ↗</a>
       <a class="cta" href="https://github.com/noktirnal42/Kiln/releases">Download</a>
     </nav>
@@ -31,14 +31,14 @@
 
 <section class="hero" aria-labelledby="hero-title">
   <div>
-    <p class="eyebrow"><span class="dot"></span>Open source · Native macOS · Preview</p>
+    <p class="eyebrow"><span class="dot"></span>Source-available · Native macOS · Preview</p>
     <h1 id="hero-title">Agents that work.<br>Hands that stay <em>on the controls.</em></h1>
     <p class="lede">Kiln is a Mac workshop where AI agents do real work (code, reverse engineering, model training) and every consequential step waits for you, at your desk or on your wrist.</p>
     <div class="actions">
       <a class="btn btn-primary" href="https://github.com/noktirnal42/Kiln/releases">Download for Mac</a>
       <a class="btn btn-ghost" href="https://github.com/noktirnal42/Kiln">View the source</a>
     </div>
-    <p class="badges"><span>Notarized by Apple</span><span>MIT licensed</span><span>Apple silicon recommended</span></p>
+    <p class="badges"><span>Notarized by Apple</span><span>Source-available</span><span>Apple silicon recommended</span></p>
     <p class="fine">Version 0.1.1 preview for macOS 15 or later. Early software: read <a href="#status">what works and what does not</a> before you rely on it.</p>
   </div>
   <div class="stage">
@@ -57,7 +57,7 @@
     <li><strong>592</strong><span>automated tests pass on the Mac</span></li>
     <li><strong>3</strong><span>approval modes: Ask, Auto, Bypass</span></li>
     <li><strong>5</strong><span>model providers verified in live chat</span></li>
-    <li><strong>MIT</strong><span>source, notarized builds, public issues</span></li>
+    <li><strong>Source-available</strong><span>source, notarized builds, public issues</span></li>
     <li><strong>Wrist</strong><span>approvals verified on a real iPhone and Apple Watch</span></li>
   </ul>
 </div>
@@ -196,6 +196,11 @@
     <article class="card"><h3>Talk to it</h3><p>Dictate, hear replies read aloud, or hold a hands-free conversation. Speech recognition runs on the Mac when it can.</p></article>
     <article class="card"><span class="chip early">Experimental</span><h3>Use other Mac apps</h3><p>Opt-in computer use reads and operates other apps through Accessibility, one approved step at a time. It has read Calendar and Messages and sent a reply.</p></article>
   </div>
+  <div class="grid-3" style="margin-top:20px">
+    <article class="card"><span class="chip ok">Working</span><h3>Browse</h3><p>A tabbed WebKit browser the agent can read and drive. Sign-in, autofill and passkeys are not verified.</p></article>
+    <article class="card"><span class="chip ok">Working</span><h3>Run devices</h3><p>Boot iOS simulators and Android emulators, watch the screen, install and launch apps, read logs.</p></article>
+    <article class="card"><span class="chip ok">Working</span><h3>Handle media</h3><p>View video, images and audio, speak text to a file and transcribe recordings. <a href="activities.html">All ten activities</a> and <a href="agent.html">the agent&rsquo;s tools</a>.</p></article>
+  </div>
 </section>
 
 <section id="status" aria-labelledby="status-title">
@@ -242,7 +247,7 @@
     <details><summary>Do I need an API key?</summary><p>Not for local models. Hosted providers need your own key, stored in the macOS Keychain.</p></details>
     <details><summary>How is this different from Claude Code, Codex or OpenCode?</summary><p>Those are excellent terminal and editor agents. Kiln is a native Mac app focused on supervising an agent: explicit approval modes, a verifiable audit trail, answering approvals from your iPhone or Apple Watch, and putting coding, reverse engineering and model training in one place. It works with many model providers. It is also much younger, so expect less polish.</p></details>
     <details><summary>Can I get the iPhone and Apple Watch apps?</summary><p>Their source is in the repository (<code>Companion/</code>). Build them with your own Apple developer signing; they are not on the App Store or TestFlight yet.</p></details>
-    <details><summary>Is it affiliated with Apple, Anthropic, OpenAI or Ghidra?</summary><p>No. Kiln is an independent open-source project and uses those names only to describe compatibility.</p></details>
+    <details><summary>Is it affiliated with Apple, Anthropic, OpenAI or Ghidra?</summary><p>No. Kiln is an independent project and uses those names only to describe compatibility.</p></details>
   </div>
 </section>
 
@@ -250,7 +255,7 @@
   <h2 id="band-title">Build the workshop <em>with us.</em></h2>
   <p class="lede">Bring your Swift, your sharpest bug report, your reverse-engineering habits or your eye for design. Every issue is public and every claim is checked.</p>
   <div class="actions"><a class="btn btn-primary" href="contribute.html">Find a first contribution</a><a class="btn btn-ghost" href="https://github.com/noktirnal42/Kiln">Star on GitHub ↗</a><a class="btn btn-ghost" href="https://github.com/sponsors/noktirnal42">Sponsor on GitHub ♥</a></div>
-  <p class="fine">Kiln is free and MIT licensed. Sponsorship pays for test hardware, model-provider testing and maintainer time.</p>
+  <p class="fine">Kiln is free for noncommercial use; commercial use needs a license. Sponsorship pays for test hardware, model-provider testing and maintainer time.</p>
 </section>
 
 </main>
@@ -258,9 +263,9 @@
 <footer>
   <div>
     <a class="brand" href="index.html"><img src="assets/icon.png" alt="">Kiln<span>/</span></a>
-    <p>Built in the open, made for the Mac. Experimental software, MIT licensed. No affiliation with Apple, Anthropic, OpenAI or Ghidra.</p>
+    <p>Built in the open, made for the Mac. Experimental software, source-available under the PolyForm Noncommercial License. No affiliation with Apple, Anthropic, OpenAI or Ghidra.</p>
   </div>
-  <div class="links"><a href="docs.html">Documentation</a><a href="roadmap.html">Roadmap</a><a href="contribute.html">Contribute</a><a href="support.html">Support</a><a href="https://github.com/noktirnal42/Kiln/releases">Releases ↗</a><a href="https://github.com/noktirnal42/Kiln">GitHub ↗</a><a href="https://github.com/sponsors/noktirnal42">Sponsor ♥ ↗</a></div>
+  <div class="links"><a href="activities.html">Activities</a><a href="agent.html">Agent &amp; MCP</a><a href="docs.html">Documentation</a><a href="roadmap.html">Roadmap</a><a href="contribute.html">Contribute</a><a href="support.html">Support</a><a href="https://github.com/noktirnal42/Kiln/wiki">Wiki ↗</a><a href="https://github.com/noktirnal42/Kiln/releases">Releases ↗</a><a href="https://github.com/noktirnal42/Kiln">GitHub ↗</a><a href="https://github.com/sponsors/noktirnal42">Sponsor ♥ ↗</a></div>
 </footer>
 <script src="site.js"></script>
 </body>

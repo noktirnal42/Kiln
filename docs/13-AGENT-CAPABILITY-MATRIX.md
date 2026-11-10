@@ -17,6 +17,35 @@ Kiln exposes application services as ordinary tools. The Workstation Agent profi
 | Chat and artifacts | Shared model registry and tool-run loop underpin chat | Conversation management, artifact creation/rendering/export and provider configuration need explicit tools |
 | Audit and approvals | Every agent run records decisions and tool results; writes and execution can require approval | Agent-facing audit queries and verification tools are missing; agents must never approve themselves or alter the approval policy |
 
+
+## Registry gaps
+
+These activity capabilities currently lack a dedicated agent tool. The IDs correspond to the registry and are not evidence of implemented behavior.
+
+- `agent.artifacts` — Create and export artifacts. Gap: artifact creation, rendering and export have no tool yet (docs/13, Chat and artifacts).
+- `agent.new-conversation` — Start a new conversation. Gap: conversation management has no tool yet (docs/13, Chat and artifacts); an agent starting its own fresh context is better served by compaction.
+- `analyze.delete-project` — Delete a project. Gap: no delete tool yet; destructive, so it needs an approval-gated adapter before it is offered.
+- `analyze.device-bench` — Device bench: connect, read registers and memory. Gap: device-bench operations need a dedicated adapter with its own limits (docs/13, Reverse engineering).
+- `analyze.select-project` — Choose the open project. Gap: tools take a project id, but there is no tool to list projects or to set the one on screen (docs/13, Reverse engineering).
+- `audit.browse` — Browse the audit record. Gap: agent-facing audit queries are not built yet (docs/13). Until they are, an agent can only see its own run's tool results.
+- `audit.verify` — Verify the audit chain. Gap: no verification tool yet (docs/13). It would be read-only; the chain itself stays append-only for agents.
+- `browser.navigate-history` — Back, forward, reload. Gap: history navigation is not a tool yet; browser_open reaches any address (docs/13, Browser).
+- `browser.tab-management` — New and close tab. Gap: browser_open can open a new tab; closing tabs has no tool yet (docs/13, Browser).
+- `develop.build` — Build the selected scheme. Gap: no service-backed build/test/run adapter or scheme picker tool yet; run_command can call xcodebuild meanwhile (docs/13, Development).
+- `develop.debug` — Debug under LLDB (breakpoints, step, inspect). Gap: no debugger adapter for agents yet (docs/13, Development).
+- `develop.diagnostics` — Language-server diagnostics and Problems. Gap: the Problems list is not exposed as a tool yet.
+- `develop.open-at-line` — Open a file in the editor at a line. Gap: no tool yet to focus the editor on a file and line (docs/13, Workspace files).
+- `develop.test` — Run tests. Gap: same as develop.build; run_command can call the test runner meanwhile.
+- `lab.compute-perplexity` — Compute perplexity. Gap: no tool yet for perplexity or prompt optimization (docs/13, Model Lab).
+- `lab.edit-training-config` — Edit training configuration and compare runs. Gap: training configuration edits and experiment comparison have no tool yet (docs/13).
+- `lab.model-download` — Download a model into the library. Gap: model download has no tool yet (docs/13); lab_start_lora takes allow_download for its own base model only.
+- `lab.playground` — Playground chat and compare runs. Gap: prompting a lab model from the playground has no tool yet; the Agent activity chats with the same registry models.
+- `lab.red-team` — Run a red-team assessment. Gap: no tool yet for red-team assessment or report export (docs/13, Model Lab).
+- `media.delete-item` — Delete a generated item. Gap: deleting library items has no tool yet; destructive, so it needs an approval-gated adapter.
+- `swarm.inspect` — Inspect a run's tasks and team channel. Gap: no top-level tool yet to read a run's plan, results or channel; tracked in docs/13 (Swarm row).
+- `swarm.run` — Run a goal with a team. Gap: no top-level tool yet to create a swarm run; tracked in docs/13 (Swarm row).
+- `swarm.stop` — Stop a swarm run. Gap: no top-level tool yet to cancel a swarm run; tracked in docs/13 (Swarm row).
+
 ## Streaming behavior
 
 Plain chat updates `ChatSession.streamingText` for each provider delta. Agent mode now emits `textDelta` events while its provider stream is still open, instead of waiting for a complete turn. Partial output is cleared when a transient failure triggers a retry, and when a text-only reply is recognized as a tool call. The final persisted response continues to use the completed, redacted turn.
