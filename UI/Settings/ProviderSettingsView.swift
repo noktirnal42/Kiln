@@ -127,6 +127,8 @@ struct ProviderSettingsView: View {
                     }
                 }
                 ModelStoreCard()
+                Divider()
+                AboutKilnView()
             }
             .padding(SSSpacing.l)
             .frame(maxWidth: .infinity, alignment: .leading)
