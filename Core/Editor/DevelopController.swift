@@ -478,7 +478,7 @@ public final class DevelopController {
     /// Applies a workspace edit: open documents are edited and saved, others are rewritten on disk. Only files inside the project.
     public func applyEdit(_ edit: LSPWorkspaceEdit) throws {
         let root = try requireRoot()
-        for (path, edits) in edit.edits {
+        for (path, _) in edit.edits {
             guard WorkspacePathResolver.relativePath(of: path, under: root) != nil else {
                 throw IDEError.failed("Refusing to edit \(path): it is outside the project.")
             }
