@@ -96,6 +96,8 @@ for p in scan:
     if not p.exists(): continue
     t = p.read_text()
     for pat, why in bad:
+        # Dependency licenses must keep their authors' copyright lines, which can include an email address.
+        if why == 'email address' and p.name == 'THIRD-PARTY-NOTICES.md': continue
         for m in re.finditer(pat, t):
             errors.append(f'{p.relative_to(root)}: {why}: {m.group(0)[:30]}')
 
