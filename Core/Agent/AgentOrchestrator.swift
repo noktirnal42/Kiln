@@ -272,6 +272,7 @@ public final class AgentOrchestrator: Sendable {
         backoffUnitSeconds: Double = 1.0,
         hooks: [HookDefinition] = [],
         checkpoint: CheckpointRecorder? = nil,
+        budgetGate: UsageBudgetGate? = nil,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -296,6 +297,7 @@ public final class AgentOrchestrator: Sendable {
                             backoffUnitSeconds: backoffUnitSeconds,
                             hooks: hooks.isEmpty ? nil : HookRunner(hooks: hooks, workspaceRoot: workspaceRoot, audit: PlatformAudit(chain: self.auditChain)),
                             checkpoint: checkpoint,
+                            budgetGate: budgetGate,
                             chat: chat,
                             audit: recorder,
                             rubric: rubricMonitor,
@@ -379,6 +381,7 @@ public final class AgentOrchestrator: Sendable {
         backoffUnitSeconds: Double,
         hooks: HookRunner?,
         checkpoint: CheckpointRecorder?,
+        budgetGate: UsageBudgetGate?,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>,
         audit: AgentAuditRecorder?,
         rubric: RubricMonitor?,
@@ -466,6 +469,10 @@ public final class AgentOrchestrator: Sendable {
             )
             if budgetDecision.verdict == .deny {
                 throw AgentRunError.budgetExhausted(budgetDecision.reason)
+            }
+            if let reason = budgetGate?.check(runTokens: summary.totalTokens) {
+                audit?.record("usage.budget_stop", ["reason": .string(reason), "run_tokens": .int(summary.totalTokens)])
+                throw AgentRunError.budgetExhausted(reason)
             }
 
             if let contextWindow {

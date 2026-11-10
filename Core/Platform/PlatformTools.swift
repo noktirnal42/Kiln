@@ -4,7 +4,7 @@ import Foundation
 /// agent and external MCP clients can use what the person can. All are named `kiln_*`.
 public enum PlatformTools {
     public static var all: [any ToolExecuting] {
-        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool()]
+        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool(), UsageReportTool()]
     }
 }
 
@@ -166,5 +166,29 @@ public struct CheckpointListTool: ToolExecuting {
             "\(m.createdAt.formatted(date: .abbreviated, time: .shortened)) · \(m.files.count) file(s): \(m.files.prefix(5).map(\.path).joined(separator: ", "))"
                 + (m.unrestorable.isEmpty ? "" : " · not restorable: \(m.unrestorable.prefix(3).joined(separator: "; "))") + (m.rewound ? " · rewound" : "")
         }.joined(separator: "\n")
+    }
+}
+
+public struct UsageReportTool: ToolExecuting {
+    let ledger: UsageLedger
+    public init() { ledger = .default }
+    init(ledger: UsageLedger) { self.ledger = ledger }
+    public var spec: ToolSpec {
+        ToolSpec(name: "kiln_usage_report", summary: "Tokens and estimated cost by provider, model and day",
+                 detail: "Costs are estimates from prices the user entered; unpriced hosted models and local models are labelled. Also shows the daily budget.",
+                 parameters: [], permission: .read)
+    }
+    public func execute(argumentsJSON: String, context: ToolExecutionContext) async throws -> String {
+        func line(_ l: UsageLine) -> String {
+            "\(l.key): \(l.tokens.formatted()) tokens, \(l.runs) runs, " + String(format: "$%.4f", l.costUSD) + (l.unpricedTokens > 0 ? " (+\(l.unpricedTokens.formatted()) tokens unpriced)" : "")
+        }
+        let today = ledger.today()
+        var text = "Today: " + line(today).replacingOccurrences(of: "today: ", with: "")
+        let budget = ledger.budget
+        text += budget.isSet ? "\nBudget: \(budget.dailyTokens > 0 ? "\(budget.dailyTokens.formatted()) tokens" : "no token cap")" + (budget.dailyUSD > 0 ? String(format: ", $%.2f", budget.dailyUSD) : "") + " per day" : "\nNo daily budget set."
+        text += "\n\nBy provider:\n" + (ledger.byProvider().map(line).joined(separator: "\n"))
+        text += "\n\nBy model:\n" + (ledger.byModel().prefix(15).map(line).joined(separator: "\n"))
+        text += "\n\nDaily:\n" + ledger.daily(limit: 14).map(line).joined(separator: "\n")
+        return text
     }
 }

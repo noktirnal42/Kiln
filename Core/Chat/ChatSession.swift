@@ -138,6 +138,21 @@ public final class ChatSession {
         return profile
     }
 
+    // MARK: Usage and budget
+    let usageLedger: UsageLedger?
+    private var modelMeta: [String: (provider: String, local: Bool)] = [:]
+
+    private func providerInfo(for modelID: String) -> (provider: String, local: Bool) {
+        modelMeta[modelID] ?? (modelID.split(separator: "/").first.map(String.init) ?? "unknown", false)
+    }
+
+    private func recordUsage(tokens: Int, model: String, conversationID: UUID) {
+        guard let usageLedger, tokens > 0 else { return }
+        let info = providerInfo(for: model)
+        usageLedger.record(UsageRecord(date: Date(), providerID: info.provider, modelID: model, local: info.local,
+                                       inputTokens: tokens, outputTokens: 0, conversationID: conversationID))
+    }
+
     // MARK: Sessions
     /// Per conversation: running, waiting for approval, or idle. Only the open conversation runs here at a time.
     public private(set) var sessionStates: [UUID: SessionState] = [:]
@@ -224,7 +239,7 @@ public final class ChatSession {
     }
 
     // MARK: Slash commands
-    public enum Pane: Equatable { case memory, commands, hooks, sessions }
+    public enum Pane: Equatable { case memory, commands, hooks, sessions, usage }
     /// A pane a slash command asked the chat to open.
     public var requestedPane: Pane?
 
@@ -241,6 +256,7 @@ public final class ChatSession {
             planMode = PlanMode.parse(arguments) ?? !planMode
             agentNotice = planMode ? "Plan mode on: the agent explores read-only and proposes a plan." : "Plan mode off."
             await platformAudit.record("plan.mode", ["on": .bool(planMode)])
+        case .cost: requestedPane = .usage
         case .memory: reloadMemory(); requestedPane = .memory
         case .commands: requestedPane = .commands
         case .hooks: requestedPane = .hooks
@@ -323,8 +339,10 @@ public final class ChatSession {
         initialModelID: String = "",
         compactionDefaults: UserDefaults? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil,
         memoryHome: URL? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? FileManager.default.homeDirectoryForCurrentUser : nil,
-        checkpointStore: CheckpointStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil
+        checkpointStore: CheckpointStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil,
+        usageLedger: UsageLedger? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil
     ) {
+        self.usageLedger = usageLedger
         self.memoryHome = memoryHome
         self.checkpointStore = checkpointStore
         self.registry = registry
@@ -686,6 +704,7 @@ public final class ChatSession {
         let store = conversations
         let model = selectedModelID
         let hooks = HookRunner.load(workspaceRoot: root, home: memoryHome)
+        let gate = usageLedger.map { UsageBudgetGate(ledger: $0, modelID: model, local: providerInfo(for: model).local) }
 
         let startedAt = Date()
         let task = Task { [weak self] in
@@ -693,7 +712,7 @@ public final class ChatSession {
             var tokens = 0
             var firstTokenAt: Date?
             let stream = orchestrator.run(
-                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop, hooks: hooks, checkpoint: recorder,
+                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop, hooks: hooks, checkpoint: recorder, budgetGate: gate?.isActive == true ? gate : nil,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
             )
             do {
@@ -728,7 +747,7 @@ public final class ChatSession {
                     Self.apply(event, to: &self.agentActivity)
                 }
             } catch {
-                self?.errorText = AgentRetry.explain(error)
+                self?.errorText = (error as? AgentRunError)?.description ?? AgentRetry.explain(error)
             }
             self?.lastTiming = ResponseTiming(firstTokenSeconds: firstTokenAt.map { $0.timeIntervalSince(startedAt) },
                                               totalSeconds: Date().timeIntervalSince(startedAt))
@@ -749,6 +768,7 @@ public final class ChatSession {
             ) {
                 self?.messages.append(saved)
             }
+            self?.recordUsage(tokens: tokens, model: model, conversationID: conversationID)
             if let recorder, let made = recorder.finish() {
                 await self?.platformAudit.record("checkpoint.created", [
                     "files": .int(made.files.count), "unrestorable_commands": .int(made.unrestorable.count), "message_id": .string(made.messageID.uuidString),
@@ -836,7 +856,10 @@ public final class ChatSession {
         if override > 0 { windowCache[modelID] = override; return override }
         if let cached = windowCache[modelID] { return cached }
         let models = await registry.allModels()
-        for model in models { windowCache[model.id] = model.contextWindow }
+        for model in models {
+            windowCache[model.id] = model.contextWindow
+            modelMeta[model.id] = (model.providerID, model.isOnDevice || [.ollama, .mlx, .appleFoundation, .applePCC].contains(model.providerType))
+        }
         return windowCache[modelID]
     }
 
