@@ -7,13 +7,13 @@ import Testing
 struct ActivityRegistryTests {
     private let registry = ActivityRegistry.standard
 
-    @Test func theTenActivitiesKeepTheirOrderSidebarAndShortcuts() {
+    @Test func theElevenActivitiesKeepTheirOrderSidebarAndShortcuts() {
         #expect(registry.descriptors.map(\.id) ==
-                ["home", "agent", "swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media"])
+                ["home", "agent", "swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images"])
         #expect(Activity.allCases.compactMap { $0.shortcutKey.map(String.init) } == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
         // Home has the logo and Agent has New chat; the rest are the sidebar's Workstation list, in order.
         #expect(Activity.allCases.filter(\.descriptor.showsInSidebar).map(\.id) ==
-                ["swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media"])
+                ["swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images"])
     }
 
     @Test func idsAreUniqueAndEveryActivityIsComplete() {
@@ -38,7 +38,7 @@ struct ActivityRegistryTests {
 
     @Test func policyPrefixesComeFromTheRegistryAndMatchTheOldList() {
         #expect(Set(ExecutionPolicy.moduleToolPrefixes) ==
-                ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_"])
+                ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_", "image_"])
         #expect(ExecutionPolicy.isModuleTool("media_open") && !ExecutionPolicy.isModuleTool("read_file"))
     }
 
@@ -96,6 +96,7 @@ struct CapabilityRegistryTests {
             BrowserModule.identifier: BrowserModule(dataStore: .nonPersistent(), downloadsFolder: folder),
             DevicesModule.identifier: DevicesModule(),
             MediaModule.identifier: MediaModule(),
+            ImageStudioModule.identifier: ImageStudioModule(),
         ]
         await ActivityRegistry.standard.registerTools(ToolRegistrationContext(registry: registry, loadedModule: { modules[$0] }))
         return registry

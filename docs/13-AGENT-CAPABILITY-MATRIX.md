@@ -42,6 +42,9 @@ These activity capabilities currently lack a dedicated agent tool. The IDs corre
 - `lab.playground` — Playground chat and compare runs. Gap: prompting a lab model from the playground has no tool yet; the Agent activity chats with the same registry models.
 - `lab.red-team` — Run a red-team assessment. Gap: no tool yet for red-team assessment or report export (docs/13, Model Lab).
 - `media.delete-item` — Delete a generated item. Gap: deleting library items has no tool yet; destructive, so it needs an approval-gated adapter.
+- `images.search-remote` — Search Hugging Face, Civitai and Draw Things' list. Gap: the agent only sees the curated catalogue; remote search results carry untrusted descriptions and need a vetted adapter.
+- `images.prompt-library` — Save prompts and styles. Gap: prompt and style library edits are GUI-only; image_generate accepts a style name.
+- `images.send-to-media` — Send a picture to the Media gallery. Gap: no tool yet; the file path from image_history can be opened with media_open.
 - `swarm.inspect` — Inspect a run's tasks and team channel. Gap: no top-level tool yet to read a run's plan, results or channel; tracked in docs/13 (Swarm row).
 - `swarm.run` — Run a goal with a team. Gap: no top-level tool yet to create a swarm run; tracked in docs/13 (Swarm row).
 - `swarm.stop` — Stop a swarm run. Gap: no top-level tool yet to cancel a swarm run; tracked in docs/13 (Swarm row).
