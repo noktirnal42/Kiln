@@ -94,7 +94,7 @@ enum REScriptEngine {
         let encoded = (try? JSONSerialization.data(withJSONObject: [binaryPath])).flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
         let script = "var binary = \(encoded.dropFirst().dropLast());\n" + source
         return try await withCheckedThrowingContinuation { continuation in
-            let gate = ResumeOnce()
+            let gate = REScriptGate()
             let worker = Thread {
                 let console = ScriptConsole()
                 console.install("re", api)
@@ -113,4 +113,10 @@ enum REScriptEngine {
             }
         }
     }
+}
+
+final class REScriptGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var claimed = false
+    func claim() -> Bool { lock.lock(); defer { lock.unlock() }; if claimed { return false }; claimed = true; return true }
 }
