@@ -78,10 +78,12 @@ struct REFindingsView: View {
 
     /// Starting point for the script editor: the binary path is in `binary`, and the last expression is the result.
     static let exampleScript = """
-    // `binary` is this project's binary; `axiom` is the analysis API.
-    const t = axiom.triage(binary);
-    axiom.log("triaged " + binary);
-    JSON.stringify(t).slice(0, 200);
+    // `re` is the project API the agent tools use: functions(), fn(name), references(target), strings(text),
+    // bytes(addr, n), search("de ad ?? ef"), cfg(fn), callGraph(fn, depth), rename(), comment(), label().
+    // `axiom` is the file-level API (triage, carve, scanCrypto) and `binary` is this project's binary path.
+    const hubs = re.functions().sort((a, b) => b.callers - a.callers).slice(0, 5);
+    axiom.log("most called: " + hubs.map(f => f.name).join(", "));
+    JSON.stringify(hubs);
     """
 
     @ViewBuilder
@@ -211,7 +213,7 @@ struct REFindingsView: View {
             }
             return rows
         case .script:
-            let result = try await module.runScript(projectID: projectID, source: scriptSource)
+            let result = try await module.runWorkbenchScript(projectID: projectID, source: scriptSource)
             return [REFindingRow(title: "result", detail: result.value)]
                 + result.output.map { REFindingRow(title: "log", detail: $0) }
         }
