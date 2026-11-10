@@ -88,10 +88,10 @@ for name, path in pages.items():
         errors.append(f'{where}: missing the "Verified status" note')
 
 # ---- privacy scan of public docs
-scan = [readme] + list(wiki.glob('*.md')) + list((root / 'site').glob('*.html')) + [root / 'docs' / 'DOCS-MAP.md']
+scan = [readme] + list(wiki.glob('*.md')) + list((root / 'site').glob('*.html')) + [root / 'docs' / 'DOCS-MAP.md', root / 'THIRD-PARTY-NOTICES.md', root / 'LICENSE-HISTORY.md', root / 'COMMERCIAL-LICENSE.md']
 bad = [(r'/Users/[A-Za-z0-9_.-]+', 'personal path'), (r'[\w.+-]+@(gmail|icloud|outlook|yahoo)\.[a-z]+', 'email address'),
        (r'\b(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|xox[bp]-[A-Za-z0-9-]{10,}|nvapi-[A-Za-z0-9_-]{10,})', 'key-like token'),
-       (r'LH8KLB9N4F', 'team identifier')]
+       (r'LH8KLB9N4F', 'team identifier'), (r'(/private)?/tmp/claude-\d+|/build-triage/|SourcePackages/(checkouts|repositories)', 'local build path')]
 for p in scan:
     if not p.exists(): continue
     t = p.read_text()

@@ -6,7 +6,7 @@ Kiln includes or links the following open-source packages. Each is used under it
 
 ## EventSource (MIT)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/EventSource-24732f58
+Source: https://github.com/mattt/EventSource.git
 
 ```
 Copyright 2025 Mattt (https://mat.tt)
@@ -34,7 +34,7 @@ DEALINGS IN THE SOFTWARE.
 
 ## SwiftTerm (MIT)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/SwiftTerm-74b92343
+Source: https://github.com/migueldeicaza/SwiftTerm.git
 
 ```
 Copyright (c) 2019-2026 Miguel de Icaza (https://github.com/migueldeicaza)
@@ -66,7 +66,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## h (Apache-2.0, rarestype/h)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/h-1c482571
+Source: https://github.com/rarestype/h
 
 ```
 Apache License
@@ -277,7 +277,7 @@ Apache License
 
 ## mlx-swift (MIT)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/mlx-swift-eecb5611
+Source: https://github.com/ml-explore/mlx-swift
 
 ```
 MIT License
@@ -307,7 +307,7 @@ SOFTWARE.
 
 ## mlx-swift-lm (MIT)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/mlx-swift-lm-c90ccc0b
+Source: https://github.com/ml-explore/mlx-swift-lm
 
 ```
 MIT License
@@ -337,7 +337,7 @@ SOFTWARE.
 
 ## swift-argument-parser (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-argument-parser-54a11a8d
+Source: https://github.com/apple/swift-argument-parser
 
 ```
 Apache License
@@ -557,7 +557,7 @@ Apache License
 
 ## swift-asn1 (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-asn1-7065ad2c
+Source: https://github.com/apple/swift-asn1.git
 
 ```
 Apache License
@@ -767,7 +767,7 @@ Apache License
 
 ## swift-collections (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-collections-9a58d5cf
+Source: https://github.com/apple/swift-collections.git
 
 ```
 Apache License
@@ -987,7 +987,7 @@ Apache License
 
 ## swift-crypto (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-crypto-7e0614ea
+Source: https://github.com/apple/swift-crypto.git
 
 ```
 Apache License
@@ -1197,7 +1197,7 @@ Apache License
 
 ## swift-huggingface (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-huggingface-ffa527b1
+Source: https://github.com/huggingface/swift-huggingface
 
 ```
 Apache License
@@ -1407,7 +1407,7 @@ Apache License
 
 ## swift-jinja (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-jinja-c9e03d9c
+Source: https://github.com/huggingface/swift-jinja.git
 
 ```
 Apache License
@@ -1617,7 +1617,7 @@ Apache License
 
 ## swift-numerics (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-numerics-d936ec6c
+Source: https://github.com/apple/swift-numerics
 
 ```
 Apache License
@@ -1837,7 +1837,7 @@ Apache License
 
 ## swift-png (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-png-fab7dc4e
+Source: https://github.com/tayloraswift/swift-png
 
 ```
 Apache License
@@ -2048,7 +2048,7 @@ Apache License
 
 ## swift-syntax (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-syntax-e1f983d3
+Source: https://github.com/swiftlang/swift-syntax.git
 
 ```
 Apache License
@@ -2268,7 +2268,7 @@ Apache License
 
 ## swift-transformers (Apache-2.0)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/swift-transformers-e50307c3
+Source: https://github.com/huggingface/swift-transformers
 
 ```
 Apache License
@@ -2478,7 +2478,7 @@ Apache License
 
 ## yyjson (MIT)
 
-Source: /tmp/claude-501/build-triage/SourcePackages/repositories/yyjson-04ab5379
+Source: https://github.com/ibireme/yyjson.git
 
 ```
 MIT License

@@ -70,7 +70,7 @@ struct AboutKilnView: View {
                         .padding(SSSpacing.m)
                 }
             }
-            .frame(width: 640, height: 520)
+            .frame(minWidth: 480, idealWidth: 520, maxWidth: 540, minHeight: 420, idealHeight: 520)
         }
     }
 }
