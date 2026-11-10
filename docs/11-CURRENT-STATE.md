@@ -60,6 +60,12 @@ One window, one sidebar, one conversation.
   Breakpoints persist per project. Switching projects and quitting end the previous debugger; build actions save only current-project documents.
   The debugger panel switches to Stack / Variables / Console tabs in narrow editor panes. **Not in Kiln:** debugger attach, conditional breakpoints, watches,
   SwiftUI previews, code folding, multi-cursor, completion/diagnostics for languages other than Swift/C-family, and stage-hunk / blame UI in the editor.
+- **Develop IDE pass (2026-11-09, unit-tested, not yet seen on screen):** `Core/Editor/DevelopController.swift` is the one service behind the editor view, palette
+  (`UI/Workstation/DevelopCommands.swift`) and the `ide_*` agent/MCP tools (`DevelopAgentTools.swift`, registered through `DevelopActivity`): open at line, outline,
+  definition, references, hover, rename (LSP, applied and saved inside the project), diagnostics, blame, build / test / run with issues returned, scheme choice,
+  debugger start / control / state, conditional breakpoints, expression evaluation. New UI in `DevelopChrome.swift`: jump bar with back/forward, Symbols / Issues / Tests /
+  References navigators, inspector (Quick Help, file, blame), activity strip, symbol context menu. Debugger gained threads, conditions and `expression`. **Not done:** multi-root
+  workspaces, inline (end-of-line) blame, watch expressions, debugger attach, completion beyond ⌥Esc. None of the new views has been looked at in the running app.
 - **Project** = the folder the agent works in. `WorkspaceStore` keeps a security-scoped bookmark per recent folder;
   without it the sandbox forgets the folder on every relaunch.
 - **Composer** (model, Agent toggle, agent profile) is shared by the Agent view and the panel beside every tool.

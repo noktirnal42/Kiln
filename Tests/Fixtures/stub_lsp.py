@@ -30,6 +30,23 @@ while True:
         send({"jsonrpc": "2.0", "id": m["id"], "result": [{"uri": m["params"]["textDocument"]["uri"], "range": {"start": {"line": 7, "character": 1}, "end": {"line": 7, "character": 4}}}]})
     elif method == "textDocument/completion":
         send({"jsonrpc": "2.0", "id": m["id"], "result": {"items": [{"label": "alpha"}, {"label": "beta", "insertText": "beta()"}]}})
+    elif method == "textDocument/documentSymbol":
+        send({"jsonrpc": "2.0", "id": m["id"], "result": [{"name": "Thing", "kind": 23,
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 3, "character": 1}},
+            "selectionRange": {"start": {"line": 0, "character": 7}, "end": {"line": 0, "character": 12}}, "children": []}]})
+    elif method == "textDocument/references":
+        u = m["params"]["textDocument"]["uri"]
+        send({"jsonrpc": "2.0", "id": m["id"], "result": [
+            {"uri": u, "range": {"start": {"line": 0, "character": 4}, "end": {"line": 0, "character": 5}}},
+            {"uri": u, "range": {"start": {"line": 1, "character": 6}, "end": {"line": 1, "character": 7}}}]})
+    elif method == "textDocument/rename":
+        u = m["params"]["textDocument"]["uri"]
+        n = m["params"]["newName"]
+        send({"jsonrpc": "2.0", "id": m["id"], "result": {"changes": {u: [
+            {"range": {"start": {"line": 0, "character": 4}, "end": {"line": 0, "character": 5}}, "newText": n},
+            {"range": {"start": {"line": 1, "character": 6}, "end": {"line": 1, "character": 7}}, "newText": n}]}}})
+    elif method == "textDocument/hover":
+        send({"jsonrpc": "2.0", "id": m["id"], "result": {"contents": {"kind": "plaintext", "value": "let a: Int"}}})
     elif method == "exit":
         break
     elif "id" in m:
