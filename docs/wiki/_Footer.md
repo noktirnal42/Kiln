@@ -1,0 +1,1 @@
+Kiln is experimental preview software. Docs describe verified behavior; see each page's *Verified status*. License: see LICENSE in the repository. Not affiliated with Apple, Anthropic, OpenAI or the Ghidra project. · [Repository](https://github.com/noktirnal42/Kiln) · [Website](https://noktirnal42.github.io/Kiln/) · [Report an issue](https://github.com/noktirnal42/Kiln/issues)
