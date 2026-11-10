@@ -62,8 +62,8 @@ c = Collect(); c.feed(text)
 refs = c.refs + re.findall(r'!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)', text)
 for r in refs:
     check_local(r, readme, 'README.md', anchors_of(text))
-if not re.search(r'^License: see LICENSE\s*$', text, re.M):
-    errors.append('README.md: expected the placeholder line "License: see LICENSE"')
+if '## License' not in text or 'PolyForm Noncommercial' not in text or 'COMMERCIAL-LICENSE.md' not in text:
+    errors.append('README.md: the License section must name PolyForm Noncommercial and link COMMERCIAL-LICENSE.md')
 
 # ---- wiki sources
 wiki = root / 'docs' / 'wiki'
