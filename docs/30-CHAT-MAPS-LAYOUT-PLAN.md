@@ -112,3 +112,5 @@ Everything in the chat needs to be checked and verified against Claude and Codex
    (background automation sends Return through accessibility). Reproduce with real key events (full-screen control or a UI test), check the Agent view and the dock,
    and replace `TextEditor` with an `NSTextView` wrapper if SwiftUI's `onKeyPress` does not see Shift+Return. Add a UI test with synthesized `keyDown` events.
 4. **Audit the whole chat** against the parity table in section 2 and verify each row on screen; the rows marked have/partial are not all verified.
+5. **Visual QA of Claude and Codex against Kiln** (owner request, 2026-11-10): first pass done for Codex in `31-CHAT-VISUAL-COMPARISON.md`; repeat for Claude Code Desktop and ChatGPT with a session
+   that can address their windows, and re-compare after each change until Kiln matches or beats them.
