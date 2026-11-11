@@ -69,22 +69,10 @@ struct GitPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Git").font(SSTypography.title())
-                    if let path = model.repositoryPath {
-                        Text("\(path) · \(model.currentBranch)")
-                            .font(SSTypography.caption())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer()
+            SSPaneHeader(title: model.repositoryPath.map { "Git · \($0.split(separator: "/").last.map(String.init) ?? $0) · \(model.currentBranch)" } ?? "Git") {
                 Button("Refresh") { Task { await model.refresh() } }
                 Button("Open Repo…") { openRepo() }
             }
-            .padding(SSSpacing.m)
-            Divider()
             if let error = model.errorText {
                 Text(error).font(SSTypography.caption()).foregroundStyle(SSColor.danger).padding(SSSpacing.s)
                 Divider()
@@ -128,7 +116,7 @@ struct GitPanelView: View {
             Divider()
             commitBox
         }
-        .frame(minWidth: 720, minHeight: 520)
+        .frame(minHeight: 320)
         .task { await model.refresh() }
     }
 
