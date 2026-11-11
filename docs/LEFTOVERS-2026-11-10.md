@@ -117,3 +117,13 @@ News tests, BundlePreferencesMigrationTests). A shared test helper that removes 
 - Fixed: Images result actions collapse to icons instead of scrolling Delete off the edge; Devices Boot/Shut down buttons have per-device accessibility labels.
 - The generated test image ("a small red kiln glowing…") is in Images → History and Media → Gallery of the real app; deleting needs a right-click or the Delete action, which background control cannot press. Delete it from the app if unwanted.
 - Still open: Permissions pane (per-tool/per-path rules), approval notifications beyond the existing Dock badge, Develop debugger UI check, Swarm run.
+
+## Devices: owner report that the simulator controls "did not work on screen"
+
+Checked on a booted iPad (A16): Launch (Settings, Safari) and Open URL (example.com) did run in the simulator, but the mirror showed the old frame
+for 10-15 s because the action waited for a 74-device `simctl list` before looking at the screen. Fixed: after an action the mirror is captured at 0.3, 1.0
+and 2.5 s before the list refreshes, and the poll interval is 0.8 s (a capture itself takes about 1.4 s on an iPad).
+**Not fixable with Apple's tools:** tapping, swiping and typing on the mirrored screen of an Apple simulator. `simctl` has no input command, so the view says so
+(it used to be a small grey line) and offers **Open in Simulator** (opens that device's window in Simulator.app). Android emulators do get touch and keys through `adb`.
+Real input would need a HID bridge: `idb` (not installed here), or a private SimulatorKit client, or XCUITest-driven taps. Brief for whoever takes it: add an `AppleInputBackend`
+behind `DeviceService.Input` that prefers `idb ui tap/swipe/text` when `idb_companion` is present, show the install hint when it is not, and keep the Simulator.app fallback.

@@ -234,6 +234,10 @@ private struct DeviceDetailPane: View {
                 }.disabled(!booted).fixedSize()
                 Button("Install…") { showInstaller = true }.disabled(!booted)
                 Button("Logs") { Task { logText = await module.logs(device); showLogs = true } }.disabled(!booted)
+                if device.platform == .apple {
+                    Button("Open in Simulator") { module.openInSimulator(device) }.disabled(!booted)
+                        .help("Tap, swipe and type in the Simulator app: Apple's tools have no way to forward input from here")
+                }
                 Spacer()
                 if device.platform == .android && booted {
                     Button { Task { await module.send(device, input: .key("KEYCODE_BACK")) } } label: { Image(systemName: "chevron.backward") }.help("Back")
@@ -258,7 +262,8 @@ private struct DeviceDetailPane: View {
                     Button("Type") { sendText(device) }.disabled(typeText.isEmpty)
                 }
             } else if booted {
-                Text("Touch and keyboard forwarding is Android-only for now: simctl has no input commands.").font(.caption).foregroundStyle(.secondary)
+                Label("This view shows the screen and runs Launch, Open and Install. Taps and typing cannot be sent from here to an Apple simulator (simctl has no input commands): use Open in Simulator for that.", systemImage: "info.circle")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(12)
