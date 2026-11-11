@@ -95,3 +95,20 @@ collections and share, then thread cards. Anything the table calls "not availabl
 - Maps: accept that hours, photos, ratings, offline maps and indoor maps cannot be done with public APIs, and treat them as links or non-goals?
 - Who builds in parallel: chat composer and thread (attachments, mentions, diff, todo, queue), Maps, and the layout host touch different files except `MainWindow`,
   `WorkstationModel`, `WorkstationSidebar`, `AgentDockView` and `ChatRootView`; the layout work should own those and the others should wait for its Canvas host.
+
+## 6. Owner todo, added 2026-11-10 (do these once the current chat slices are done)
+
+Everything in the chat needs to be checked and verified against Claude and Codex, and missing features and functions implemented. Specific items:
+
+1. **Chat display and tool calls.** The owner does not like how the thread and especially tool calls look; the ChatGPT, Codex and Claude desktop apps are much better.
+   Redesign the thread: calmer message layout, tool calls as compact, expandable steps with a clear running/done/failed state, inline command output, file edits as diff cards
+   (started: the diff card), a single "worked for 42 s" summary line, streaming that never jumps, code blocks with Copy and Open in Editor, tables and math.
+   Method: screenshot Claude, Codex and ChatGPT desktop side by side with Kiln, list the differences, then build shared `SSCard`/`SSStep` components.
+2. **Tool-call round limit.** The agent pauses after a fixed number of model rounds (`AgentOrchestrator.roundLimit`, default 200, "Paused after N steps; say continue").
+   Make it a visible, per-profile setting (Settings and a composer menu), allow "keep going" without typing, show round count and cost in the Team/step line,
+   and raise or remove the cap for long runs while keeping the budget gate and Stop button as the real limits.
+3. **Multi-line input (Shift+Return) is reported as not working.** The code path is `ComposerReturn.decide` plus `insertNewline()` in `ChatRootView`
+   (`NSApp.keyWindow?.firstResponder as? NSTextView` then `insertNewlineIgnoringFieldEditor`), covered by logic tests only; it has never been checked with real keystrokes
+   (background automation sends Return through accessibility). Reproduce with real key events (full-screen control or a UI test), check the Agent view and the dock,
+   and replace `TextEditor` with an `NSTextView` wrapper if SwiftUI's `onKeyPress` does not see Shift+Return. Add a UI test with synthesized `keyDown` events.
+4. **Audit the whole chat** against the parity table in section 2 and verify each row on screen; the rows marked have/partial are not all verified.

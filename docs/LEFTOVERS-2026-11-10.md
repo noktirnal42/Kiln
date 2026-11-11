@@ -127,3 +127,13 @@ and 2.5 s before the list refreshes, and the poll interval is 0.8 s (a capture i
 (it used to be a small grey line) and offers **Open in Simulator** (opens that device's window in Simulator.app). Android emulators do get touch and keys through `adb`.
 Real input would need a HID bridge: `idb` (not installed here), or a private SimulatorKit client, or XCUITest-driven taps. Brief for whoever takes it: add an `AppleInputBackend`
 behind `DeviceService.Input` that prefers `idb ui tap/swipe/text` when `idb_companion` is present, show the install hint when it is not, and keep the Simulator.app fallback.
+
+## Chat slice 2: diff card and task list (2026-11-10)
+
+- **Diff card** (`Core/Platform/RunDiff.swift`, `Modules/Chat/RunCards.swift`): after a run that edited files, the thread shows "Changed N files +a −d" with a unified diff per file and a confirmed
+  **Revert** per file (restores the saved copy, or moves a file the run created to the Trash; refuses when the file changed after the run). Seen working on screen, including both reverts.
+  A `.task` on an empty `Group` never ran, so the card first did not appear; it is on a `VStack` now.
+- **Task list** (`kiln_todo_write`, `Core/Platform/TodoList.swift`): the agent writes the whole list; a card above the composer shows it. 9 unit tests pass; **not seen on screen**:
+  the local 7B model wrote a `todos.txt` file instead of calling the tool, Ollama Cloud answered "payment required", and `gemma4:e4b` was too slow to finish. A line in the agent prompt now says to use the tool.
+- The model picker hides recents that no provider offers (a leaked `stub-m1` kept appearing there; something outside this checkout's tests still writes it into the real `chat.recentModels`).
+- Owner todo for the next session: see `docs/30-CHAT-MAPS-LAYOUT-PLAN.md` section 6 (chat display and tool calls, round limit, Shift+Return, full chat audit).

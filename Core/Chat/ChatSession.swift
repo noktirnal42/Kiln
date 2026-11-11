@@ -259,6 +259,37 @@ public final class ChatSession {
         if let last = messages.last { await fork(at: last.id) }
     }
 
+    // MARK: Task list (the agent's kiln_todo_write)
+    public private(set) var todoItems: [TodoItem] = []
+
+    func syncTodos(_ id: UUID) {
+        if id == conversationID { todoItems = TodoBoard.shared.items(for: id) }
+    }
+
+    public func clearTodos() { if let conversationID { TodoBoard.shared.clear(conversationID) } }
+
+    // MARK: Diff of a run
+    /// Bumped after a file is reverted so open diff cards read the files again.
+    public private(set) var diffRevision = 0
+
+    /// What the run started by `messageID` changed, file by file (computed off the main thread).
+    public func runDiff(for messageID: UUID) async -> [RunFileDiff] {
+        guard let store = checkpointStore, let conversationID, let workspaceRoot,
+              let manifest = store.all(conversationID: conversationID).first(where: { $0.messageID == messageID }) else { return [] }
+        let root = URL(fileURLWithPath: workspaceRoot, isDirectory: true)
+        return await Task.detached(priority: .userInitiated) { RunDiff.files(manifest: manifest, store: store, workspaceRoot: root) }.value
+    }
+
+    /// Puts one file of that run back as it was. Says what happened in the notice line; a file changed since is left alone.
+    public func revertFile(_ path: String, in messageID: UUID) async {
+        guard let store = checkpointStore, let conversationID, let workspaceRoot,
+              let manifest = store.all(conversationID: conversationID).first(where: { $0.messageID == messageID }) else { return }
+        let result = store.revert(file: path, in: manifest, workspaceRoot: URL(fileURLWithPath: workspaceRoot, isDirectory: true))
+        agentNotice = result
+        await platformAudit.record("checkpoint.file_reverted", ["path": .string(path), "result": .string(result)])
+        diffRevision += 1
+    }
+
     // MARK: Checkpoints and rewind
     let checkpointStore: CheckpointStore?
     /// User messages whose run changed files or ran commands, so the thread can offer "Rewind to here".
@@ -452,6 +483,7 @@ public final class ChatSession {
             compactions = saved
         }
         // Unit tests switch between stub models; they must not write those into the real app's recent models.
+        TodoBoard.shared.observe { [weak self] id in Task { @MainActor in self?.syncTodos(id) } }
         recentsDefaults = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? UserDefaults.standard : nil
         recentModelIDs = recentsDefaults?.stringArray(forKey: recentsKey) ?? []
     }
@@ -470,6 +502,7 @@ public final class ChatSession {
         stopStreaming()
         queuedMessages = []
         attachments = []
+        todoItems = []
         do {
             let summary = try await conversations.createConversation(title: "New Conversation", modelID: selectedModelID.isEmpty ? nil : selectedModelID)
             conversationID = summary.id
@@ -489,6 +522,7 @@ public final class ChatSession {
             let page = try await conversations.messages(conversationID: id)
             let summaries = try await conversations.conversations()
             conversationID = id
+            todoItems = TodoBoard.shared.items(for: id)
             conversationTitle = summaries.first { $0.id == id }?.title ?? "Conversation"
             messages = page.messages
             if let model = summaries.first(where: { $0.id == id })?.modelID, !model.isEmpty {

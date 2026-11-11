@@ -20,6 +20,7 @@ struct ChatRootView: View {
                         ForEach(Array(session.messages.enumerated()), id: \.element.id) { index, message in
                             MessageBubble(session: session, message: message)
                                 .id(message.id)
+                            if let owner = diffOwner(at: index) { RunDiffCardView(session: session, messageID: owner) }
                             ForEach(session.contextNotes.filter { $0.afterMessageCount == index + 1 }) { ContextNoteView(note: $0) }
                         }
                         ForEach(session.contextNotes.filter { $0.afterMessageCount > session.messages.count || $0.afterMessageCount <= 0 }) {
@@ -144,6 +145,15 @@ struct ChatRootView: View {
         voice.speak(reply.content)
     }
 
+    /// The user message whose run just ended at `index` (the last reply before the next prompt), if that run changed files.
+    private func diffOwner(at index: Int) -> UUID? {
+        let all = session.messages
+        guard all[index].role == .assistant, index == all.count - 1 || all[index + 1].role == .user,
+              let user = all[..<index].last(where: { $0.role == .user }),
+              session.checkpointedMessageIDs.contains(user.id) else { return nil }
+        return user.id
+    }
+
     private func send() {
         voice.stopSpeaking()
         let text = input
@@ -210,6 +220,7 @@ struct ComposerView: View {
                 MentionList(matches: mentionMatches) { input = MentionParser.completing(input, with: $0) }
                     .padding(.top, SSSpacing.xs)
             }
+            TodoCardView(session: session)
             ComposerContextRow(session: session)
             composer
         }

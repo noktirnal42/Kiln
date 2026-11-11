@@ -13,7 +13,7 @@ enum AgentActivity {
         starterPrompts: { hasProject in StarterPrompts.project(hasProject) + [StarterPrompts.binary, StarterPrompts.hardware] },
         toolPrefixes: ["mcp_", "computer_"],
         agentToolPatterns: ["mcp_*", "computer_use", "kiln_*"],
-        agentPromptSentence: "Use list_skills / read_skill for installed skills. Use mcp_list_tools and mcp_call_tool for connected MCP servers. Use computer_use to inspect or control running Mac apps after the user enables it; inspect before interacting.",
+        agentPromptSentence: "Use list_skills / read_skill for installed skills. Use mcp_list_tools and mcp_call_tool for connected MCP servers. Use computer_use to inspect or control running Mac apps after the user enables it; inspect before interacting. For a job with three or more steps, call kiln_todo_write with the whole list first and again as each step finishes (one item in_progress); it is a tool call, never a file.",
         capabilities: [
             .tool("web_fetch", "Fetch a web page", .execute),
             .tool("web_search", "Search the web", .execute),
@@ -29,6 +29,7 @@ enum AgentActivity {
             .tool("kiln_command_write", "Create or replace a custom slash command", .write),
             .tool("kiln_hooks_list", "List configured hooks", .read),
             .tool("kiln_checkpoint_list", "List file checkpoints", .read),
+            .tool("kiln_todo_write", "Keep a visible task list for the current job", .read),
             .exempt("agent.rewind", "Rewind files and conversation to an earlier message", .write,
                     because: "Deliberate: rewinding discards work, so the person does it from the conversation; the agent can list checkpoints."),
             .exempt("agent.sessions", "List sessions with status; resume and fork them", .read,
