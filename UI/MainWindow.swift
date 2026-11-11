@@ -4,6 +4,7 @@ import SwiftUI
 /// command palette over everything.
 struct MainWindow: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.openSettings) private var openSettings
     @State private var workstation = WorkstationModel()
     /// Sidebar (244) + the narrowest tool (about 600) + the panel (360), with some air.
     static let dockMinimumWindowWidth: CGFloat = 1240
@@ -32,6 +33,7 @@ struct MainWindow: View {
         .background(SSColor.canvas)
         .tint(SSColor.accent)
         .navigationTitle("Kiln — \(workstation.selected.title)")
+        .onChange(of: workstation.settingsRequests) { _, _ in openSettings() }
         .overlay { paletteOverlay }
         .background { shortcuts }
         .onChange(of: app.requestedActivity, initial: true) { _, activity in

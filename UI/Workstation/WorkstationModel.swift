@@ -123,6 +123,8 @@ final class WorkstationModel {
     var sidebarVisible = true
     var showApprovals = false
     var showModules = false
+    /// Bumped to ask the window to open Settings (the window owns `openSettings`).
+    var settingsRequests = 0
 
     /// Injected so tests never write into the real app's preferences (they run inside the app host).
     private let defaults: UserDefaults
@@ -179,7 +181,7 @@ final class WorkstationModel {
         list.append(WorkstationCommand(
             id: "settings.show", title: "Settings…", subtitle: "Provider keys, the local model store and About",
             symbol: "gearshape", keywords: ["preferences", "api key", "providers", "about"], shortcut: "⌘,",
-            run: { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) }))
+            run: { [weak self] in self?.settingsRequests += 1 }))
         list += projectCommands(app: app)
         list += slashCommands(app: app)
         list += DevelopCommands.all(app: app, select: { [weak self] in self?.select(.develop, app: app) })

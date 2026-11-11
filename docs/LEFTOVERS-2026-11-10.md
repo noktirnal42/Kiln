@@ -79,7 +79,7 @@ Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the s
 ## Open items (not done in this session)
 
 - **Not yet seen on screen:** Devices boot/capture of a real device, Media viewer with a file, Images generation with a real
-  engine, Develop debugger UI, Settings → About, Home at wide widths, light mode for any screen, Swarm run.
+  engine, Develop debugger UI, a Swarm run. Seen since: Settings and its About sheet, light mode on Browser and Analyze.
 - **Palette:** the Maps and News activities are Codex's; their toolbars clip at narrow widths (see docs/29).
 - **Cleanup debts (handoff section 5):** 14 `claude/*` worktrees, `kiln-codex-integration` and prunable `/private/tmp/kiln-*` worktrees
   are still present; none removed. `git branch --merged` was not run. Build folders under `/private/tmp/claude-501/` are kept
@@ -94,6 +94,7 @@ Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the s
 
 - Fixed: Git tab explains "No repository" / "Working tree clean"; after 60 s without a reply the thread says the provider may be busy and suggests Stop and another model.
 - Verified: Devices (shared header, simulator list, empty detail guidance) and Images Create at a 1416 pt window with the agent dock.
-- **Unexplained, not fixed:** after a relaunch the status bar and the model picker show `stub-m1` (a unit-test model) as the selected, top "Recent" model, even though `chat.recentModels` in `com.kiln.app` (and the container copy) starts with a real model and the conversation store has no `stub-m1` rows. Only `Audit/audit-events.jsonl` mentions it (test runs write into the real audit chain). Picking a real model in the picker fixes it for the session. Next step: log `recentModelIDs` at `ChatSession.init`, and make tests use a temporary audit and defaults location.
+- **Fixed (the `stub-m1` mystery):** `ChatSession.recordRecent` wrote to `UserDefaults.standard`, so any unit test that switched models put `stub-m1` at the top of the real recent-models list (and so into the status bar after relaunch). It now writes nothing under XCTest, and the value was removed from the real defaults. `defaults read` can lag `cfprefsd`; read the plist with `plutil -p` to see the file.
 - Another set of leaked test preferences appeared (`kiln.tests.*`, `kiln.news.tests.*`, `kiln.remote.test.*` in `~/Library/Preferences` and the container); the News tests (Codex) do not remove their suites.
 - A blind click on a stale element index pressed Play on a simulator (iPad A16 booted); it was shut down with `simctl shutdown all`.
+- Added: an Appearance control (System, Light, Dark, High Contrast) in Settings; `ThemeManager` existed but nothing used it. The palette's "Settings…" entry now opens the window (it used a selector that did nothing); the menu bar route always worked.
