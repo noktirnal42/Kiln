@@ -114,6 +114,7 @@ public struct ApplePrivateCloudProvider: ModelProvider {
     public init() {}
 
     public func checkAvailability() async -> ProviderAvailability {
+        #if compiler(>=6.4)
         guard #available(macOS 27.0, *) else {
             return .unavailable("Private Cloud Compute requires macOS 27 or later.")
         }
@@ -123,6 +124,9 @@ public struct ApplePrivateCloudProvider: ModelProvider {
         case .unavailable(.systemNotReady): return .unavailable("Private Cloud Compute is not ready. Check Apple Intelligence, network access, and the app's entitlement.")
         case .unavailable: return .unavailable("Private Cloud Compute is unavailable on this Mac.")
         }
+        #else
+        return .unavailable("This build does not include the macOS 27 SDK required for Private Cloud Compute.")
+        #endif
     }
 
     public func fetchModels() async throws -> [ModelDescriptor] {
@@ -134,6 +138,7 @@ public struct ApplePrivateCloudProvider: ModelProvider {
     }
 
     public func streamChat(_ request: ChatRequest, reasoning: ReasoningConfig?) async throws -> AsyncThrowingStream<ChatChunk, Error> {
+        #if compiler(>=6.4)
         guard #available(macOS 27.0, *) else { throw ProviderError.engineUnavailable("Private Cloud Compute requires macOS 27 or later.") }
         let model = PrivateCloudComputeLanguageModel()
         guard model.isAvailable else {
@@ -160,6 +165,9 @@ public struct ApplePrivateCloudProvider: ModelProvider {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+        #else
+        throw ProviderError.engineUnavailable("This build does not include the macOS 27 SDK required for Private Cloud Compute.")
+        #endif
     }
 }
 
