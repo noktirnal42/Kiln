@@ -419,7 +419,8 @@ public final class ChatSession {
            let saved = try? JSONDecoder().decode([UUID: ConversationCompaction].self, from: data) {
             compactions = saved
         }
-        recentsDefaults = UserDefaults.standard
+        // Unit tests switch between stub models; they must not write those into the real app's recent models.
+        recentsDefaults = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? UserDefaults.standard : nil
         recentModelIDs = recentsDefaults?.stringArray(forKey: recentsKey) ?? []
     }
 
