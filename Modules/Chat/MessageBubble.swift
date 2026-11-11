@@ -191,8 +191,9 @@ struct ThinkingDots: View {
                     .animation(.easeInOut(duration: 0.6).repeatForever().delay(Double(index) * 0.2), value: phase)
             }
             if let label {
-                Text(waited > 15 ? "Still waiting for the model to start responding" : label)
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(waited > 60 ? "No answer after \(Int(waited)) s. The provider may be busy: Stop, then pick another model from the model menu."
+                     : waited > 15 ? "Still waiting for the model to start responding" : label)
+                    .font(.system(size: 12)).foregroundStyle(waited > 60 ? SSColor.warning : .secondary)
             }
         }
     }

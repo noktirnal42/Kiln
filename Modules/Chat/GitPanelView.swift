@@ -138,6 +138,14 @@ struct GitPanelView: View {
                 .controlSize(.small)
             }
         }
+        .overlay {
+        if model.statuses.isEmpty {
+            SSEmptyState(symbol: model.repositoryPath == nil ? "arrow.triangle.branch" : "checkmark.circle",
+                         title: model.repositoryPath == nil ? "No repository" : "Working tree clean",
+                         message: model.repositoryPath == nil ? "The project folder is not a Git repository. Open one with Open Repo…, or ask the agent to run git init."
+                                                              : "No changed files. Edits by you or the agent show up here to stage and commit.")
+        }
+        }
     }
 
     private var commitBox: some View {

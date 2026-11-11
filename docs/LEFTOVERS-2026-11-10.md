@@ -80,9 +80,6 @@ Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the s
 
 - **Not yet seen on screen:** Devices boot/capture of a real device, Media viewer with a file, Images generation with a real
   engine, Develop debugger UI, Settings → About, Home at wide widths, light mode for any screen, Swarm run.
-- **Hosted model stall:** with NVIDIA NIM the run shows "Still waiting for the model" indefinitely; the UI offers Stop but no timeout
-  message or fallback suggestion. Consider a visible timeout hint after ~60 s.
-- **Git tab:** with no repository it shows only an empty list; add a guidance empty state.
 - **Palette:** the Maps and News activities are Codex's; their toolbars clip at narrow widths (see docs/29).
 - **Cleanup debts (handoff section 5):** 14 `claude/*` worktrees, `kiln-codex-integration` and prunable `/private/tmp/kiln-*` worktrees
   are still present; none removed. `git branch --merged` was not run. Build folders under `/private/tmp/claude-501/` are kept
@@ -92,3 +89,11 @@ Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the s
 - **Parity (doc 17):** a Permissions pane (per-tool and per-path rules) and approval notifications remain; the approvals sheet now
   shows and revokes grants but has no rules editor.
 - Full test suite not run (other agents were building); targeted suites pass: 49 tests (Workstation, registry, editor settings, usage, push).
+
+## Added after the OpenCode review
+
+- Fixed: Git tab explains "No repository" / "Working tree clean"; after 60 s without a reply the thread says the provider may be busy and suggests Stop and another model.
+- Verified: Devices (shared header, simulator list, empty detail guidance) and Images Create at a 1416 pt window with the agent dock.
+- **Unexplained, not fixed:** after a relaunch the status bar and the model picker show `stub-m1` (a unit-test model) as the selected, top "Recent" model, even though `chat.recentModels` in `com.kiln.app` (and the container copy) starts with a real model and the conversation store has no `stub-m1` rows. Only `Audit/audit-events.jsonl` mentions it (test runs write into the real audit chain). Picking a real model in the picker fixes it for the session. Next step: log `recentModelIDs` at `ChatSession.init`, and make tests use a temporary audit and defaults location.
+- Another set of leaked test preferences appeared (`kiln.tests.*`, `kiln.news.tests.*`, `kiln.remote.test.*` in `~/Library/Preferences` and the container); the News tests (Codex) do not remove their suites.
+- A blind click on a stale element index pressed Play on a simulator (iPad A16 booted); it was shut down with `simctl shutdown all`.
