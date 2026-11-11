@@ -78,6 +78,23 @@ public final class ChatSession {
     // MARK: Composer context (shared by the Agent view and the dock, so both show the same draft state)
     /// Files, folders and images attached to the next message.
     public var attachments: [ComposerAttachment] = []
+    /// Shared by the centered thread and the compact dock, retained separately for each open conversation.
+    public var composerText = ""
+    private struct ComposerDraft {
+        var text: String
+        var attachments: [ComposerAttachment]
+    }
+    private var composerDrafts: [UUID: ComposerDraft] = [:]
+
+    private func switchComposer(to id: UUID, preserveCurrent: Bool = false) {
+        if let conversationID {
+            composerDrafts[conversationID] = ComposerDraft(text: composerText, attachments: attachments)
+        }
+        guard !preserveCurrent else { return }
+        let saved = composerDrafts[id]
+        composerText = saved?.text ?? ""
+        attachments = saved?.attachments ?? []
+    }
     /// Messages typed while a run was going, oldest first.
     public private(set) var queuedMessages: [QueuedMessage] = []
     /// Set when the person pressed Stop: queued messages stay put until they send one or press Send now.
@@ -519,13 +536,13 @@ public final class ChatSession {
 
     // MARK: Conversation lifecycle
 
-    public func newConversation() async {
+    public func newConversation(preserveComposer: Bool = false) async {
         stopStreaming()
         queuedMessages = []
-        attachments = []
         todoItems = []
         do {
             let summary = try await conversations.createConversation(title: "New Conversation", modelID: selectedModelID.isEmpty ? nil : selectedModelID)
+            switchComposer(to: summary.id, preserveCurrent: preserveComposer)
             conversationID = summary.id
             conversationTitle = summary.title
             messages = []
@@ -542,6 +559,7 @@ public final class ChatSession {
         do {
             let page = try await conversations.messages(conversationID: id)
             let summaries = try await conversations.conversations()
+            if conversationID != id { switchComposer(to: id) }
             conversationID = id
             todoItems = TodoBoard.shared.items(for: id)
             conversationTitle = summaries.first { $0.id == id }?.title ?? "Conversation"
@@ -615,9 +633,12 @@ public final class ChatSession {
         try? await conversations.deleteConversation(id)
         conversationListGeneration += 1
         compactions[id] = nil
+        composerDrafts[id] = nil
         saveCompactions()
         if conversationID == id {
             conversationID = nil
+            composerText = ""
+            attachments = []
             contextNotes = []
             contextUsage = nil
             messages = []
@@ -664,7 +685,7 @@ public final class ChatSession {
             return
         }
         if conversationID == nil {
-            await newConversation()
+            await newConversation(preserveComposer: true)
             guard conversationID != nil else { return }
         }
         guard let conversationID else { return }

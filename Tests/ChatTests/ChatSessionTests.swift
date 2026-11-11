@@ -5,6 +5,36 @@ import Testing
 
 @MainActor
 struct ChatSessionTests {
+    @Test func conversationDraftsKeepTextAndAttachmentsSeparate() async throws {
+        let (session, _, _) = try makeSession()
+        await session.newConversation()
+        let first = try #require(session.conversationID)
+        session.composerText = "first draft"
+        let file = URL(fileURLWithPath: "/tmp/first-draft.txt")
+        session.attach([file])
+
+        await session.newConversation()
+        let second = try #require(session.conversationID)
+        #expect(session.composerText.isEmpty && session.attachments.isEmpty)
+        session.composerText = "second draft"
+        await session.loadConversation(first)
+        #expect(session.composerText == "first draft")
+        #expect(session.attachments.map(\.url) == [file])
+        await session.loadConversation(second)
+        #expect(session.composerText == "second draft" && session.attachments.isEmpty)
+        await session.deleteConversation(second)
+        #expect(session.composerText.isEmpty && session.attachments.isEmpty)
+    }
+
+    @Test func creatingConversationForFirstSendPreservesAttachments() async throws {
+        let (session, _, _) = try makeSession()
+        let file = URL(fileURLWithPath: "/tmp/first-send.txt")
+        session.attach([file])
+        await session.newConversation(preserveComposer: true)
+        #expect(session.conversationID != nil)
+        #expect(session.attachments.map(\.url) == [file])
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema([Conversation.self, Message.self, Artifact.self, ArtifactVersion.self])
         return try ModelContainer(

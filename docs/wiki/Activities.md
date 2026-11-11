@@ -2,6 +2,8 @@
 
 Kiln's activities are declared once in the activity registry (`Core/Registry/`), which also determines their shortcuts. In the `codex/kiln-qa-completion` development branch, Chat, Code, Browser, Maps and Devices have toolbar controls; the Work menu and command palette (⌘K) provide access to the other activities. On wider windows, Chat stays in the center beside Browser, Maps, Devices, Media and News; Develop and Analyze keep a larger central workspace. Packaged releases can differ from this development layout.
 
+In that development branch, an unsent message follows the conversation between the center and the compact dock. Draft text and attachments are kept separately for conversations while Kiln is open; they are not persisted across relaunches.
+
 | Shortcut | Activity | One line |
 |---|---|---|
 | ⌘1 | [Home](#home) | Overview and get-started checklist |

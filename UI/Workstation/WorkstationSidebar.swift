@@ -5,6 +5,7 @@ import AppKit
 /// tools that share that conversation. It replaces an icon rail whose entries each opened a separate screen.
 struct WorkstationSidebar: View {
     @Bindable var workstation: WorkstationModel
+    var chatVisible = false
     @Environment(AppModel.self) private var app
     @State private var history = ChatHistoryModel()
 
@@ -75,7 +76,7 @@ struct WorkstationSidebar: View {
     private var newChat: some View {
         Button {
             Task { await app.chatSession?.newConversation() }
-            workstation.select(.agent, app: app)
+            if !chatVisible { workstation.select(.agent, app: app) }
         } label: {
             Label("New chat", systemImage: "square.and.pencil")
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -119,10 +120,10 @@ struct WorkstationSidebar: View {
     }
 
     private func chatRow(_ item: ConversationSummary) -> some View {
-        let selected = workstation.selected == .agent && app.chatSession?.conversationID == item.id
+        let selected = chatVisible && app.chatSession?.conversationID == item.id
         return Button {
             Task { await app.chatSession?.loadConversation(item.id) }
-            workstation.select(.agent, app: app)
+            if !chatVisible { workstation.select(.agent, app: app) }
         } label: {
             Text(item.title)
                 .font(.system(size: 12.5))

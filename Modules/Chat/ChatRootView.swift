@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ChatRootView: View {
     @Bindable var session: ChatSession
-    @State private var input = ""
     @State private var showArtifacts = false
     @State private var voice = VoiceController()
     @State private var lastSpokenID: UUID?
@@ -75,15 +74,15 @@ struct ChatRootView: View {
                     .padding(.vertical, SSSpacing.xs)
                 Divider()
             }
-            ComposerView(session: session, voice: voice, input: $input, onSend: send)
+            ComposerView(session: session, voice: voice, input: $session.composerText, onSend: send)
         }
         .onAppear {
             voice.onUtterance = { text in
                 if voice.conversation {
-                    input = ""
+                    session.composerText = ""
                     Task { await session.send(text) }
                 } else {
-                    input += (input.isEmpty ? "" : " ") + text
+                    session.composerText += (session.composerText.isEmpty ? "" : " ") + text
                 }
             }
         }
@@ -156,8 +155,8 @@ struct ChatRootView: View {
 
     private func send() {
         voice.stopSpeaking()
-        let text = input
-        input = ""
+        let text = session.composerText
+        session.composerText = ""
         Task { await session.send(text) }
     }
 

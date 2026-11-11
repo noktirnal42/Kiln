@@ -14,7 +14,8 @@ struct MainWindow: View {
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     if workstation.sidebarVisible {
-                        WorkstationSidebar(workstation: workstation)
+                        WorkstationSidebar(workstation: workstation,
+                                           chatVisible: workstation.selected == .agent || (workstation.dockShown && geometry.size.width >= Self.dockMinimumWindowWidth))
                         Divider()
                     }
                     if let session = app.chatSession,
