@@ -20,7 +20,7 @@ struct BundlePreferencesMigrationTests {
         #expect(migrated["theme"] as? String == "dark")
         #expect(migrated["NSWindow Frame"] == nil)
         #expect(defaults.persistentDomain(forName: oldID)?["workspace"] as? String == "old")
-        UserDefaults(suiteName: oldID)?.set("light", forKey: "theme")
+        TestDefaults.suite(oldID)?.set("light", forKey: "theme")
         BundlePreferencesMigration.migrate(defaults: defaults, from: oldID, to: newID)
         #expect(defaults.persistentDomain(forName: newID)?["theme"] as? String == "dark")
     }

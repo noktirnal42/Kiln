@@ -6,7 +6,7 @@ import RSSReaderCore
 @MainActor struct NewsTests {
     @Test func subscriptionsValidateAndPersist() throws {
         let suite = "kiln.news.tests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = TestDefaults.suite(suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let state = NewsState(defaults: defaults)
         #expect(throws: (any Error).self) { try state.add("file:///etc/passwd") }
@@ -24,7 +24,7 @@ import RSSReaderCore
     }
     @Test func allStoriesCombinesSuccessfulSourcesAndReportsFailures() async throws {
         let suite = "kiln.news.tests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = TestDefaults.suite(suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let state = NewsState(defaults: defaults, fetch: { url in
             if url.host == "bad.example" { throw NewsError.invalid("offline") }

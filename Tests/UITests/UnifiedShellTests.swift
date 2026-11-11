@@ -57,7 +57,7 @@ struct HistoryGroupingTests {
 struct WorkspaceStoreTests {
     private func store() throws -> (WorkspaceStore, UserDefaults, URL) {
         let suite = "kiln.tests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(TestDefaults.suite(suite))
         defaults.removePersistentDomain(forName: suite)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-ws-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

@@ -104,7 +104,7 @@ struct ContextSessionTests {
 
     @Test func slashCompactSummarisesKeepsTheTailAndLeavesANote() async throws {
         let suite = "kiln-tests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(TestDefaults.suite(suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let session = try await makeSession(defaults: defaults)
         for i in 0..<4 { await session.send("question \(i) " + String(repeating: "z", count: 2_000)) }
@@ -135,7 +135,7 @@ struct ContextSessionTests {
 
     @Test func compactionStateSurvivesAnAppRestart() async throws {
         let suite = "kiln-tests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(TestDefaults.suite(suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let session = try await makeSession(defaults: defaults)
         for i in 0..<4 { await session.send("question \(i) " + String(repeating: "z", count: 2_000)) }

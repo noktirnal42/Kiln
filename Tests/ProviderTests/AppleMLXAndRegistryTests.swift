@@ -87,7 +87,7 @@ struct AppleAndMLXProviderTests {
         defer { try? FileManager.default.removeItem(at: hub) }
         try makeRepo(in: hub, repo: "org/model", architectures: ["LlamaForCausalLM"])
         let suite = "kiln.tests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(TestDefaults.suite(suite))
         defer { defaults.removePersistentDomain(forName: suite) }
 
         let location = ModelStoreLocation(defaults: defaults)

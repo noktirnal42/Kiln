@@ -11,7 +11,7 @@ struct WorkstationTests {
     /// A throwaway preferences suite, so nothing here touches the real app's settings.
     private func isolatedDefaults() -> UserDefaults {
         let name = "kiln.tests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = TestDefaults.suite(name)!
         defaults.removePersistentDomain(forName: name)
         return defaults
     }
