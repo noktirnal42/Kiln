@@ -18,9 +18,21 @@ struct WorkstationTests {
 
     // MARK: Activities
 
-    @Test func workstationStartsWithBrowser() {
+    @Test func workstationStartsWithChat() {
         let model = WorkstationModel(defaults: isolatedDefaults())
-        #expect(model.selected == .browser)
+        #expect(model.selected == .agent)
+    }
+
+    @Test func canvasSurfacesKeepChatCentralAndDeepWorkKeepsItsSpace() {
+        let model = WorkstationModel(defaults: isolatedDefaults())
+        for activity in [Activity.browser, .maps, .devices, .media, .news] {
+            model.selected = activity
+            #expect(model.usesRightCanvas)
+        }
+        for activity in [Activity.agent, .develop, .analyze] {
+            model.selected = activity
+            #expect(!model.usesRightCanvas)
+        }
     }
 
     @Test func everyActivityHasAUniqueShortcutInRailOrder() {

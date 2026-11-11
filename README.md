@@ -15,7 +15,7 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 
 ## What Kiln is
 
-- **One window, one conversation.** A sidebar of activities, a project folder the agent works in, and a composer shared by the Agent view and the panel beside every tool.
+- **One window, one conversation.** Chat opens in the center; Browser, Maps, Devices, Media and News can appear beside it on wider windows. Develop and Analyze keep a larger workspace with a compact chat panel. The sidebar provides projects, conversations, scheduled tasks and activities.
 - **Agents with real tools.** File, shell, Git, reverse-engineering, Model Lab, browser, device, media and (opt-in) computer-use tools run through shared services, policy gates and approvals.
 - **Bring your models.** Apple Foundation Models, MLX, Ollama (local and cloud), NVIDIA NIM, OpenRouter and any OpenAI-compatible endpoint, with keys in the macOS Keychain.
 - **Supervised by design.** Ask, Auto and Bypass approval modes, a behavior monitor, tripwires and a hash-chained audit log you can verify from the app.

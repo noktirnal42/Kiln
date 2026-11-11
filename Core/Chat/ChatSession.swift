@@ -284,11 +284,30 @@ public final class ChatSession {
 
     /// Puts one file of that run back as it was. Says what happened in the notice line; a file changed since is left alone.
     public func revertFile(_ path: String, in messageID: UUID) async {
-        guard let store = checkpointStore, let conversationID, let workspaceRoot,
+        guard !isStreaming, let store = checkpointStore, let conversationID, let workspaceRoot,
               let manifest = store.all(conversationID: conversationID).first(where: { $0.messageID == messageID }) else { return }
         let result = store.revert(file: path, in: manifest, workspaceRoot: URL(fileURLWithPath: workspaceRoot, isDirectory: true))
         agentNotice = result
         await platformAudit.record("checkpoint.file_reverted", ["path": .string(path), "result": .string(result)])
+        diffRevision += 1
+    }
+
+    /// Recheck every file at the moment it is restored; the diff may have become stale while the dialog was open.
+    public func revertFiles(_ paths: [String], in messageID: UUID) async {
+        guard !isStreaming, let store = checkpointStore, let conversationID, let workspaceRoot,
+              let manifest = store.all(conversationID: conversationID).first(where: { $0.messageID == messageID }) else { return }
+        let root = URL(fileURLWithPath: workspaceRoot, isDirectory: true)
+        var results: [String] = []
+        for path in paths {
+            guard !isStreaming else {
+                results.append("Stopped undoing changes because a new run started.")
+                break
+            }
+            let result = store.revert(file: path, in: manifest, workspaceRoot: root)
+            results.append(result)
+            await platformAudit.record("checkpoint.file_reverted", ["path": .string(path), "result": .string(result)])
+        }
+        agentNotice = results.joined(separator: " ")
         diffRevision += 1
     }
 

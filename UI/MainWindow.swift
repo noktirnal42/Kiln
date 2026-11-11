@@ -17,13 +17,26 @@ struct MainWindow: View {
                         WorkstationSidebar(workstation: workstation)
                         Divider()
                     }
-                    activityContent
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .background(SSColor.canvas)
-                    // The agent panel yields before the work does: below this width the tool in front needs the room.
-                    if workstation.dockShown, geometry.size.width >= Self.dockMinimumWindowWidth, let session = app.chatSession {
-                        Divider()
-                        AgentDockView(session: session, context: workstation.selected, workstation: workstation)
+                    if let session = app.chatSession,
+                       workstation.selected == .agent || (workstation.usesRightCanvas && workstation.dockVisible && geometry.size.width >= Self.dockMinimumWindowWidth) {
+                        HSplitView {
+                            ChatRootView(session: session)
+                                .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+                            if workstation.selected != .agent {
+                                activityContent
+                                    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                    .background(SSColor.canvas)
+                            }
+                        }
+                    } else {
+                        activityContent
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            .background(SSColor.canvas)
+                        // Deep work keeps the large central surface with the compact conversation alongside it.
+                        if workstation.dockShown, geometry.size.width >= Self.dockMinimumWindowWidth, let session = app.chatSession {
+                            Divider()
+                            AgentDockView(session: session, context: workstation.selected, workstation: workstation)
+                        }
                     }
                 }
                 StatusBar(workstation: workstation)

@@ -11,6 +11,35 @@ public struct InstalledModel: Codable, Identifiable, Equatable, Sendable {
     public var isLanguageModel: Bool = true
 }
 
+/// Filtering an installed cache is independent of the UI and does not imply runtime support.
+public enum InstalledModelCatalog {
+    public enum Sort: String, CaseIterable, Sendable { case name, smallest, largest }
+    public enum Fit: Equatable, Sendable { case estimatedFit, tight, tooLarge, unavailable, unknown }
+
+    public static func fit(_ model: InstalledModel, hardware: HardwareProfile) -> Fit {
+        guard hardware.isAppleSilicon, hardware.metalDeviceName != nil, model.isLanguageModel else { return .unavailable }
+        guard model.totalBytes > 0, model.totalBytes <= UInt64(Int64.max - 2 * 1_073_741_824) else { return .unknown }
+        switch hardware.canLoad(weightsBytes: Int64(model.totalBytes), forTraining: false) {
+        case .fits: return .estimatedFit
+        case .tight: return .tight
+        case .doesNotFit: return .tooLarge
+        }
+    }
+
+    public static func select(_ models: [InstalledModel], query: String, fitsOnly: Bool, sort: Sort, hardware: HardwareProfile) -> [InstalledModel] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return models.filter { model in
+            model.isLanguageModel && (term.isEmpty || model.repoID.localizedStandardContains(term)) &&
+                (!fitsOnly || fit(model, hardware: hardware) == .estimatedFit)
+        }.sorted { a, b in
+            if sort != .name, a.totalBytes != b.totalBytes {
+                return sort == .smallest ? a.totalBytes < b.totalBytes : a.totalBytes > b.totalBytes
+            }
+            return a.id.localizedStandardCompare(b.id) == .orderedAscending
+        }
+    }
+}
+
 /// The universal model repository: the standard Hugging Face cache layout,
 /// shared with `hf`, `mlx_lm`, transformers, and every other app honouring
 /// HF_HUB_CACHE. Location order: `HF_HUB_CACHE`, `HF_HOME/hub`,

@@ -354,8 +354,9 @@ struct AgentModeBar: View {
                 .labelsHidden().controlSize(.small).frame(maxWidth: 150)
                 PermissionModeMenu(center: ApprovalCenter.shared)
                 if session.workspaceRoot == nil {
-                    Label("No project — pick one in the sidebar", systemImage: "folder.badge.questionmark")
+                    Label("No project", systemImage: "folder.badge.questionmark")
                         .font(SSTypography.caption()).foregroundStyle(SSColor.warning)
+                        .lineLimit(1).fixedSize()
                         .help("Without a project folder the agent can't read or change files.")
                 }
             }
@@ -380,7 +381,7 @@ struct AgentModeBar: View {
         .sheet(isPresented: $showSessions) { SessionsPaneView(session: session) }
         .sheet(isPresented: $showUsage) { UsagePaneView(session: session) }
         .sheet(isPresented: $showSchedules) { SchedulesPaneView(session: session) }
-        .onChange(of: session.requestedPane) { _, pane in
+        .onChange(of: session.requestedPane, initial: true) { _, pane in
             switch pane { case .memory: showMemory = true; case .commands: showCommands = true; case .hooks: showHooks = true; case .sessions: showSessions = true; case .usage: showUsage = true; case .schedules: showSchedules = true; case nil: break }
             session.requestedPane = nil
         }

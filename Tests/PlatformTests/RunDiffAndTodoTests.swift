@@ -82,6 +82,37 @@ struct RunDiffTests {
         #expect(try String(contentsOf: file, encoding: .utf8) == "someone else\n")
     }
 
+    @Test func deletionAfterRunIsNotUndone() throws {
+        let (root, store) = try project("deleted-later")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let file = root.appendingPathComponent("a.txt")
+        try "before".write(to: file, atomically: true, encoding: .utf8)
+        let conversation = UUID(), message = UUID()
+        let recorder = CheckpointRecorder(store: store, conversationID: conversation, messageID: message, workspaceRoot: root)
+        try edit(recorder, tool: "write_file", path: "a.txt") { try "agent".write(to: file, atomically: true, encoding: .utf8) }
+        let manifest = try #require(recorder.finish())
+        try FileManager.default.removeItem(at: file)
+        #expect(try #require(RunDiff.files(manifest: manifest, store: store, workspaceRoot: root).first).canRevert == false)
+        #expect(store.revert(file: "a.txt", in: manifest, workspaceRoot: root).contains("changed after the run"))
+        let report = store.rewind(conversationID: conversation, messages: [message], from: message, workspaceRoot: root)
+        #expect(report.skipped.count == 1)
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+    }
+
+    @Test func recreatedFileAfterRunDeletionIsNotOverwritten() throws {
+        let (root, store) = try project("recreated")
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+        let file = root.appendingPathComponent("a.txt")
+        try "before".write(to: file, atomically: true, encoding: .utf8)
+        let recorder = CheckpointRecorder(store: store, conversationID: UUID(), messageID: UUID(), workspaceRoot: root)
+        try edit(recorder, tool: "write_file", path: "a.txt") { try "agent".write(to: file, atomically: true, encoding: .utf8) }
+        try edit(recorder, tool: "delete_file", path: "a.txt") { try FileManager.default.removeItem(at: file) }
+        let manifest = try #require(recorder.finish())
+        try "new work".write(to: file, atomically: true, encoding: .utf8)
+        #expect(store.revert(file: "a.txt", in: manifest, workspaceRoot: root).contains("changed after the run"))
+        #expect(try String(contentsOf: file, encoding: .utf8) == "new work")
+    }
+
     @Test func binaryFilesAreSummarisedNotDiffed() throws {
         let (root, store) = try project("bin")
         defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }

@@ -100,11 +100,10 @@ public final class CheckpointStore: @unchecked Sendable {
                 guard target.path.hasPrefix(root.path + "/"), manifest.workspace == workspaceRoot.path || manifest.workspace == root.path else {
                     report.skipped.append("\(entry.path): outside this project"); continue
                 }
-                if let expected = entry.afterHash, let now = Self.hash(of: target), now != expected {
+                if Self.hash(of: target) != entry.afterHash {
                     report.skipped.append("\(entry.path): changed since the run")
                     continue
                 }
-                if entry.afterHash != nil, Self.hash(of: target) == nil, !entry.existed { continue }   // already gone
                 if entry.existed, let blob = entry.blob {
                     do {
                         try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -189,7 +188,7 @@ public final class CheckpointRecorder: @unchecked Sendable {
         guard let url = pending.removeValue(forKey: callID) else { return }
         let relative = String(url.path.dropFirst(root.path.count + 1))
         if let index = manifest.files.firstIndex(where: { $0.path == relative }) {
-            manifest.files[index].afterHash = CheckpointStore.hash(of: url) ?? manifest.files[index].afterHash
+            manifest.files[index].afterHash = CheckpointStore.hash(of: url)
             persistLocked()
         }
     }

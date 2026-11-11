@@ -218,12 +218,12 @@ public struct MLXProvider: ModelProvider {
             throw ProviderError.notFound("model '\(request.model)' is not in the model store at \(current.root.path)")
         }
         let engine = MLXEngineCache.shared.engine(for: URL(fileURLWithPath: model.path))
-        guard let prompt = request.messages.last(where: { $0.role == .user })?.content else {
-            throw ProviderError.invalidResponse("no user message to answer")
+        guard !request.messages.isEmpty else { throw ProviderError.invalidResponse("no messages to answer") }
+        let turns = request.messages.map { message in
+            ChatTurn(role: message.role.rawValue, text: message.content, toolCallID: message.metadata["tool_call_id"],
+                     calls: message.toolCalls.map { .init(id: $0.id, name: $0.name, arguments: $0.arguments) })
         }
-        let lastUser = request.messages.lastIndex(where: { $0.role == .user }) ?? request.messages.endIndex
-        let history = request.messages[..<lastUser].map { ChatTurn(role: $0.role.rawValue, text: $0.content) }
-        let stream = engine.streamRespond(prompt: prompt, history: Array(history))
+        let stream = engine.streamConversation(turns)
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {

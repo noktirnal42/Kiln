@@ -66,6 +66,7 @@ struct RunDiffCardView: View {
     @State private var files: [RunFileDiff] = []
     @State private var expanded: Set<String> = []
     @State private var confirming: RunFileDiff?
+    @State private var confirmingAll = false
     @State private var loaded = false
 
     var body: some View {
@@ -79,6 +80,14 @@ struct RunDiffCardView: View {
                         Text("+\(files.reduce(0) { $0 + $1.additions })").font(.system(size: 11, design: .monospaced)).foregroundStyle(SSColor.success)
                         Text("−\(files.reduce(0) { $0 + $1.deletions })").font(.system(size: 11, design: .monospaced)).foregroundStyle(SSColor.danger)
                         Spacer()
+                        Button(expanded.count == files.count ? "Hide changes" : "View changes") {
+                            expanded = expanded.count == files.count ? [] : Set(files.map(\.path))
+                        }
+                        .controlSize(.mini).buttonStyle(.borderless)
+                        Button("Undo all") { confirmingAll = true }
+                            .controlSize(.mini).buttonStyle(.borderless)
+                            .disabled(session.isStreaming || !files.contains(where: \.canRevert))
+                            .help("Restore files that have not changed since this run")
                     }
                     .padding(.horizontal, SSSpacing.s).padding(.vertical, 7)
                     ForEach(files) { file in
@@ -95,6 +104,15 @@ struct RunDiffCardView: View {
                     Button("Cancel", role: .cancel) {}
                 } message: { file in
                     Text(file.change == .added ? "The file the agent created is moved to the Trash." : "The file goes back to how it was before this run. Later edits by the agent in this run are lost.")
+                }
+                .confirmationDialog("Undo changes from this run?", isPresented: $confirmingAll, titleVisibility: .visible) {
+                    Button("Undo changes", role: .destructive) {
+                        let paths = files.filter(\.canRevert).map(\.path)
+                        Task { await session.revertFiles(paths, in: messageID) }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Files changed since the run will be left alone. Files created by the run will be moved to the Trash.")
                 }
             }
         }
@@ -126,7 +144,7 @@ struct RunDiffCardView: View {
                 .accessibilityLabel("\(file.path), \(file.change.rawValue), \(file.additions) added, \(file.deletions) removed")
                 Button("Revert") { confirming = file }
                     .controlSize(.mini).buttonStyle(.bordered)
-                    .disabled(!file.canRevert)
+                    .disabled(session.isStreaming || !file.canRevert)
                     .help(file.canRevert ? "Put this file back as it was before the run" : "This file changed after the run, so it is left alone")
             }
             .padding(.horizontal, SSSpacing.s).padding(.vertical, 5)

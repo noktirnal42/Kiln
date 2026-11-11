@@ -28,6 +28,7 @@ struct WorkstationSidebar: View {
             header
             VStack(alignment: .leading, spacing: SSSpacing.m) {
                 newChat
+                scheduledTasks
                 ProjectSwitcher()
             }
             .padding(.horizontal, SSSpacing.s)
@@ -87,6 +88,22 @@ struct WorkstationSidebar: View {
         }
         .buttonStyle(.plain)
         .help("Start a new conversation (⌘N)")
+    }
+
+    private var scheduledTasks: some View {
+        Button {
+            workstation.select(.agent, app: app)
+            app.chatSession?.requestedPane = .schedules
+        } label: {
+            Label("Scheduled tasks", systemImage: "calendar.badge.clock")
+                .font(.system(size: 12.5))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, SSSpacing.s).padding(.vertical, 5)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("View and manage scheduled tasks")
+        .disabled(app.chatSession == nil)
     }
 
     @ViewBuilder

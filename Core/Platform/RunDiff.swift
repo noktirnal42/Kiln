@@ -75,10 +75,7 @@ public enum RunDiff {
             if before == nil, after == nil { return nil }                 // created and deleted again
             if let before, let after, before == after { return nil }
             let change: RunFileDiff.Change = before == nil ? .added : (after == nil ? .deleted : .modified)
-            let canRevert: Bool = {
-                guard let expected = entry.afterHash else { return true }
-                return CheckpointStore.hash(of: url) == expected || (after == nil && change == .deleted)
-            }()
+            let canRevert = CheckpointStore.hash(of: url) == entry.afterHash
             func text(_ data: Data?) -> [String]? {
                 guard let data else { return [] }
                 guard data.count <= maxBytes, !data.contains(0), let string = String(data: data, encoding: .utf8) else { return nil }
@@ -105,7 +102,7 @@ extension CheckpointStore {
         guard let entry = manifest.files.first(where: { $0.path == path }) else { return "\(path) is not part of this run." }
         let target = root.appendingPathComponent(path).standardizedFileURL
         guard target.path.hasPrefix(root.path + "/") else { return "\(path) is outside this project." }
-        if let expected = entry.afterHash, let now = Self.hash(of: target), now != expected {
+        if Self.hash(of: target) != entry.afterHash {
             return "\(path) changed after the run, so it was left alone."
         }
         if entry.existed, let blob = entry.blob {

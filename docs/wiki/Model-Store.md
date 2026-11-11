@@ -1,6 +1,6 @@
 # Model Store
 
-Kiln keeps one shared **local model store** so language models are downloaded once and reused by Lab, Playground and the MLX provider.
+Kiln can use a shared Hugging Face cache for MLX models across Lab, Playground and the MLX provider. Ollama maintains its own runtime-specific store; choosing the Hugging Face cache in Kiln does not configure or move Ollama models.
 
 ## Layout
 
@@ -14,11 +14,12 @@ Where the store lives (internal or external drive) is up to you; models can be l
 - Agents can register a Hub repository (`lab_register_model`, downloads nothing) and remove a library entry (`lab_delete_model`, which never touches the cache). LoRA and distillation tools use only cached base models unless `allow_download` is passed.
 - LM Studio's own model folder and Ollama's model directory are not scanned. Ollama uses only what its running server knows.
 - Kiln never deletes the shared cache.
+- Lab's installed-model list can be filtered by name and estimated memory fit, and sorted by name or size. The estimate uses the model's stored size and the current Mac's hardware; it does not establish that an architecture or a particular context length will run.
 
 ## Image models
 
-A catalog and downloader for image models is on the [[Roadmap]] and is not part of the current build.
+Image Studio includes an image-model catalog and downloader. A unified catalog for downloading and deleting both Ollama and MLX language models is planned; the existing Hugging Face language-model search registers references and does not itself download them.
 
 ---
 
-**Verified status.** Scan behavior and the CausalLM filter come from `docs/11-CURRENT-STATE.md`; the scan mitigation and cache time come from `docs/KNOWN-ISSUES.md`. MLX chat from a drive store was verified. **Not checked:** first-run store selection on a new Mac in this pass, and the scan time on slow media after further optimization.
+**Verified status.** An unsandboxed live test on 2026-11-10 exercised MLX text, conversation history and tool-result continuation using a model on the drive. Native MLX tool-call generation and vision remain unverified and are not advertised by this provider. First-run store selection and scan performance on other Macs have not been checked in this pass.
