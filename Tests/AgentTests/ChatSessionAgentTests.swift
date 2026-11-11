@@ -10,7 +10,9 @@ struct ChatSessionAgentTests {
         final class Counter: @unchecked Sendable {
             private let lock = NSLock()
             private var count = 0
-            func next() -> Int { lock.withLock { count += 1; return count } }
+            private var recorded: [ChatRequest] = []
+            func next(_ request: ChatRequest) -> Int { lock.withLock { recorded.append(request); count += 1; return count } }
+            var requests: [ChatRequest] { lock.withLock { recorded } }
         }
         struct Provider: Kiln.ModelProvider {
             let counter: Counter
@@ -23,7 +25,7 @@ struct ChatSessionAgentTests {
             }
             func checkAvailability() async -> ProviderAvailability { .available() }
             func streamChat(_ request: ChatRequest, reasoning: ReasoningConfig?) async throws -> AsyncThrowingStream<ChatChunk, Error> {
-                let number = counter.next()
+                let number = counter.next(request)
                 return AsyncThrowingStream { c in
                     Task {
                         if number == 1 {
@@ -44,7 +46,8 @@ struct ChatSessionAgentTests {
         let schema = Schema([Conversation.self, Message.self, Artifact.self, ArtifactVersion.self])
         let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
         let registry = ModelRegistry(eventBus: ModuleEventBus())
-        await registry.register(Provider(counter: Counter()))
+        let counter = Counter()
+        await registry.register(Provider(counter: counter))
         let limits = AgentRoundLimits(defaults: nil)
         #expect(limits.set(1, for: "Workstation Agent"))
         let session = ChatSession(registry: registry, conversations: ConversationStore(container: container), artifacts: ArtifactStore(container: container), workspaceRoot: root.path, roundLimits: limits)
@@ -61,9 +64,21 @@ struct ChatSessionAgentTests {
         try await Task.sleep(for: .milliseconds(100))
         #expect(session.pausedAfterRounds == 1)
         #expect(session.queuePaused && session.queuedMessages.map(\.text) == ["queued follow-up"])
+        session.selectedModelID = "different-model"
         await session.continuePausedRun()
-        #expect(session.messages.contains { $0.role == .user && $0.content.hasPrefix("Continue the previous task.") })
-        for _ in 0..<100 where !session.queuedMessages.isEmpty || session.isStreaming { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(session.errorText?.contains("model, profile, project or agent mode changed") == true)
+        #expect(counter.requests.count == 1)
+        session.selectedModelID = "stub-m1"
+        await session.continuePausedRun()
+        #expect(session.messages.contains { $0.role == .user && $0.content.hasPrefix("Continue the previous task") })
+        let requests = counter.requests
+        let resumed = try #require(requests.dropFirst().first)
+        #expect(resumed.messages.contains { $0.role == .assistant && $0.toolCalls.contains { $0.id == "call-1" && $0.name == "read_file" } })
+        #expect(resumed.messages.contains { $0.role == .tool && $0.metadata["tool_call_id"] == "call-1" && $0.content.contains("sample") })
+        #expect(resumed.messages.filter { $0.metadata["kiln_profile_system"] == "1" }.count == 1)
+        for _ in 0..<100 where counter.requests.count < 3 || session.isStreaming { try await Task.sleep(for: .milliseconds(10)) }
+        let followUp = try #require(counter.requests.dropFirst(2).first)
+        #expect(!followUp.messages.contains { $0.role == .tool }, "paused context must not leak into a later queued turn")
     }
 
     private func record(_ id: UUID, _ status: ToolCallStatus) -> ToolCallRecord {

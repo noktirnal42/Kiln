@@ -226,7 +226,7 @@ struct ComposerView: View {
                     Spacer()
                     Button("Keep going") { Task { await session.continuePausedRun() } }
                         .controlSize(.small)
-                        .help("Continue as a new message. Earlier tool output is not retained; the agent should verify the current state. Approvals and budget limits still apply.")
+                        .help("Continue in a new turn with the in-memory tool context. Approvals and budget limits still apply.")
                 }
                 .padding(.horizontal, SSSpacing.m).padding(.vertical, SSSpacing.xs)
             }

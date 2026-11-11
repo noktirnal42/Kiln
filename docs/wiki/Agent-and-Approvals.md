@@ -8,7 +8,7 @@ A profile decides which tools the agent is offered.
 - **Coding Agent**: adds file, shell and Git tools.
 - **Workstation Agent**: adds the module tools (`re_*`, `lab_*`, `browser_*`, `device_*`, `media_*`, swarm tools and opt-in computer use). Each module declares the prefixes it owns in the registry.
 
-Agent mode runs `AgentOrchestrator` with policy gates A and B, approvals, a behavior monitor and a tamper-evident audit record. The default run limit is 200 steps and it pauses rather than failing. In the `codex/kiln-round-control` development branch, the limit can be changed per profile in Settings or the composer, and `kiln_round_limit_read` / `kiln_round_limit_set` expose it to agents and MCP clients. Changes apply to the next run; the write tool requires approval. **Keep going** starts a new turn after a pause. Earlier tool outputs are not retained in conversation history, so it asks the agent to verify the current state rather than promising a lossless resume.
+Agent mode runs `AgentOrchestrator` with policy gates A and B, approvals, a behavior monitor and a tamper-evident audit record. The default run limit is 200 steps and it pauses rather than failing. In the `codex/kiln-round-control` development branch, the limit can be changed per profile in Settings or the composer, and `kiln_round_limit_read` / `kiln_round_limit_set` expose it to agents and MCP clients. Changes apply to the next run; the write tool requires approval. **Keep going** starts a new turn with the tool context retained in memory, subject to normal context compaction. The context is lost after relaunch or switching conversations; changing the model, profile, project or agent mode requires a new message instead.
 
 ## Approvals
 

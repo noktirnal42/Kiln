@@ -136,6 +136,15 @@ public final class ChatSession {
     public private(set) var roundLimitRevision = 0
     public private(set) var pausedAfterRounds: Int?
     private let roundLimits: AgentRoundLimits
+    private struct PausedContext {
+        var conversationID: UUID
+        var profileName: String
+        var modelID: String
+        var workspacePath: String?
+        var messages: [ChatMessage]
+    }
+    private var pausedContext: PausedContext?
+    private var continuingContext: PausedContext?
 
     public func roundLimit(for profile: AgentProfile) -> Int {
         _ = roundLimitRevision
@@ -149,8 +158,15 @@ public final class ChatSession {
     }
 
     public func continuePausedRun() async {
-        guard pausedAfterRounds != nil, !isStreaming else { return }
-        await send("Continue the previous task. The last run paused at its step limit; review the conversation and verify the current state before proceeding.")
+        guard pausedAfterRounds != nil, !isStreaming, let context = pausedContext else { return }
+        guard agentEnabled, context.conversationID == conversationID, context.profileName == agentProfile?.name,
+              context.modelID == selectedModelID, context.workspacePath == workspaceRoot else {
+            errorText = "The model, profile, project or agent mode changed. Continue with a new message after reviewing the previous work."
+            return
+        }
+        continuingContext = context
+        defer { continuingContext = nil }
+        await send("Continue the previous task from where you stopped. Verify the current state before changing files.", includeAttachments: false)
     }
     /// Text waiting to be put in the message box (a starter prompt, or context handed over from another tool).
     public var draft = ""
@@ -560,6 +576,7 @@ public final class ChatSession {
     public func newConversation(preserveComposer: Bool = false) async {
         stopStreaming()
         pausedAfterRounds = nil
+        pausedContext = nil
         queuedMessages = []
         todoItems = []
         do {
@@ -579,6 +596,7 @@ public final class ChatSession {
     public func loadConversation(_ id: UUID) async {
         stopStreaming()
         pausedAfterRounds = nil
+        pausedContext = nil
         do {
             let page = try await conversations.messages(conversationID: id)
             let summaries = try await conversations.conversations()
@@ -660,6 +678,8 @@ public final class ChatSession {
         saveCompactions()
         if conversationID == id {
             conversationID = nil
+            pausedAfterRounds = nil
+            pausedContext = nil
             composerText = ""
             attachments = []
             contextNotes = []
@@ -681,16 +701,17 @@ public final class ChatSession {
 
     // MARK: Streaming
 
-    public func send(_ text: String) async {
+    public func send(_ text: String, includeAttachments: Bool = true) async {
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         if isStreaming {
             // Keep typing while the agent works: the message waits its turn instead of being dropped.
-            queuedMessages.append(QueuedMessage(text: trimmed, attachments: attachments))
-            attachments = []
+            queuedMessages.append(QueuedMessage(text: trimmed, attachments: includeAttachments ? attachments : []))
+            if includeAttachments { attachments = [] }
             return
         }
         pausedAfterRounds = nil
+        pausedContext = nil
         queuePaused = false
         switch SlashCommands.resolve(trimmed, commands: availableCommands()) {
         case .plainMessage: break
@@ -716,8 +737,8 @@ public final class ChatSession {
         errorText = nil
 
         let titleSource = trimmed
-        let expansion = ContextExpander.expand(prompt: trimmed, attachments: attachments, workspaceRoot: workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) })
-        attachments = []
+        let expansion = ContextExpander.expand(prompt: trimmed, attachments: includeAttachments ? attachments : [], workspaceRoot: workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) })
+        if includeAttachments { attachments = [] }
         if !expansion.skipped.isEmpty { agentNotice = "Not attached: " + expansion.skipped.joined(separator: "; ") }
         trimmed = expansion.text
 
@@ -891,7 +912,14 @@ public final class ChatSession {
     private func runAgent(orchestrator: AgentOrchestrator, profile: AgentProfile, conversationID: UUID) async {
         guard let promptIndex = messages.lastIndex(where: { $0.role == .user }) else { isStreaming = false; return }
         let prompt = messages[promptIndex].content
-        let history = Self.agentHistory(messages: messages, upTo: promptIndex, compaction: compactions[conversationID])
+        let continuation = continuingContext
+        continuingContext = nil
+        let history: [ChatMessage]
+        if let continuation, continuation.conversationID == conversationID {
+            history = continuation.messages
+        } else {
+            history = Self.agentHistory(messages: messages, upTo: promptIndex, compaction: compactions[conversationID])
+        }
         let window = await contextWindow(for: selectedModelID)
         reloadMemory()
         var profile = effectiveProfile(profile)
@@ -948,10 +976,22 @@ public final class ChatSession {
                     case .contextMeasured(let used, let window): self.contextUsage = ContextUsage(used: used, window: window)
                     case .contextCompacted(let compaction):
                         self.recordCompaction(compaction, conversationID: conversationID, promptIndex: promptIndex)
+                    case .pausedContext(let context):
+                        guard self.conversationID == conversationID else { break }
+                        let restored = context.map { message in
+                            var message = message
+                            if message.metadata.removeValue(forKey: ContextMetadata.prompt) != nil {
+                                message.metadata[ContextMetadata.sourceIndex] = String(promptIndex)
+                            }
+                            return message
+                        }
+                        self.pausedContext = PausedContext(conversationID: conversationID, profileName: profile.name, modelID: model, workspacePath: root?.path, messages: restored)
                     case .finished(let summary):
                         finalText = summary.finalText; tokens = summary.totalTokens
-                        self.pausedAfterRounds = summary.pausedAfterRounds
-                        if summary.pausedAfterRounds != nil { self.queuePaused = true }
+                        if self.conversationID == conversationID {
+                            self.pausedAfterRounds = summary.pausedAfterRounds
+                            if summary.pausedAfterRounds != nil { self.queuePaused = true }
+                        }
                     case .awaitingApproval(let request):
                         self.setSessionState(.waitingForApproval, for: conversationID)
                         self.pendingApprovals += 1

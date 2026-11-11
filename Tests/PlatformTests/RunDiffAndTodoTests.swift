@@ -16,6 +16,11 @@ struct AgentRoundLimitTests {
         #expect(restored.limit(for: "Research Assistant") == 200)
     }
 
+    @Test func pausedContextIsNotWrittenToAudit() {
+        let event = AgentEvent.pausedContext([ChatMessage(role: .tool, content: "private tool output")])
+        #expect(AgentAuditRecorder.entry(for: event) == nil)
+    }
+
     @Test func toolsReadAndChangeOnlyKnownProfiles() async throws {
         let limits = AgentRoundLimits(defaults: nil)
         let context = ToolExecutionContext(workspaceRoot: nil, conversationID: UUID())
