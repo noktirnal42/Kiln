@@ -62,6 +62,33 @@ earlier QA (Python unit tests, `pip install pytest`, Swift and Xcode version pro
 without asking; that is what the checkpoint test above ran into. Owner decision: revoke in Approvals (shield icon
 in the sidebar footer) → Standing grants.
 
-## Open items
+## OpenCode's uncommitted work (found mid-session)
 
-(continued below as they are found)
+OpenCode left about 20 untracked files in the checkout (`Core/Capabilities`, `Core/ModelRouting`, `Core/Notifications`,
+`Core/Settings`, `Core/Agent/SlashCommands.swift`, `Core/Swarm/SwarmCoordinator.swift`, `Core/Voice/VoiceManager.swift`,
+`Core/Devices/DevicesService.swift`, `Modules/{Notifications,Settings,Swarm,Voice}`, `Modules/Devices/DevicesTools.swift`, docs 24-28,
+and `ENABLE_CAPABILITY_REGISTRY` in `project.yml`). After `xcodegen generate` they broke the build: six files had syntax errors,
+`SlashCommands.swift` duplicated `Core/Platform/SlashCommands.swift` (same product file name), and most of the rest
+re-implements features that exist and are tested. Docs 24-28 say "implementation complete" and quote 592 tests, which is
+not true of the code. Everything was **moved unchanged** to the shared notes folder
+`.../side-session-notes/local_cb5577b1-.../opencode-quarantine/` (with a README); nothing was deleted. Worth a second look:
+`Core/ModelRouting` (routing rules), `Core/Settings/SettingsLayers.swift` (user/project settings layers),
+`Core/Notifications`. Its `docs/29-VISUAL-QA-2026-11-10.md` is about the committed Maps/News work and was left in place (untracked).
+Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the session; those are not part of this QA.
+
+## Open items (not done in this session)
+
+- **Not yet seen on screen:** Devices boot/capture of a real device, Media viewer with a file, Images generation with a real
+  engine, Develop debugger UI, Settings → About, Home at wide widths, light mode for any screen, Swarm run.
+- **Hosted model stall:** with NVIDIA NIM the run shows "Still waiting for the model" indefinitely; the UI offers Stop but no timeout
+  message or fallback suggestion. Consider a visible timeout hint after ~60 s.
+- **Git tab:** with no repository it shows only an empty list; add a guidance empty state.
+- **Palette:** the Maps and News activities are Codex's; their toolbars clip at narrow widths (see docs/29).
+- **Cleanup debts (handoff section 5):** 14 `claude/*` worktrees, `kiln-codex-integration` and prunable `/private/tmp/kiln-*` worktrees
+  are still present; none removed. `git branch --merged` was not run. Build folders under `/private/tmp/claude-501/` are kept
+  (`build-triage` is in use). The leaked `stub-m1` selection was not found in `com.kiln.app` defaults (recents show real models).
+  Test chats `hooks/`, the empty "New Conversation" and the checkpoint-test chat and the `kiln-qa-re-sample` project were deleted through the app.
+  The demo project `~/KilnDemo/DemoPackage` is untouched (the checkpoint test file was rewound away).
+- **Parity (doc 17):** a Permissions pane (per-tool and per-path rules) and approval notifications remain; the approvals sheet now
+  shows and revokes grants but has no rules editor.
+- Full test suite not run (other agents were building); targeted suites pass: 49 tests (Workstation, registry, editor settings, usage, push).
