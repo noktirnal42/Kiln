@@ -352,6 +352,23 @@ struct AgentModeBar: View {
                     }
                 }
                 .labelsHidden().controlSize(.small).frame(maxWidth: 150)
+                if let profile = session.agentProfile {
+                    Menu {
+                        ForEach(AgentRoundLimits.presets, id: \.self) { limit in
+                            Button {
+                                session.setRoundLimit(limit, for: profile)
+                            } label: {
+                                if session.roundLimit(for: profile) == limit { Label("\(limit) steps", systemImage: "checkmark") }
+                                else { Text("\(limit) steps") }
+                            }
+                        }
+                    } label: {
+                        Text("\(session.roundLimit(for: profile)) steps").font(SSTypography.caption())
+                    }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                    .help("Maximum model rounds for \(profile.name); changes apply to the next run")
+                    .accessibilityLabel("Step limit: \(session.roundLimit(for: profile))")
+                }
                 PermissionModeMenu(center: ApprovalCenter.shared)
                 if session.workspaceRoot == nil {
                     Label("No project", systemImage: "folder.badge.questionmark")

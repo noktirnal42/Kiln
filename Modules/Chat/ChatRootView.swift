@@ -220,6 +220,16 @@ struct ComposerView: View {
             }
             TodoCardView(session: session)
             ComposerContextRow(session: session)
+            if let steps = session.pausedAfterRounds, !session.isStreaming {
+                HStack {
+                    Text("Paused after \(steps) steps").font(SSTypography.caption()).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Keep going") { Task { await session.continuePausedRun() } }
+                        .controlSize(.small)
+                        .help("Continue as a new message. Earlier tool output is not retained; the agent should verify the current state. Approvals and budget limits still apply.")
+                }
+                .padding(.horizontal, SSSpacing.m).padding(.vertical, SSSpacing.xs)
+            }
             composer
             AgentModeBar(session: session).padding(.top, 2)
         }

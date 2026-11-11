@@ -30,6 +30,8 @@ enum AgentActivity {
             .tool("kiln_hooks_list", "List configured hooks", .read),
             .tool("kiln_checkpoint_list", "List file checkpoints", .read),
             .tool("kiln_todo_write", "Keep a visible task list for the current job", .read),
+            .tool("kiln_round_limit_read", "Read a profile's step limit", .read),
+            .tool("kiln_round_limit_set", "Set a profile's step limit for future runs", .write),
             .exempt("agent.rewind", "Rewind files and conversation to an earlier message", .write,
                     because: "Deliberate: rewinding discards work, so the person does it from the conversation; the agent can list checkpoints."),
             .exempt("agent.sessions", "List sessions with status; resume and fork them", .read,

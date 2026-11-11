@@ -108,6 +108,18 @@ struct ProviderSettingsView: View {
                     Text("Hosted models sometimes queue a request for a minute or more before answering. A request with no reply by then is reported as stalled instead of hanging.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
+                if let session = app.chatSession {
+                    VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                        Text("Agent step limits").font(SSTypography.headline())
+                        ForEach(session.agentProfiles, id: \.name) { profile in
+                            Stepper(value: Binding(get: { session.roundLimit(for: profile) }, set: { session.setRoundLimit($0, for: profile) }), in: AgentRoundLimits.allowed, step: 50) {
+                                Text("\(profile.name): \(session.roundLimit(for: profile)) steps")
+                            }
+                        }
+                        Text("Each run pauses at its profile's limit. Changes apply to the next run; approvals and budgets still apply.")
+                            .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    }
+                }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
                     Toggle("Computer use", isOn: $computerUseEnabled)
                     Text("Allow the agent to inspect and interact with running apps. Each action asks for approval and macOS Accessibility permission is required.")

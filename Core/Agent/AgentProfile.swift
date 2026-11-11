@@ -1,5 +1,39 @@
 import Foundation
 
+/// The step limit is a user preference keyed by profile name: built-in profile UUIDs change between launches.
+public final class AgentRoundLimits: @unchecked Sendable {
+    public static let shared = AgentRoundLimits(defaults: .standard)
+    public static let key = "agent.roundLimitsByProfile"
+    public static let presets = [50, 100, 200, 500, 1000]
+    public static let allowed = 1...10_000
+    private let defaults: UserDefaults?
+    private let lock = NSLock()
+    private var values: [String: Int]
+
+    public init(defaults: UserDefaults?) {
+        self.defaults = defaults
+        self.values = defaults?.dictionary(forKey: Self.key) as? [String: Int] ?? [:]
+    }
+
+    public func limit(for profile: String) -> Int {
+        lock.withLock {
+            if let defaults { values = defaults.dictionary(forKey: Self.key) as? [String: Int] ?? [:] }
+            guard let value = values[profile], Self.allowed.contains(value) else { return AgentOrchestrator.defaultRoundLimit }
+            return value
+        }
+    }
+
+    @discardableResult public func set(_ value: Int, for profile: String) -> Bool {
+        guard Self.allowed.contains(value), !profile.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, profile.count <= 120 else { return false }
+        lock.withLock {
+            if let defaults { values = defaults.dictionary(forKey: Self.key) as? [String: Int] ?? [:] }
+            values[profile] = value
+            defaults?.set(values, forKey: Self.key)
+        }
+        return true
+    }
+}
+
 /// A saved agent configuration: model, system prompt, tool permissions, and
 /// the operational limits the runtime enforces on every run.
 public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {

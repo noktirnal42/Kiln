@@ -133,6 +133,25 @@ public final class ChatSession {
     /// On by default and on the full Workstation Agent: Kiln is meant to be a working coding agent out of the box,
     /// and every write, command and network call still waits for approval.
     public var agentEnabled = true
+    public private(set) var roundLimitRevision = 0
+    public private(set) var pausedAfterRounds: Int?
+    private let roundLimits: AgentRoundLimits
+
+    public func roundLimit(for profile: AgentProfile) -> Int {
+        _ = roundLimitRevision
+        return roundLimits.limit(for: profile.name)
+    }
+
+    public func setRoundLimit(_ limit: Int, for profile: AgentProfile) {
+        guard roundLimits.set(limit, for: profile.name) else { return }
+        roundLimitRevision += 1
+        Task { await platformAudit.record("agent.round_limit_changed", ["profile": .string(profile.name), "steps": .int(limit), "source": .string("settings")]) }
+    }
+
+    public func continuePausedRun() async {
+        guard pausedAfterRounds != nil, !isStreaming else { return }
+        await send("Continue the previous task. The last run paused at its step limit; review the conversation and verify the current state before proceeding.")
+    }
     /// Text waiting to be put in the message box (a starter prompt, or context handed over from another tool).
     public var draft = ""
     public var agentProfileIndex = AgentProfile.builtIns.filter { !$0.toolPermissions.enabledTools.isEmpty }
@@ -496,8 +515,10 @@ public final class ChatSession {
         memoryHome: URL? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? FileManager.default.homeDirectoryForCurrentUser : nil,
         checkpointStore: CheckpointStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil,
         usageLedger: UsageLedger? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil,
-        scheduleStore: ScheduleStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil
+        scheduleStore: ScheduleStore? = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .default : nil,
+        roundLimits: AgentRoundLimits = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .shared : AgentRoundLimits(defaults: nil)
     ) {
+        self.roundLimits = roundLimits
         self.scheduleStore = scheduleStore
         self.usageLedger = usageLedger
         self.memoryHome = memoryHome
@@ -538,6 +559,7 @@ public final class ChatSession {
 
     public func newConversation(preserveComposer: Bool = false) async {
         stopStreaming()
+        pausedAfterRounds = nil
         queuedMessages = []
         todoItems = []
         do {
@@ -556,6 +578,7 @@ public final class ChatSession {
 
     public func loadConversation(_ id: UUID) async {
         stopStreaming()
+        pausedAfterRounds = nil
         do {
             let page = try await conversations.messages(conversationID: id)
             let summaries = try await conversations.conversations()
@@ -667,6 +690,7 @@ public final class ChatSession {
             attachments = []
             return
         }
+        pausedAfterRounds = nil
         queuePaused = false
         switch SlashCommands.resolve(trimmed, commands: availableCommands()) {
         case .plainMessage: break
@@ -895,6 +919,7 @@ public final class ChatSession {
         let model = selectedModelID
         let hooks = HookRunner.load(workspaceRoot: root, home: memoryHome)
         let gate = usageLedger.map { UsageBudgetGate(ledger: $0, modelID: model, local: providerInfo(for: model).local) }
+        let roundLimit = roundLimits.limit(for: profile.name)
 
         let startedAt = Date()
         let task = Task { [weak self] in
@@ -902,7 +927,7 @@ public final class ChatSession {
             var tokens = 0
             var firstTokenAt: Date?
             let stream = orchestrator.run(
-                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop, hooks: hooks, checkpoint: recorder, budgetGate: gate?.isActive == true ? gate : nil,
+                profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, roundLimit: roundLimit, stop: stop, hooks: hooks, checkpoint: recorder, budgetGate: gate?.isActive == true ? gate : nil,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
             )
             do {
@@ -923,7 +948,10 @@ public final class ChatSession {
                     case .contextMeasured(let used, let window): self.contextUsage = ContextUsage(used: used, window: window)
                     case .contextCompacted(let compaction):
                         self.recordCompaction(compaction, conversationID: conversationID, promptIndex: promptIndex)
-                    case .finished(let summary): finalText = summary.finalText; tokens = summary.totalTokens
+                    case .finished(let summary):
+                        finalText = summary.finalText; tokens = summary.totalTokens
+                        self.pausedAfterRounds = summary.pausedAfterRounds
+                        if summary.pausedAfterRounds != nil { self.queuePaused = true }
                     case .awaitingApproval(let request):
                         self.setSessionState(.waitingForApproval, for: conversationID)
                         self.pendingApprovals += 1

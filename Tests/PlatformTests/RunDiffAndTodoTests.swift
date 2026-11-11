@@ -2,6 +2,38 @@ import Foundation
 import Testing
 @testable import Kiln
 
+@Suite("Agent step limits")
+struct AgentRoundLimitTests {
+    @Test func limitsArePerProfilePersistedAndValidated() throws {
+        let defaults = try #require(TestDefaults.suite("kiln.roundlimit.tests.\(UUID().uuidString)"))
+        let limits = AgentRoundLimits(defaults: defaults)
+        #expect(limits.limit(for: "Coding Agent") == 200)
+        #expect(limits.set(500, for: "Coding Agent"))
+        #expect(!limits.set(0, for: "Coding Agent"))
+        #expect(!limits.set(10_001, for: "Coding Agent"))
+        let restored = AgentRoundLimits(defaults: defaults)
+        #expect(restored.limit(for: "Coding Agent") == 500)
+        #expect(restored.limit(for: "Research Assistant") == 200)
+    }
+
+    @Test func toolsReadAndChangeOnlyKnownProfiles() async throws {
+        let limits = AgentRoundLimits(defaults: nil)
+        let context = ToolExecutionContext(workspaceRoot: nil, conversationID: UUID())
+        let read = RoundLimitReadTool(limits: limits), write = RoundLimitWriteTool(limits: limits)
+        #expect(write.spec.permission == .write && read.spec.permission == .read)
+        _ = try await write.execute(argumentsJSON: #"{"profile":"Coding Agent","steps":500}"#, context: context)
+        let value = try await read.execute(argumentsJSON: #"{"profile":"Coding Agent"}"#, context: context)
+        #expect(value.contains("500"))
+        await #expect(throws: AgentRunError.self) {
+            try await write.execute(argumentsJSON: #"{"profile":"Unknown","steps":500}"#, context: context)
+        }
+        await #expect(throws: AgentRunError.self) {
+            try await write.execute(argumentsJSON: #"{"profile":"Coding Agent","steps":0}"#, context: context)
+        }
+        #expect(limits.limit(for: "Coding Agent") == 500)
+    }
+}
+
 @Suite("Run diff")
 struct RunDiffTests {
     @Test func linesShowChangesWithContextAndCollapseTheRest() {
