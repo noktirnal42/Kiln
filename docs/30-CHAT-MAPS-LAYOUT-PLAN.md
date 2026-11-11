@@ -107,10 +107,16 @@ Everything in the chat needs to be checked and verified against Claude and Codex
 2. **Tool-call round limit.** The agent pauses after a fixed number of model rounds (`AgentOrchestrator.roundLimit`, default 200, "Paused after N steps; say continue").
    Make it a visible, per-profile setting (Settings and a composer menu), allow "keep going" without typing, show round count and cost in the Team/step line,
    and raise or remove the cap for long runs while keeping the budget gate and Stop button as the real limits.
-3. **Multi-line input (Shift+Return) is reported as not working.** The code path is `ComposerReturn.decide` plus `insertNewline()` in `ChatRootView`
+3. **(Fixed 2026-11-10, see below) Multi-line input (Shift+Return) was reported as not working.** The code path is `ComposerReturn.decide` plus `insertNewline()` in `ChatRootView`
    (`NSApp.keyWindow?.firstResponder as? NSTextView` then `insertNewlineIgnoringFieldEditor`), covered by logic tests only; it has never been checked with real keystrokes
    (background automation sends Return through accessibility). Reproduce with real key events (full-screen control or a UI test), check the Agent view and the dock,
    and replace `TextEditor` with an `NSTextView` wrapper if SwiftUI's `onKeyPress` does not see Shift+Return. Add a UI test with synthesized `keyDown` events.
 4. **Audit the whole chat** against the parity table in section 2 and verify each row on screen; the rows marked have/partial are not all verified.
 5. **Visual QA of Claude and Codex against Kiln** (owner request, 2026-11-10): first pass done for Codex in `31-CHAT-VISUAL-COMPARISON.md`; repeat for Claude Code Desktop and ChatGPT with a session
    that can address their windows, and re-compare after each change until Kiln matches or beats them.
+
+**Composer card and keyboard (2026-11-10):** the message box is now one rounded card (`ComposerView` in `ChatRootView.swift`): text, then "+" (attach, @ file, / command), voice and send; the model, Agent, Plan, profile and permission chips sit under the card.
+`TextEditor` was replaced by an `NSTextView` wrapper (`Modules/Chat/ComposerTextView.swift`) so keys are decided at the AppKit level: **Return** sends (queues while the agent works), **Shift/Option/Control+Return** add a line break,
+**⌘Return** sends/queues (as in Claude Code), **Tab** completes an `@` file or a `/` command. 29 tests, including real `keyDown` events sent to the real text view (`ComposerTextViewTests`); the card, a three-line draft
+and the picker were seen on screen. Real keystrokes through the running app were not typed (background control), so one manual check of Shift+Return in the app is still worth doing.
+Still open from section 6: tool-call and thread display redesign, the round limit setting, the full chat audit.

@@ -202,12 +202,11 @@ struct ComposerView: View {
     var voice: VoiceController?
     @Binding var input: String
     let onSend: () -> Void
-    @State private var editorWidth: CGFloat = 0
+    @State private var textHeight: CGFloat = 40
     @State private var mentionMatches: [String] = []
 
     var body: some View {
         VStack(spacing: 0) {
-            AgentModeBar(session: session)
             if let voiceError = voice?.errorText {
                 Text(voiceError).font(SSTypography.caption()).foregroundStyle(SSColor.danger)
                     .padding(.horizontal, SSSpacing.m).frame(maxWidth: .infinity, alignment: .leading)
@@ -223,6 +222,7 @@ struct ComposerView: View {
             TodoCardView(session: session)
             ComposerContextRow(session: session)
             composer
+            AgentModeBar(session: session).padding(.top, 2)
         }
         .task(id: MentionParser.activeQuery(in: input)) { await refreshMentions() }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
@@ -269,27 +269,6 @@ struct ComposerView: View {
         session.draft = ""
     }
 
-    /// Return sends; ⌘/⇧/⌥-Return puts a line break at the caret instead.
-    private func insertNewline() {
-        if let editor = NSApp.keyWindow?.firstResponder as? NSTextView {
-            editor.insertNewlineIgnoringFieldEditor(nil)
-        } else {
-            input += "\n"
-        }
-    }
-
-    /// Match the editor's font and wrapping width, reserving space only for its actual
-    /// content. At the cap, TextEditor's native scrolling handles longer drafts.
-    private var editorHeight: CGFloat {
-        guard editorWidth > 12 else { return 44 }
-        let bounds = (input + " ").boundingRect(
-            with: CGSize(width: editorWidth - 12, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: NSFont.systemFont(ofSize: 14)]
-        )
-        return min(160, max(44, ceil(bounds.height) + 16))
-    }
-
     /// Dictate, read replies aloud, or hold a spoken conversation.
     private func voiceControls(_ voice: VoiceController) -> some View {
         HStack(spacing: SSSpacing.xs) {
@@ -318,78 +297,85 @@ struct ComposerView: View {
         .buttonStyle(.borderless)
     }
 
+    /// One rounded card, like Claude Code and Codex: the text, then a row with "+", voice and send. The model, mode and context sit under it.
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: SSSpacing.s) {
-            Button(action: attachFiles) { Image(systemName: "paperclip").font(.title3) }
+        VStack(spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                ComposerTextView(text: $input, isStreaming: session.isStreaming, onSend: onSend, onTab: completeFromTab, onHeight: { textHeight = $0 })
+                    .frame(height: min(168, max(40, textHeight + 4)))
+                if let voice, voice.phase == .listening {
+                    Text(voice.partial.isEmpty ? "Listening…" : voice.partial)
+                        .foregroundStyle(.secondary).font(SSTypography.caption())
+                        .padding(.horizontal, 8).padding(.top, 8).allowsHitTesting(false)
+                } else if input.isEmpty {
+                    Text(placeholder)
+                        .foregroundStyle(.tertiary).font(.system(size: 13))
+                        .padding(.horizontal, 8).padding(.top, 7).allowsHitTesting(false)
+                }
+            }
+            HStack(spacing: SSSpacing.xs) {
+                plusMenu
+                Spacer(minLength: 0)
+                if let voice { voiceControls(voice) }
+                sendButtons
+            }
+            .padding(.top, 2)
+        }
+        .padding(.horizontal, SSSpacing.s).padding(.vertical, SSSpacing.xs)
+        .background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(SSColor.hairline))
+        .padding(.horizontal, SSSpacing.m)
+        .padding(.top, SSSpacing.xs)
+    }
+
+    private var placeholder: String {
+        session.isStreaming ? "Type to queue the next message  ·  ⏎ queues it" : "Message  ·  ⏎ send  ·  ⇧⏎ new line  ·  @ file  ·  / command"
+    }
+
+    private var plusMenu: some View {
+        Menu {
+            Button("Attach files or folders…", systemImage: "paperclip") { attachFiles() }
+            Button("Reference a project file (@)", systemImage: "at") { if !input.hasSuffix("@") { input += (input.isEmpty || input.hasSuffix(" ") ? "" : " ") + "@" } }
+            Button("Slash commands (/)", systemImage: "slash.circle") { if input.isEmpty { input = "/" } }
+        } label: {
+            Image(systemName: "plus").font(.system(size: 13, weight: .medium)).frame(width: 26, height: 26)
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .help("Attach files, reference a file with @, or run a slash command. You can also drop files here.")
+        .accessibilityLabel("Add to message")
+    }
+
+    @ViewBuilder
+    private var sendButtons: some View {
+        let hasText = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if session.isStreaming {
+            if hasText {
+                Button(action: onSend) { Image(systemName: "text.append").font(.system(size: 15)) }
+                    .buttonStyle(.borderless)
+                    .help("Queue this message: it is sent when the agent finishes (⏎)")
+                    .accessibilityLabel("Queue message")
+            }
+            Button { session.stopStreaming() } label: { Image(systemName: "stop.circle.fill").font(.system(size: 22)) }
                 .buttonStyle(.borderless)
-                .help("Attach files or folders (or drop them here). Type @ to reference a project file.")
-                .accessibilityLabel("Attach files")
-                .padding(.bottom, 4)
-            TextEditor(text: $input)
-                .font(.system(size: 14))
-                .frame(height: editorHeight)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { editorWidth = $0 }
-                .overlay(alignment: .topLeading) {
-                    if let voice, voice.phase == .listening {
-                        Text(voice.partial.isEmpty ? "Listening…" : voice.partial)
-                            .foregroundStyle(.secondary)
-                            .font(SSTypography.caption())
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 10)
-                            .allowsHitTesting(false)
-                    } else if input.isEmpty {
-                        Text(session.isStreaming ? "Type to queue the next message…  (⏎ queues it)" : "Message…  (@ to reference files, ⏎ to send, ⌘⏎ for a new line)")
-                            .foregroundStyle(.tertiary)
-                            .font(SSTypography.caption())
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 10)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .onKeyPress(.tab, phases: .down) { _ in
-                    if let first = mentionMatches.first, MentionParser.activeQuery(in: input) != nil {
-                        input = MentionParser.completing(input, with: first)
-                        return .handled
-                    }
-                    guard let first = completions.first else { return .ignored }
-                    input = "/\(first.name) "
-                    return .handled
-                }
-                .onKeyPress(.return, phases: .down) { press in
-                    switch ComposerReturn.decide(modifiers: press.modifiers, text: input, isStreaming: session.isStreaming, hasMarkedText: ComposerReturn.focusedViewIsComposing) {
-                    case .send: onSend(); return .handled
-                    case .newline: insertNewline(); return .handled
-                    case .ignore: return .handled
-                    case .passThrough: return .ignored
-                    }
-                }
-
-            if let voice { voiceControls(voice) }
-
-            if session.isStreaming {
-                if !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Button(action: onSend) { Image(systemName: "text.append").font(.title2) }
-                        .buttonStyle(.borderless)
-                        .help("Queue this message: it is sent when the agent finishes (⏎)")
-                        .accessibilityLabel("Queue message")
-                }
-                Button { session.stopStreaming() } label: {
-                    Image(systemName: "stop.circle.fill").font(.title2)
-                }
                 .help("Stop")
                 .accessibilityLabel("Stop generating")
-            } else {
-                Button(action: onSend) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                }
-                .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } else {
+            Button(action: onSend) { Image(systemName: "arrow.up.circle.fill").font(.system(size: 22)) }
+                .buttonStyle(.borderless)
+                .disabled(!hasText)
                 .help("Send (⏎)")
                 .accessibilityLabel("Send message")
-            }
         }
-        .padding(.horizontal, SSSpacing.m)
-        .padding(.vertical, SSSpacing.s)
+    }
+
+    /// Tab completes the first mention, else the first slash command.
+    private func completeFromTab() -> Bool {
+        if let first = mentionMatches.first, MentionParser.activeQuery(in: input) != nil {
+            input = MentionParser.completing(input, with: first)
+            return true
+        }
+        if let first = completions.first { input = "/\(first.name) "; return true }
+        return false
     }
 }
 

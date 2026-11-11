@@ -11,9 +11,21 @@ enum ComposerReturn: Equatable {
     /// An input method is composing: let it confirm its candidate instead of sending.
     case passThrough
 
+    /// Same rules for a raw AppKit key event.
+    nonisolated static func decide(flags: NSEvent.ModifierFlags, text: String, isStreaming: Bool, hasMarkedText: Bool) -> ComposerReturn {
+        var modifiers: EventModifiers = []
+        if flags.contains(.command) { modifiers.insert(.command) }
+        if flags.contains(.shift) { modifiers.insert(.shift) }
+        if flags.contains(.option) { modifiers.insert(.option) }
+        if flags.contains(.control) { modifiers.insert(.control) }
+        return decide(modifiers: modifiers, text: text, isStreaming: isStreaming, hasMarkedText: hasMarkedText)
+    }
+
+    /// Return sends (or queues, while the agent works). Shift, Option and Control Return add a line break. ⌘Return also sends or queues,
+    /// as in Claude Code, so it never leaves a stray line break in a message that is about to go.
     nonisolated static func decide(modifiers: EventModifiers, text: String, isStreaming: Bool, hasMarkedText: Bool) -> ComposerReturn {
         if hasMarkedText { return .passThrough }
-        if !modifiers.isDisjoint(with: [.command, .shift, .option]) { return .newline }
+        if !modifiers.isDisjoint(with: [.shift, .option, .control]) { return .newline }
         // While a run is going Return still sends: the session queues the message and sends it when the run ends.
         let ready = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         return ready ? .send : .ignore
