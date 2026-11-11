@@ -81,9 +81,11 @@ Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the s
 - **Not yet seen on screen:** Devices boot/capture of a real device, Media viewer with a file, Images generation with a real
   engine, Develop debugger UI, a Swarm run. Seen since: Settings and its About sheet, light mode on Browser and Analyze.
 - **Palette:** the Maps and News activities are Codex's; their toolbars clip at narrow widths (see docs/29).
-- **Cleanup debts (handoff section 5):** 14 `claude/*` worktrees, `kiln-codex-integration` and prunable `/private/tmp/kiln-*` worktrees
-  are still present; none removed. `git branch --merged` was not run. Build folders under `/private/tmp/claude-501/` are kept
-  (`build-triage` is in use). The leaked `stub-m1` selection was not found in `com.kiln.app` defaults (recents show real models).
+- **Cleanup (done):** 12 merged worktrees (11 under `.claude/worktrees/`, plus `../kiln-codex-integration`) were removed and 20 merged
+  `claude/*` and `codex/*` branches deleted with `git branch -d` after `git branch --merged HEAD`; prunable `/private/tmp/kiln-*` entries pruned.
+  **Kept because they are not merged:** `claude/image-studio-8ff931` (+2 commits, worktree with an untracked upscale screenshot),
+  `claude/integration-registry-bf14c5` (+1), `codex/axiom-core-tests` (+2), `codex/ghidra-setup` (+2), `codex/lab-agent-start` (+2). Their owners should
+  say whether to merge or drop them. Build folders under `/private/tmp/claude-501/` are kept (`build-triage` is in use); the leaked `stub-m1` selection is fixed (below).
   Test chats `hooks/`, the empty "New Conversation" and the checkpoint-test chat and the `kiln-qa-re-sample` project were deleted through the app.
   The demo project `~/KilnDemo/DemoPackage` is untouched (the checkpoint test file was rewound away).
 - **Parity (doc 17):** a Permissions pane (per-tool and per-path rules) and approval notifications remain; the approvals sheet now
