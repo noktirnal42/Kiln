@@ -28,7 +28,7 @@ The owner's words: the chat must be at parity with Claude and Codex and **better
 Details and acceptance notes are in doc 30; this is the order I would work in.
 
 1. **Thread display, second pass** (doc 30 section 6 item 1, doc 31): Codex-style "Worked for X ›" as an option next to the Claude-style sentence lines; per-burst sentence lines between the assistant's sentences (store the text of each model round with the reply:
-   `MessageSnapshot` has no field for it, add one with a SwiftData migration); file-name chips that open the editor at the line; Copy on code blocks; tables and math; dismissible banner above the composer; edit-and-resubmit; "Undo all / View changes" on the diff card header.
+   `MessageSnapshot` has no field for it, add one with a SwiftData migration); file-name chips that open the editor at the line; tables and math (Copy on code blocks is done: `CodeBlockHeader`, seen on screen); dismissible banner above the composer; edit-and-resubmit; "Undo all / View changes" on the diff card header.
 2. **Round limit as a setting** (`AgentOrchestrator.defaultRoundLimit = 200`, "Paused after N steps"): visible, per profile, "keep going" without typing.
 3. **Verify Shift+Return in the running app** with real keystrokes (it is tested with synthesized events only) and the whole chat against doc 30's parity table.
 4. **Layout** (doc 30 section 7): sidebar for projects, sessions, pins and Settings only; modes become a title-bar icon row (session rail, Terminal ⌘J, changes, browser, devices, files, view options) opening a Canvas beside the thread;

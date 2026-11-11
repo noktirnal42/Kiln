@@ -140,3 +140,5 @@ used here (qwen2.5-coder:7b) invented an `echo` tool and so ran nothing. Still t
 3. **Native macOS chrome.** A real toolbar (SwiftUI `.toolbar` / `NSToolbar`, customisable, with the icon row above), a complete menu bar (File, Edit, View, Go, Thread, Window, Help with the standard commands and shortcuts,
    including every palette command), **tooltips on every icon and control**, a **Help** menu and in-app help (search field in the Help menu, a Help window with the documentation rendered from `docs/` and the wiki sources, keyboard shortcuts sheet, "What's new"),
    an **About** panel (it exists inside Settings; make it the standard About Kiln panel with version, licence, notices), links to documentation and support, and accessibility labels to match. Check each against the macOS Human Interface Guidelines.
+
+Done since: **Copy on code blocks** (`CodeBlockHeader` in `Modules/Chat/MarkdownBlockView.swift`, seen on screen).
