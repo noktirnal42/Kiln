@@ -124,6 +124,8 @@ public final class ChatSession {
     /// Tool calls of the current (or last) agent run, in order.
     public private(set) var agentActivity: [ToolCallRecord] = []
     public private(set) var agentRound = 0
+    /// When the current agent run began, for the live "Running swift test · 1m 26s" line.
+    public private(set) var runStartedAt: Date?
     public private(set) var agentNotice: String?
     private var agentStop: AgentStopFlag?
 
@@ -844,6 +846,7 @@ public final class ChatSession {
         agentStop = stop
         agentActivity = []
         agentRound = 0
+        runStartedAt = Date()
         agentNotice = nil
         let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
         let registry = registry

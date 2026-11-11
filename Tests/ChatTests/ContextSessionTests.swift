@@ -15,14 +15,14 @@ struct ToolActivitySummaryTests {
             item("read_file", "1"), item("read_file", "2"), item("read_file", "3"),
             item("read_file", "4"), item("read_file", "5"), item("read_file", "6"),
         ]
-        #expect(ToolActivitySummary.line(for: items) == "Ran 4 commands · edited 2 files · read 6 files")
+        #expect(ToolActivitySummary.line(for: items) == "Ran 4 commands, edited 2 files and read 6 files")
     }
 
     @Test func singularsPluralsAndFailures() {
-        #expect(ToolActivitySummary.line(for: [item("run_command", failed: true)]) == "Ran 1 command · 1 failed")
+        #expect(ToolActivitySummary.line(for: [item("run_command", failed: true)]) == "Ran 1 command, 1 failed")
         #expect(ToolActivitySummary.line(for: [item("read_file", "x")]) == "Read 1 file")
         #expect(ToolActivitySummary.line(for: [item("web_search"), item("git_status"), item("re_list_functions")])
-                == "1 git operation · 1 web lookup · used 1 other tool")
+                == "1 git operation, 1 web lookup and used 1 other tool")
         #expect(ToolActivitySummary.line(for: []) == "")
     }
 }

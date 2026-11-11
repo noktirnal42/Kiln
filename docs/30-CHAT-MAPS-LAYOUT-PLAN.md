@@ -100,7 +100,7 @@ collections and share, then thread cards. Anything the table calls "not availabl
 
 Everything in the chat needs to be checked and verified against Claude and Codex, and missing features and functions implemented. Specific items:
 
-1. **Chat display and tool calls.** The owner does not like how the thread and especially tool calls look; the ChatGPT, Codex and Claude desktop apps are much better.
+1. **Chat display and tool calls (first pass done 2026-11-10, see below).** The owner does not like how the thread and especially tool calls look; the ChatGPT, Codex and Claude desktop apps are much better.
    Redesign the thread: calmer message layout, tool calls as compact, expandable steps with a clear running/done/failed state, inline command output, file edits as diff cards
    (started: the diff card), a single "worked for 42 s" summary line, streaming that never jumps, code blocks with Copy and Open in Editor, tables and math.
    Method: screenshot Claude, Codex and ChatGPT desktop side by side with Kiln, list the differences, then build shared `SSCard`/`SSStep` components.
@@ -120,3 +120,11 @@ Everything in the chat needs to be checked and verified against Claude and Codex
 **⌘Return** sends/queues (as in Claude Code), **Tab** completes an `@` file or a `/` command. 29 tests, including real `keyDown` events sent to the real text view (`ComposerTextViewTests`); the card, a three-line draft
 and the picker were seen on screen. Real keystrokes through the running app were not typed (background control), so one manual check of Shift+Return in the app is still worth doing.
 Still open from section 6: tool-call and thread display redesign, the round limit setting, the full chat audit.
+
+**Thread and tool-call pass (2026-11-10):** `Core/Chat/ToolActivitySummary.swift` gained `ToolPhrase` (a step reads as a verb and what it touched: *Ran* `swift test`, *Edited* `Pagination.swift`; live line in the progressive tense)
+and summaries are sentences ("Ran 4 commands, edited 2 files and read 6 files"). The live view is now Claude Code's: finished steps fold into one grey sentence-line with a chevron, only an approval that needs you stays in view,
+and one live line says what is happening with elapsed time (`LiveStatusLine`). Step rows show a verb and the object, with an icon only for steps that waited, failed or were blocked. A reply that is only a tool call written as text no longer
+shows raw JSON: a notice says nothing ran, with Show text and Try again. Reply actions stay visible at half strength. `TextToolCall.parseAll` lets small local models run several calls written in a row
+(all or nothing; unknown tools, prose between calls, truncated calls and more than eight calls run none). 15 new tests; the replacement of raw JSON was seen on screen; the live line was **not** seen on screen because the local model
+used here (qwen2.5-coder:7b) invented an `echo` tool and so ran nothing. Still to do from this section: Codex-style "Worked for X" option, file-name chips that open the editor, code-block Copy, per-burst sentence-lines between the assistant's sentences
+(needs per-round text stored with the reply), the round-limit setting, and the full chat audit.
