@@ -51,6 +51,12 @@ the easiest; Develop and Analyze keep a full-screen mode). Each step ships behin
 
 Suggested order: attachments and `@` mentions, diff card, todo card, queue and steer, thread management, Team card, background runs, PR flow.
 
+**Built so far (2026-11-10, commit `91a78bf`, unit-tested, seen working on screen):** `@file` mentions with a ranked picker (Tab completes), attachments through the paperclip,
+drag and drop (code added, not exercised on screen) and chips in the thread, a message queue while the agent works (paused by Stop, "Send now"), a 60 s slow-reply hint.
+Files are expanded into the message as read-only context with size limits; binary files and paths outside the project are refused with a note; **images are attached by path only,
+because no provider path carries pixels yet** (next: a `ChatMessage` image part for OpenAI-compatible and Ollama vision models). Not yet: paste of images from the clipboard, `@symbol`/`@page`/`@device`,
+steering a running agent mid-step, diff card, todo card.
+
 ## 3. Maps parity table (Apple Maps; limits of MapKit noted)
 
 State of the code: `Modules/Maps` (Codex) has map, place search, directions from the map centre, pins, USGS historical maps, layers (standard/satellite/hybrid),
