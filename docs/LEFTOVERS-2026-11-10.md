@@ -78,8 +78,10 @@ Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the s
 
 ## Open items (not done in this session)
 
-- **Not yet seen on screen:** Devices boot/capture of a real device, Media viewer with a file, Images generation with a real
-  engine, Develop debugger UI, a Swarm run. Seen since: Settings and its About sheet, light mode on Browser and Analyze.
+- **Not yet seen on screen:** the Develop debugger UI and a Swarm run. Seen since: Settings and its About sheet, light mode on Browser and Analyze,
+  Images generation (SD-Turbo, MLX, 56.8 s including the first model load from the drive; `verified-images-generation-sd-turbo.jpg`),
+  Send to Media then the Media viewer (`verified-media-viewer.jpg`), and Devices booting an iPad simulator and showing its live screen
+  (`verified-devices-booted-ipad.jpg`; the very first boot kept the row busy for about three minutes while the simulator migrated its data).
 - **Palette:** the Maps and News activities are Codex's; their toolbars clip at narrow widths (see docs/29).
 - **Cleanup (done):** 12 merged worktrees (11 under `.claude/worktrees/`, plus `../kiln-codex-integration`) were removed and 20 merged
   `claude/*` and `codex/*` branches deleted with `git branch -d` after `git branch --merged HEAD`; prunable `/private/tmp/kiln-*` entries pruned.
@@ -108,3 +110,10 @@ The suites still leave preference files behind in `~/Library/Preferences` (246 m
 `kiln.news.tests.*`, `kiln.migration.*`); they were deleted again by pattern. The remaining leakers use `UserDefaults(suiteName:)` without
 `removePersistentDomain` (ContextSessionTests, UnifiedShellTests, AppleMLXAndRegistryTests, WorkstationTests/RegistryTests `isolatedDefaults`,
 News tests, BundlePreferencesMigrationTests). A shared test helper that removes the suite in a `defer` would fix them.
+
+## Finishing pass
+
+- Test suites now clean up all preference suites (`Tests/Support/TestDefaults.swift`); a run leaves 0 files behind (was hundreds).
+- Fixed: Images result actions collapse to icons instead of scrolling Delete off the edge; Devices Boot/Shut down buttons have per-device accessibility labels.
+- The generated test image ("a small red kiln glowing…") is in Images → History and Media → Gallery of the real app; deleting needs a right-click or the Delete action, which background control cannot press. Delete it from the app if unwanted.
+- Still open: Permissions pane (per-tool/per-path rules), approval notifications beyond the existing Dock badge, Develop debugger UI check, Swarm run.

@@ -77,10 +77,10 @@ private struct DeviceListPane: View {
             if busy { ProgressView().controlSize(.small) }
             else if device.canBoot {
                 Button { Task { await module.boot(device) } } label: { Image(systemName: "play.fill") }
-                    .buttonStyle(.borderless).help("Boot \(device.name)")
+                    .buttonStyle(.borderless).help("Boot \(device.name)").accessibilityLabel("Boot \(device.name), \(device.runtime)")
             } else if device.canShutdown {
                 Button { Task { await module.shutdown(device) } } label: { Image(systemName: "stop.fill") }
-                    .buttonStyle(.borderless).help("Shut down \(device.name)")
+                    .buttonStyle(.borderless).help("Shut down \(device.name)").accessibilityLabel("Shut down \(device.name), \(device.runtime)")
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 5)

@@ -284,21 +284,28 @@ private struct CanvasPane: View {
                 Text("\(r.engine) · \(r.modelName) · \(r.request.width)×\(r.request.height) · \(r.request.steps) steps · guidance \(r.request.guidance, specifier: "%.1f") · seed \(r.seed) · \(r.seconds, specifier: "%.1f") s")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
-            ScrollView(.horizontal) {
-              HStack {
-                Button { Task { await module.rerun(item) } } label: { Label("Re-run", systemImage: "arrow.clockwise") }
-                Button { module.loadSettings(from: item) } label: { Label("Load settings", systemImage: "slider.horizontal.3") }
-                Button { module.useAsReference(item) } label: { Label("Use as reference", systemImage: "photo.badge.arrow.down") }
-                Menu { Button("×2") { module.upscale(item, factor: 2) }; Button("×4") { module.upscale(item, factor: 4) } } label: { Label("Upscale", systemImage: "arrow.up.left.and.arrow.down.right") }
-                    .help("Lanczos resampling: a bigger picture, not an AI-sharpened one")
-                Button { module.sendToMedia(item) } label: { Label("Send to Media", systemImage: "play.rectangle") }
-                Button { NSWorkspace.shared.activateFileViewerSelecting([item.url]) } label: { Label("Reveal", systemImage: "magnifyingglass") }
-                Button(role: .destructive) { module.delete(item) } label: { Label("Delete", systemImage: "trash") }
-              }.fixedSize(horizontal: true, vertical: false)
+            // Labels and icons when they fit, icons alone when they do not: no action hides off the edge (Delete used to).
+            ViewThatFits(in: .horizontal) {
+                actionRow(item).labelStyle(.titleAndIcon)
+                actionRow(item).labelStyle(.iconOnly)
             }
-            .controlSize(.small).labelStyle(.titleAndIcon)
+            .controlSize(.small)
         }
         .padding(SSSpacing.s)
+    }
+
+    private func actionRow(_ item: ImageHistoryItem) -> some View {
+        HStack {
+            Button { Task { await module.rerun(item) } } label: { Label("Re-run", systemImage: "arrow.clockwise") }
+            Button { module.loadSettings(from: item) } label: { Label("Load settings", systemImage: "slider.horizontal.3") }
+            Button { module.useAsReference(item) } label: { Label("Use as reference", systemImage: "photo.badge.arrow.down") }
+            Menu { Button("×2") { module.upscale(item, factor: 2) }; Button("×4") { module.upscale(item, factor: 4) } } label: { Label("Upscale", systemImage: "arrow.up.left.and.arrow.down.right") }
+                .help("Lanczos resampling: a bigger picture, not an AI-sharpened one")
+            Button { module.sendToMedia(item) } label: { Label("Send to Media", systemImage: "play.rectangle") }
+            Button { NSWorkspace.shared.activateFileViewerSelecting([item.url]) } label: { Label("Reveal", systemImage: "magnifyingglass") }
+            Button(role: .destructive) { module.delete(item) } label: { Label("Delete", systemImage: "trash") }
+        }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var strip: some View {
