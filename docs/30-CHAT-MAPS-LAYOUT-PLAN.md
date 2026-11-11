@@ -66,7 +66,7 @@ Suggested order: attachments and `@` mentions, diff card, todo card, queue and s
 **Built so far (2026-11-10, commit `91a78bf`, unit-tested, seen working on screen):** `@file` mentions with a ranked picker (Tab completes), attachments through the paperclip,
 drag and drop (code added, not exercised on screen) and chips in the thread, a message queue while the agent works (paused by Stop, "Send now"), a 60 s slow-reply hint.
 Files are expanded into the message as read-only context with size limits; binary files and paths outside the project are refused with a note; **images are attached by path only,
-because the composer does not yet read or submit pixels**. The development branch has a `ChatMessage` image payload and request encoding for Ollama and OpenAI-compatible transports, but this is transport groundwork only: attachment validation, provider capability checks, conversation persistence and migration, agent history, and live vision QA remain before images can be sent from chat. Not yet: paste of images from the clipboard, `@symbol`/`@page`/`@device`,
+because the composer does not yet submit pixels**. The development branch has bounded, metadata-stripped image preparation, a `ChatMessage` image payload, and request encoding for Ollama and OpenAI-compatible transports, but these are groundwork only: submission and failure handling, provider capability checks, conversation persistence and migration, agent history, and live vision QA remain before images can be sent from chat. Not yet: paste of images from the clipboard, `@symbol`/`@page`/`@device`,
 steering a running agent mid-step, diff card, todo card.
 
 ## 3. Maps parity table (Apple Maps; limits of MapKit noted)
