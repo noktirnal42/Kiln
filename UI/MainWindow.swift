@@ -46,6 +46,43 @@ struct MainWindow: View {
         .background(SSColor.canvas)
         .tint(SSColor.accent)
         .navigationTitle("Kiln — \(workstation.selected.title)")
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button { workstation.sidebarVisible.toggle() } label: {
+                    Label("Toggle sidebar", systemImage: "sidebar.left")
+                }
+                .help(workstation.sidebarVisible ? "Hide sidebar (⌃⌘S)" : "Show sidebar (⌃⌘S)")
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { workstation.select(.agent, app: app) } label: {
+                    Label("Chat", systemImage: "bubble.left.and.text.bubble.right")
+                }
+                .help("Open chat")
+                Button { workstation.select(.develop, app: app) } label: {
+                    Label("Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+                .help("Open Develop")
+                ForEach([Activity.browser, .maps, .devices]) { activity in
+                    Button {
+                        workstation.select(workstation.selected == activity ? .agent : activity, app: app)
+                    } label: {
+                        Label(activity.title, systemImage: activity.symbol)
+                    }
+                    .help("\(activity.title) — \(activity.summary)")
+                    .accessibilityAddTraits(workstation.selected == activity ? .isSelected : [])
+                }
+                Menu {
+                    ForEach(Activity.allCases.filter(\.descriptor.showsInSidebar)) { activity in
+                        Button { workstation.select(activity, app: app) } label: {
+                            Label(activity.title, systemImage: activity.symbol)
+                        }
+                    }
+                } label: {
+                    Label("Work", systemImage: "square.grid.2x2")
+                }
+                .help("Open a workspace")
+            }
+        }
         .onChange(of: workstation.settingsRequests) { _, _ in openSettings() }
         .overlay { paletteOverlay }
         .background { shortcuts }

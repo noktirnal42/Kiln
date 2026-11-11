@@ -40,10 +40,6 @@ struct WorkstationSidebar: View {
             }
             .frame(maxHeight: .infinity, alignment: .top)
             Divider()
-            tools
-                .padding(.horizontal, SSSpacing.s)
-                .padding(.vertical, SSSpacing.s)
-            Divider()
             footer
         }
         .frame(width: 244)
@@ -142,29 +138,6 @@ struct WorkstationSidebar: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
         .contextMenu {
             Button("Delete", role: .destructive) { Task { await app.chatSession?.deleteConversation(item.id) } }
-        }
-    }
-
-    private var tools: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            SSSectionLabel("Workstation").padding(.horizontal, SSSpacing.s).padding(.bottom, 2)
-            ForEach(Activity.allCases.filter(\.descriptor.showsInSidebar)) { activity in
-                let selected = workstation.selected == activity
-                Button { workstation.select(activity, app: app) } label: {
-                    HStack(spacing: SSSpacing.s) {
-                        Image(systemName: activity.symbol).frame(width: 18)
-                            .foregroundStyle(selected ? SSColor.accent : .secondary)
-                        Text(activity.title).font(.system(size: 13, weight: selected ? .semibold : .regular))
-                        Spacer()
-                    }
-                    .padding(.horizontal, SSSpacing.s).padding(.vertical, 6)
-                    .background(selected ? SSColor.accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? .isSelected : [])
-                .help("\(activity.title) — \(activity.summary)" + (activity.shortcutKey.map { " (⌘\($0))" } ?? ""))
-            }
         }
     }
 

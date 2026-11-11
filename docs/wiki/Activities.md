@@ -1,6 +1,6 @@
 # Activities
 
-Kiln has thirteen development activities, declared once in the activity registry (`Core/Registry/`). The sidebar order is also the shortcut order. Each opens with the same header and tab strip; the agent panel stays beside every activity except Agent.
+Kiln's activities are declared once in the activity registry (`Core/Registry/`), which also determines their shortcuts. In the `codex/kiln-qa-completion` development branch, Chat, Code, Browser, Maps and Devices have toolbar controls; the Work menu and command palette (⌘K) provide access to the other activities. On wider windows, Chat stays in the center beside Browser, Maps, Devices, Media and News; Develop and Analyze keep a larger central workspace. Packaged releases can differ from this development layout.
 
 | Shortcut | Activity | One line |
 |---|---|---|
