@@ -128,3 +128,15 @@ shows raw JSON: a notice says nothing ran, with Show text and Try again. Reply a
 (all or nothing; unknown tools, prose between calls, truncated calls and more than eight calls run none). 15 new tests; the replacement of raw JSON was seen on screen; the live line was **not** seen on screen because the local model
 used here (qwen2.5-coder:7b) invented an `echo` tool and so ran nothing. Still to do from this section: Codex-style "Worked for X" option, file-name chips that open the editor, code-block Copy, per-burst sentence-lines between the assistant's sentences
 (needs per-round text stored with the reply), the round-limit setting, and the full chat audit.
+
+## 7. Owner todo, added 2026-11-10 (layout and chrome; do after the current chat work)
+
+1. **Sidebar is for projects, sessions and pins, plus Settings.** The modes (Swarm, Develop, Analyze, Lab, Audit, Browser, Devices, Media, Images, Maps, News) no longer live in the left sidebar. They move to the title-bar toolbar
+   as icons, the way Claude Code Desktop does it (the screenshot the owner supplied shows: a session-rail toggle at the left of the title bar, then Terminal ⌘J, changes, browser, devices/simulators, files, and a view-options menu).
+   Each icon opens its surface in the Canvas beside the thread (see section 1), with the existing full-screen mode available from the tab. The sidebar then has room for: pinned threads, projects with their threads under them,
+   running/unread/approval dots, search, new chat, and the account/Settings row at the bottom. The activity registry (`Core/Registry`) stays the source of truth: toolbar icons, palette entries and shortcuts come from descriptors, with a flag for which icons are shown by default.
+2. **Swarm folds into chat.** There is no separate Swarm screen. Options to decide and prototype: (a) a **Team toggle** in the composer (the goal becomes a team run, the thread shows the Team card with live workers),
+   (b) a **tool and command for the agent** (`/swarm <goal>` and the existing `swarm_*` tools, so the agent itself decides to fan out and the user can ask for it), (c) both. Recommended: (c). The Team card, per-worker transcripts in the Canvas, approvals inbox and cost per worker are in section 1.
+3. **Native macOS chrome.** A real toolbar (SwiftUI `.toolbar` / `NSToolbar`, customisable, with the icon row above), a complete menu bar (File, Edit, View, Go, Thread, Window, Help with the standard commands and shortcuts,
+   including every palette command), **tooltips on every icon and control**, a **Help** menu and in-app help (search field in the Help menu, a Help window with the documentation rendered from `docs/` and the wiki sources, keyboard shortcuts sheet, "What's new"),
+   an **About** panel (it exists inside Settings; make it the standard About Kiln panel with version, licence, notices), links to documentation and support, and accessibility labels to match. Check each against the macOS Human Interface Guidelines.
