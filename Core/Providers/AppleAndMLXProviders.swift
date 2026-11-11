@@ -56,6 +56,9 @@ public struct AppleFoundationProvider: ModelProvider {
         _ request: ChatRequest,
         reasoning: ReasoningConfig?
     ) async throws -> AsyncThrowingStream<ChatChunk, Error> {
+        guard request.messages.allSatisfy({ $0.images.isEmpty }) else {
+            throw ProviderError.engineUnavailable("Image input is not yet supported by Apple Foundation Models in Kiln.")
+        }
         guard #available(macOS 26.0, *) else {
             throw ProviderError.engineUnavailable("Apple Foundation Models require macOS 26.0 or later.")
         }
@@ -138,6 +141,9 @@ public struct ApplePrivateCloudProvider: ModelProvider {
     }
 
     public func streamChat(_ request: ChatRequest, reasoning: ReasoningConfig?) async throws -> AsyncThrowingStream<ChatChunk, Error> {
+        guard request.messages.allSatisfy({ $0.images.isEmpty }) else {
+            throw ProviderError.engineUnavailable("Image input is not yet supported by Apple Private Cloud Compute in Kiln.")
+        }
         #if compiler(>=6.4)
         guard #available(macOS 27.0, *) else { throw ProviderError.engineUnavailable("Private Cloud Compute requires macOS 27 or later.") }
         let model = PrivateCloudComputeLanguageModel()
@@ -220,6 +226,9 @@ public struct MLXProvider: ModelProvider {
         _ request: ChatRequest,
         reasoning: ReasoningConfig?
     ) async throws -> AsyncThrowingStream<ChatChunk, Error> {
+        guard request.messages.allSatisfy({ $0.images.isEmpty }) else {
+            throw ProviderError.engineUnavailable("Image input is not yet supported by the MLX chat engine in Kiln.")
+        }
         let current = store()
         // The registry hands over the bare repo id ("org/repo").
         guard let model = await current.installedOffPool().last(where: { $0.repoID == request.model && $0.isLanguageModel }) else {

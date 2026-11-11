@@ -57,6 +57,13 @@ public enum OpenAICompatibleTransport {
                     "role": ProviderJSON(message.role.rawValue),
                     "content": ProviderJSON(message.content),
                 ]
+                if !message.images.isEmpty {
+                    var parts: [ProviderJSON] = [ProviderJSON(["type": ProviderJSON("text"), "text": ProviderJSON(message.content)])]
+                    parts += message.images.map { image in
+                        ProviderJSON(["type": ProviderJSON("image_url"), "image_url": ProviderJSON(["url": ProviderJSON("data:\(image.mimeType);base64,\(image.data.base64EncodedString())")])])
+                    }
+                    value["content"] = ProviderJSON(parts)
+                }
                 if !message.toolCalls.isEmpty {
                     value["tool_calls"] = ProviderJSON(message.toolCalls.map { call in
                         ProviderJSON([

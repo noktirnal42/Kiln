@@ -100,6 +100,9 @@ public struct OpenCodeProvider: ModelProvider {
                     "role": ProviderJSON(message.role.rawValue),
                     "content": ProviderJSON(message.content),
                 ]
+                if !message.images.isEmpty {
+                    value["images"] = ProviderJSON(message.images.map { ProviderJSON($0.data.base64EncodedString()) })
+                }
                 if !message.toolCalls.isEmpty {
                     value["tool_calls"] = ProviderJSON(message.toolCalls.map { call in
                         var function: [String: ProviderJSON] = [
