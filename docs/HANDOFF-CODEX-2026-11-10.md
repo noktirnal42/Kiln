@@ -56,3 +56,9 @@ Details and acceptance notes are in doc 30; this is the order I would work in.
 ## Not verified on screen (be honest about it)
 
 Task-list card, live status line, Shift+Return in the running app, drop of a file onto the composer, Develop and Analyze debugger UIs, a booted device with real touch, Maps and News (yours), light mode beyond Browser and Analyze.
+
+
+## Update 2026-11-11
+
+- Local model audit and capability detection: see `docs/32-LOCAL-MODELS.md` and the last section of `docs/LEFTOVERS-2026-11-10.md`. `Scripts/test-ollama-tools.sh <model>` checks structured tool calling.
+- Blocked: the external model drive is full (pulls fail), and GUI verification of the live status line and task card is pending an unlocked screen.

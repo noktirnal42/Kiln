@@ -137,3 +137,10 @@ behind `DeviceService.Input` that prefers `idb ui tap/swipe/text` when `idb_comp
   the local 7B model wrote a `todos.txt` file instead of calling the tool, Ollama Cloud answered "payment required", and `gemma4:e4b` was too slow to finish. A line in the agent prompt now says to use the tool.
 - The model picker hides recents that no provider offers (a leaked `stub-m1` kept appearing there; something outside this checkout's tests still writes it into the real `chat.recentModels`).
 - Owner todo for the next session: see `docs/30-CHAT-MAPS-LAYOUT-PLAN.md` section 6 (chat display and tool calls, round limit, Shift+Return, full chat audit).
+
+## Local models and capability detection (2026-11-11)
+
+- Kiln now asks Ollama `/api/show` for each local model's capabilities (tools, vision, thinking) and trained context instead of guessing from the name; the shown window is `min(trained, 8192)` because Kiln runs local models at `num_ctx` 8192. Unit tests pass; full suite green (934 tests).
+- `huihui_ai/qwen3.5-abliterated:9b` is installed and makes real structured tool calls (checked with `Scripts/test-ollama-tools.sh`).
+- **Not done:** security models (`foundation-sec-abliterated:8b`, `baronllm-abliterated:8b`) could not be pulled, the external model drive is full (1.6 GB free). Owner decides which old models to remove; the audit and commands are in `docs/32-LOCAL-MODELS.md`.
+- **Not seen on screen:** the live status line, the task-list card and the new model in the picker; the screen was locked during the last session, so screenshots failed. Re-check once the screen is unlocked (select the qwen3.5 model, run a multi-tool task).

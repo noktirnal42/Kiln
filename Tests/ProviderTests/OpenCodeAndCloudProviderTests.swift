@@ -16,8 +16,42 @@ struct OpenCodeProviderTests {
         let qwen = try #require(models.first { $0.name == "qwen3:8b" })
         #expect(qwen.supportsTools)
         #expect(qwen.supportsReasoning)
-        #expect(qwen.contextWindow == 32768)
+        #expect(qwen.contextWindow == 8192, "a local model's window is what Kiln asks Ollama to run with, not the trained maximum")
         #expect(qwen.isOnDevice)
+    }
+
+    @Test func localModelsAreDescribedByWhatOllamaReportsNotByTheirName() async throws {
+        MockURLProtocol.reset()
+        defer { MockURLProtocol.reset() }
+        MockURLProtocol.route("/api/tags", json: #"{"models":[{"name":"gemma4:e4b"}]}"#)
+        // A family the name lists have never heard of; /api/show is the source of truth.
+        MockURLProtocol.route("/api/show", json: #"{"capabilities":["completion","vision","tools","thinking"],"model_info":{"gemma4.context_length":131072}}"#)
+        let model = try #require(try await stubbedProvider().fetchModels().first)
+        #expect(model.supportsTools && model.supportsReasoning && model.supportsVision)
+        #expect(model.contextWindow == 8192)
+    }
+
+    @Test func aModelOllamaSaysCannotUseToolsIsNotOfferedThemEvenIfTheNameLooksCapable() async throws {
+        MockURLProtocol.reset()
+        defer { MockURLProtocol.reset() }
+        MockURLProtocol.route("/api/tags", json: #"{"models":[{"name":"qwen3-coder-special:7b"}]}"#)
+        MockURLProtocol.route("/api/show", json: #"{"capabilities":["completion"],"model_info":{"qwen3.context_length":4096}}"#)
+        let model = try #require(try await stubbedProvider().fetchModels().first)
+        #expect(!model.supportsTools)
+        #expect(model.contextWindow == 4096, "a model trained for less than Kiln asks for keeps its own limit")
+    }
+
+    @Test func showAnswersAreParsedWithoutAssumingTheArchitectureName() {
+        let info = OpenCodeProvider.parseShow(Data(#"{"capabilities":["Tools","completion"],"model_info":{"general.parameter_count":1,"llama.context_length":8192}}"#.utf8))
+        #expect(info == .init(capabilities: ["tools", "completion"], trainedContext: 8192))
+        #expect(OpenCodeProvider.parseShow(Data("{}".utf8)) == nil)
+        #expect(OpenCodeProvider.parseShow(Data("not json".utf8)) == nil)
+    }
+
+    @Test func theNameListsStillCoverNewerFamiliesWhenShowIsUnavailable() {
+        for name in ["gemma4:e4b", "devstral-small-2:24b", "glm-4.7-flash", "qwen3.5:9b", "huihui_ai/qwen3.5-abliterated:9b"] {
+            #expect(OpenCodeProvider.supportsTools(modelName: name), "\(name)")
+        }
     }
 
     @Test func fetchModelsFallsBackToOpenAICompatibleCatalog() async throws {

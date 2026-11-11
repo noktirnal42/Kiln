@@ -145,7 +145,7 @@ public struct OpenCodeProvider: ModelProvider {
             "temperature": ProviderJSON(options.temperature ?? request.temperature),
             "top_p": ProviderJSON(options.top_p ?? request.topP),
             "num_predict": ProviderJSON(options.num_predict ?? request.maxTokens),
-            "num_ctx": ProviderJSON(8192),
+            "num_ctx": ProviderJSON(Self.runtimeContextTokens),
         ])
 
         let key = apiKey()
@@ -207,6 +207,40 @@ public struct OpenCodeProvider: ModelProvider {
 
     // MARK: Catalogs
 
+    /// The context Kiln asks a local Ollama model to run with (`num_ctx`). A model's trained maximum (often 128K to 256K) is far larger;
+    /// the window shown and used for compaction is the smaller of the two, so the meter matches what the server really keeps.
+    static let runtimeContextTokens = 8192
+
+    /// What Ollama says about one model: `/api/show` lists its capabilities (completion, tools, thinking, vision) and its trained context.
+    /// Reading this instead of guessing from the name keeps new model families (Qwen3.5 and later, Gemma 4, Devstral, GLM 4.7) working without a code change.
+    struct ShowInfo: Equatable, Sendable {
+        var capabilities: Set<String>
+        var trainedContext: Int?
+    }
+
+    static func parseShow(_ data: Data) -> ShowInfo? {
+        guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+        let capabilities = Set(((object["capabilities"] as? [String]) ?? []).map { $0.lowercased() })
+        var context: Int?
+        if let info = object["model_info"] as? [String: Any] {
+            for (key, value) in info where key.hasSuffix(".context_length") { context = (value as? Int) ?? (value as? NSNumber)?.intValue }
+        }
+        guard !capabilities.isEmpty || context != nil else { return nil }
+        return ShowInfo(capabilities: capabilities, trainedContext: context)
+    }
+
+    private func ollamaShow(_ name: String) async -> ShowInfo? {
+        guard let url = URL(string: "\(baseURL)/api/show") else { return nil }
+        var wire = URLRequest(url: url)
+        wire.httpMethod = "POST"
+        wire.timeoutInterval = 8
+        wire.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        wire.httpBody = try? JSONSerialization.data(withJSONObject: ["model": name])
+        guard let (data, response) = try? await session.data(for: wire),
+              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return nil }
+        return Self.parseShow(data)
+    }
+
     private func fetchOllamaCatalog() async throws -> [ModelDescriptor] {
         guard let url = URL(string: "\(baseURL)/api/tags") else {
             throw ProviderError.missingConfiguration("invalid base URL")
@@ -222,25 +256,39 @@ public struct OpenCodeProvider: ModelProvider {
             throw ProviderError.invalidResponse("Ollama /api/tags returned HTTP \(status)")
         }
         let decoded = try JSONDecoder().decode(OllamaModelsResponse.self, from: data)
-        return decoded.models
+        let entries = decoded.models
             .filter { model in
                 guard scope == .local else { return true }
                 let cloud = model.remoteHost != nil || model.name.hasSuffix(":cloud") || model.name.hasSuffix("-cloud")
                 return !cloud
             }
+        // Local models are asked directly (cheap, same machine). Hosted ones advertise capabilities in the listing already.
+        var shown: [String: ShowInfo] = [:]
+        if scope == .local {
+            await withTaskGroup(of: (String, ShowInfo?).self) { group in
+                for entry in entries { group.addTask { (entry.name, await self.ollamaShow(entry.name)) } }
+                for await (name, info) in group { if let info { shown[name] = info } }
+            }
+        }
+        return entries
             .map { entry in
-                let advertised = Set((entry.capabilities ?? []).map { $0.lowercased() })
-                let supportsReasoning = advertised.contains("thinking") || Self.supportsReasoning(modelName: entry.name)
-                let supportsTools = advertised.contains("tools") || Self.supportsTools(modelName: entry.name)
+                let advertised = Set((entry.capabilities ?? []).map { $0.lowercased() }).union(shown[entry.name]?.capabilities ?? [])
+                let known = shown[entry.name] != nil || !advertised.isEmpty
+                // A model Ollama described is trusted; the name lists are only the fallback for a server that did not say.
+                let supportsReasoning = known ? advertised.contains("thinking") : Self.supportsReasoning(modelName: entry.name)
+                let supportsTools = known ? advertised.contains("tools") : Self.supportsTools(modelName: entry.name)
+                let trained = shown[entry.name]?.trainedContext ?? entry.details?.contextLength
+                let window = scope == .local ? min(trained ?? Self.estimateContextWindow(for: entry.name), Self.runtimeContextTokens)
+                                             : (trained ?? Self.estimateContextWindow(for: entry.name))
                 return ModelDescriptor(
                     id: "\(id)-\(entry.name)",
                     name: entry.name,
                     providerID: id,
                     providerType: providerType,
-                    contextWindow: entry.details?.contextLength ?? Self.estimateContextWindow(for: entry.name),
+                    contextWindow: window,
                     supportsReasoning: supportsReasoning,
                     supportsTools: supportsTools,
-                    supportsVision: entry.name.lowercased().contains("llava") || entry.name.lowercased().contains("vision"),
+                    supportsVision: advertised.contains("vision") || entry.name.lowercased().contains("llava") || entry.name.lowercased().contains("vision"),
                     isOnDevice: scope == .local,
                     tags: scope == .local ? ["local", "ollama"] : ["cloud", "ollama"]
                 )
@@ -336,7 +384,7 @@ public struct OpenCodeProvider: ModelProvider {
 
     static func supportsTools(modelName: String) -> Bool {
         let value = modelName.lowercased()
-        return ["qwen2.5", "qwen3", "llama3.1", "llama-3.1", "llama3.2", "llama-3.2", "llama3.3", "llama-3.3", "mistral-small", "command-r", "granite", "firefunction", "nemotron", "gpt-oss", "glm-4.5", "glm-5.3"]
+        return ["qwen2.5", "qwen3", "llama3.1", "llama-3.1", "llama3.2", "llama-3.2", "llama3.3", "llama-3.3", "mistral-small", "command-r", "granite", "firefunction", "nemotron", "gpt-oss", "glm-4.5", "glm-4.7", "glm-5.3", "gemma4", "gemma-4", "devstral"]
             .contains { value.contains($0) }
     }
 
