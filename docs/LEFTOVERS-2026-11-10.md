@@ -100,3 +100,11 @@ Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the s
 - Another set of leaked test preferences appeared (`kiln.tests.*`, `kiln.news.tests.*`, `kiln.remote.test.*` in `~/Library/Preferences` and the container); the News tests (Codex) do not remove their suites.
 - A blind click on a stale element index pressed Play on a simulator (iPad A16 booted); it was shut down with `simctl shutdown all`.
 - Added: an Appearance control (System, Light, Dark, High Contrast) in Settings; `ThemeManager` existed but nothing used it. The palette's "Settings…" entry now opens the window (it used a selector that did nothing); the menu bar route always worked.
+
+## Test status at the end of the session
+
+Full suite on this branch (`c3bc270` plus Codex's Maps/News work in the tree): **884 tests in 185 suites passed** (82 s, nothing else building).
+The suites still leave preference files behind in `~/Library/Preferences` (246 more appeared in this run: `kiln.tests.*`, `kiln-tests-*`,
+`kiln.news.tests.*`, `kiln.migration.*`); they were deleted again by pattern. The remaining leakers use `UserDefaults(suiteName:)` without
+`removePersistentDomain` (ContextSessionTests, UnifiedShellTests, AppleMLXAndRegistryTests, WorkstationTests/RegistryTests `isolatedDefaults`,
+News tests, BundlePreferencesMigrationTests). A shared test helper that removes the suite in a `defer` would fix them.
