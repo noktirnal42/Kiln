@@ -66,7 +66,39 @@ public final class ChatSession {
     public private(set) var conversationID: UUID?
     public private(set) var conversationTitle: String
     public private(set) var messages: [MessageSnapshot]
-    public private(set) var isStreaming = false
+    public private(set) var isStreaming = false {
+        didSet {
+            // A finished run sends the next queued message, unless the person stopped it (then the queue waits for them).
+            if oldValue, !isStreaming, !queuePaused, errorText == nil, !queuedMessages.isEmpty {
+                Task { [weak self] in await self?.sendNextQueued() }
+            }
+        }
+    }
+
+    // MARK: Composer context (shared by the Agent view and the dock, so both show the same draft state)
+    /// Files, folders and images attached to the next message.
+    public var attachments: [ComposerAttachment] = []
+    /// Messages typed while a run was going, oldest first.
+    public private(set) var queuedMessages: [QueuedMessage] = []
+    /// Set when the person pressed Stop: queued messages stay put until they send one or press Send now.
+    public private(set) var queuePaused = false
+
+    public func attach(_ urls: [URL]) {
+        for url in urls where !attachments.contains(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
+            attachments.append(ComposerAttachment(url: url))
+        }
+    }
+    public func removeAttachment(_ id: UUID) { attachments.removeAll { $0.id == id } }
+    public func removeQueued(_ id: UUID) { queuedMessages.removeAll { $0.id == id } }
+
+    /// Sends the oldest queued message now (when idle) and resumes automatic sending.
+    public func sendNextQueued() async {
+        guard !isStreaming, !queuedMessages.isEmpty else { return }
+        queuePaused = false
+        let next = queuedMessages.removeFirst()
+        attachments = next.attachments
+        await send(next.text)
+    }
     public private(set) var streamingText = ""
     public private(set) var streamingReasoning = ""
     /// How long the last reply took to start and to finish. First-token time is provider latency; the rest is streaming.
@@ -436,6 +468,8 @@ public final class ChatSession {
 
     public func newConversation() async {
         stopStreaming()
+        queuedMessages = []
+        attachments = []
         do {
             let summary = try await conversations.createConversation(title: "New Conversation", modelID: selectedModelID.isEmpty ? nil : selectedModelID)
             conversationID = summary.id
@@ -550,7 +584,14 @@ public final class ChatSession {
 
     public func send(_ text: String) async {
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isStreaming else { return }
+        guard !trimmed.isEmpty else { return }
+        if isStreaming {
+            // Keep typing while the agent works: the message waits its turn instead of being dropped.
+            queuedMessages.append(QueuedMessage(text: trimmed, attachments: attachments))
+            attachments = []
+            return
+        }
+        queuePaused = false
         switch SlashCommands.resolve(trimmed, commands: availableCommands()) {
         case .plainMessage: break
         case .builtIn(let command, let arguments):
@@ -574,12 +615,18 @@ public final class ChatSession {
         guard let conversationID else { return }
         errorText = nil
 
+        let titleSource = trimmed
+        let expansion = ContextExpander.expand(prompt: trimmed, attachments: attachments, workspaceRoot: workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) })
+        attachments = []
+        if !expansion.skipped.isEmpty { agentNotice = "Not attached: " + expansion.skipped.joined(separator: "; ") }
+        trimmed = expansion.text
+
         do {
             if let user = try await conversations.appendMessage(conversationID: conversationID, role: .user, content: trimmed) {
                 messages.append(user)
             }
             if conversationTitle == ConversationTitle.placeholder {
-                await renameConversation(to: ConversationTitle.make(from: trimmed))
+                await renameConversation(to: ConversationTitle.make(from: titleSource))
             }
             try await conversations.setConversationModel(conversationID, modelID: selectedModelID.isEmpty ? nil : selectedModelID)
         } catch {
@@ -605,6 +652,7 @@ public final class ChatSession {
     }
 
     public func stopStreaming() {
+        queuePaused = true
         agentStop?.stop()
         streamTask?.cancel()
         streamTask = nil

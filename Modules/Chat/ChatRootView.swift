@@ -146,8 +146,6 @@ struct ChatRootView: View {
 
     private func send() {
         voice.stopSpeaking()
-        // A reply is still running (or still stopping): keep what was typed instead of dropping it unsent.
-        guard !session.isStreaming else { return }
         let text = input
         input = ""
         Task { await session.send(text) }
@@ -195,6 +193,7 @@ struct ComposerView: View {
     @Binding var input: String
     let onSend: () -> Void
     @State private var editorWidth: CGFloat = 0
+    @State private var mentionMatches: [String] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -207,10 +206,45 @@ struct ComposerView: View {
                 CommandCompletionList(matches: completions) { input = "/\($0.name) " }
                     .padding(.top, SSSpacing.xs)
             }
+            if !mentionMatches.isEmpty {
+                MentionList(matches: mentionMatches) { input = MentionParser.completing(input, with: $0) }
+                    .padding(.top, SSSpacing.xs)
+            }
+            ComposerContextRow(session: session)
             composer
+        }
+        .task(id: MentionParser.activeQuery(in: input)) { await refreshMentions() }
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            for provider in providers {
+                _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                    guard let url else { return }
+                    Task { @MainActor in session.attach([url]) }
+                }
+            }
+            return true
         }
         .onChange(of: session.draft) { _, text in takeDraft(text) }
         .onAppear { takeDraft(session.draft) }
+    }
+
+    /// Files matching the `@` being typed, searched off the main thread (a project can have thousands).
+    private func refreshMentions() async {
+        guard let query = MentionParser.activeQuery(in: input), let root = session.workspaceRoot else { mentionMatches = []; return }
+        try? await Task.sleep(for: .milliseconds(120))   // let typing settle
+        if Task.isCancelled { return }
+        let url = URL(fileURLWithPath: root, isDirectory: true)
+        let found = await Task.detached(priority: .userInitiated) { WorkspaceFileSearch.matches(query: query, root: url) }.value
+        if !Task.isCancelled { mentionMatches = found }
+    }
+
+    private func attachFiles() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose files or folders to attach to the next message."
+        panel.prompt = "Attach"
+        if panel.runModal() == .OK { session.attach(panel.urls) }
     }
 
     private var completions: [SlashCommand] {
@@ -275,6 +309,11 @@ struct ComposerView: View {
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: SSSpacing.s) {
+            Button(action: attachFiles) { Image(systemName: "paperclip").font(.title3) }
+                .buttonStyle(.borderless)
+                .help("Attach files or folders (or drop them here). Type @ to reference a project file.")
+                .accessibilityLabel("Attach files")
+                .padding(.bottom, 4)
             TextEditor(text: $input)
                 .font(.system(size: 14))
                 .frame(height: editorHeight)
@@ -288,7 +327,7 @@ struct ComposerView: View {
                             .padding(.vertical, 10)
                             .allowsHitTesting(false)
                     } else if input.isEmpty {
-                        Text("Message…  (@ to reference files, ⏎ to send, ⌘⏎ for a new line)")
+                        Text(session.isStreaming ? "Type to queue the next message…  (⏎ queues it)" : "Message…  (@ to reference files, ⏎ to send, ⌘⏎ for a new line)")
                             .foregroundStyle(.tertiary)
                             .font(SSTypography.caption())
                             .padding(.horizontal, 6)
@@ -297,6 +336,10 @@ struct ComposerView: View {
                     }
                 }
                 .onKeyPress(.tab, phases: .down) { _ in
+                    if let first = mentionMatches.first, MentionParser.activeQuery(in: input) != nil {
+                        input = MentionParser.completing(input, with: first)
+                        return .handled
+                    }
                     guard let first = completions.first else { return .ignored }
                     input = "/\(first.name) "
                     return .handled
@@ -313,6 +356,12 @@ struct ComposerView: View {
             if let voice { voiceControls(voice) }
 
             if session.isStreaming {
+                if !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button(action: onSend) { Image(systemName: "text.append").font(.title2) }
+                        .buttonStyle(.borderless)
+                        .help("Queue this message: it is sent when the agent finishes (⏎)")
+                        .accessibilityLabel("Queue message")
+                }
                 Button { session.stopStreaming() } label: {
                     Image(systemName: "stop.circle.fill").font(.title2)
                 }

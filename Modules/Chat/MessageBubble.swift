@@ -40,9 +40,17 @@ struct MessageBubble: View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack {
                 Spacer(minLength: 60)
-                Text(message.content)
-                    .font(.system(size: 14))
-                    .textSelection(.enabled)
+                let parts = ContextExpander.split(message.content)
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(parts.visible)
+                        .font(.system(size: 14))
+                        .textSelection(.enabled)
+                    if !parts.attached.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(parts.attached, id: \.self) { ComposerChip(symbol: "paperclip", title: $0, tint: SSColor.accent) }
+                        }
+                    }
+                }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 9)
                     .background(Color.primary.opacity(0.08))

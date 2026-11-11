@@ -16,7 +16,8 @@ struct ComposerReturnTests {
         #expect(decide(text: "") == .ignore)
         #expect(decide(text: "  \n \t") == .ignore)
     }
-    @Test("Return while the model is streaming does not send") func streaming() { #expect(decide(streaming: true) == .ignore) }
+    @Test("Return while the model is streaming still sends: the session queues the message") func streaming() { #expect(decide(streaming: true) == .send) }
+    @Test("an empty box does not send while streaming either") func emptyWhileStreaming() { #expect(decide(text: " ", streaming: true) == .ignore) }
     @Test("line-break shortcuts still work while streaming and when the box is empty") func newlineAlways() {
         #expect(decide(.shift, text: "", streaming: true) == .newline)
     }

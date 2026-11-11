@@ -91,7 +91,6 @@ struct AgentDockView: View {
     }
 
     private func send() {
-        guard !session.isStreaming else { return }   // keep the draft while a reply is still running
         let text = input
         input = ""
         Task { await session.send(text) }

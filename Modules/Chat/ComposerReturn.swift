@@ -14,8 +14,9 @@ enum ComposerReturn: Equatable {
     nonisolated static func decide(modifiers: EventModifiers, text: String, isStreaming: Bool, hasMarkedText: Bool) -> ComposerReturn {
         if hasMarkedText { return .passThrough }
         if !modifiers.isDisjoint(with: [.command, .shift, .option]) { return .newline }
+        // While a run is going Return still sends: the session queues the message and sends it when the run ends.
         let ready = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        return ready && !isStreaming ? .send : .ignore
+        return ready ? .send : .ignore
     }
 
     /// Whether the focused text view is mid-composition (Japanese, Chinese, Korean input, dead keys).
