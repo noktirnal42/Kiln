@@ -34,6 +34,7 @@ These activities exist only in the development branch and are not in a published
 - **Contacts:** read-only. Kiln never creates, edits or deletes contacts.
 - **Calendar and Reminders:** read, and add an event or reminder after approval. Nothing is edited or deleted.
 - **Messages:** reading your conversations needs Full Disk Access for Kiln (macOS has no lighter permission for this), and sending needs Automation permission to control the Messages app. Apple documents no supported interface for either, so a macOS update can break them. Nothing is uploaded.
+- **Notes:** reads and adds notes by asking the Notes app, which needs Automation permission for Notes. Kiln never edits or deletes notes and cannot read locked ones.
 - **GitHub:** read-only, through the `gh` sign-in already on your Mac. Kiln never sees the token.
 - **Untrusted text:** mail, texts, calendar entries and GitHub text come from other people. Kiln labels them untrusted for agents, and sending or creating anything still needs your approval.
 

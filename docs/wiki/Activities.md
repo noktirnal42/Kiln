@@ -60,7 +60,7 @@ Not an activity, but part of the Agent: dictation, spoken replies and a hands-fr
 
 ## Mail, Contacts, Messages, Calendar and GitHub (in development)
 
-Seven more activities exist in the development branch. None is in a published release, and none has been tried against a real account yet.
+Eight more activities exist in the development branch. None is in a published release, and none has been tried against a real account yet.
 
 - **Mail:** add an account with your name, address and password. Kiln finds the servers (built-in settings, the Thunderbird configuration database, the domain's own autoconfig file, then common names) and proves the sign-in before saving. Then read, reply and compose. Gmail, iCloud and Yahoo need an app-specific password. **Limits:** no browser sign-in, so Outlook.com and Microsoft 365 are not supported; no STARTTLS-only providers; no offline cache, search or folder actions.
 - **Contacts:** a read-only lookup that also completes addresses in Mail and numbers for texts. **Limits:** tested with a fake contact list; needs your macOS permission.
@@ -68,6 +68,7 @@ Seven more activities exist in the development branch. None is in a published re
 - **Calendar:** the next 7 days of events and open reminders; agents can add an event or reminder after approval. **Limits:** EventKit has not been exercised against real data; no edit or delete.
 - **Research:** a library of sources with notes and tags, citations in APA, MLA and BibTeX, DOI lookup through Crossref (only the DOI is sent), and a PDF reader that highlights text and saves a new annotated copy (the original is never changed). Agents can read and search PDFs in the project. **Limits:** scanned PDFs have no selectable text and there is no OCR; locked PDFs are refused.
 - **Cloud Drives:** browse and search the names of the iCloud Drive, Google Drive, Dropbox and OneDrive folders that the providers' own apps sync to this Mac, read text files, and copy files into the project or save a project file into a drive (with approval). Kiln never signs in to a cloud service and never handles a token. **Limits:** online-only files must be downloaded in Finder first; search matches names, not contents; Google Docs and Sheets are only link files on disk; macOS may ask for access to the folders.
+- **Notes:** recent notes, search, read, and add a new note in Apple Notes by asking the Notes app (macOS asks once for Automation permission). **Limits:** Apple documents no data API for Notes, so this can change with macOS updates; Kiln only creates notes and never edits or deletes; password-locked notes cannot be read; attachments and checklists are not read.
 - **GitHub:** pull requests, CI runs and issues for the open project, read-only, through the `gh` sign-in on your Mac. **Limits:** no comments, reviews or merges.
 
 All five have agent and MCP tools; see [[MCP Server and Tools]] and the permissions in [[Security and Privacy]]. Shortcuts can open any activity or put a question in the message box ("Ask Kiln").
