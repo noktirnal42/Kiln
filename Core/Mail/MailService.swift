@@ -56,6 +56,14 @@ public struct MailService: Sendable {
         }
     }
 
+    /// One message by UID, without changing its read state.
+    public func message(uid: UInt32, in mailbox: String = "INBOX") async throws -> Summary? {
+        try await withClient { client in
+            _ = try await client.select(mailbox)
+            return try await client.fetch(uids: [uid]).first.map { Summary(uid: $0.uid, flags: $0.flags, message: MIMEParser.parse($0.raw)) }
+        }
+    }
+
     public func threads(in mailbox: String = "INBOX", limit: Int = 25) async throws -> [MailThreading.Thread] {
         MailThreading.threads(try await recent(in: mailbox, limit: limit).map(\.message))
     }

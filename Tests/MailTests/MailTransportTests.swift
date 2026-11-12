@@ -205,3 +205,47 @@ struct MailTransportTests {
         #expect(SMTPClient.dotStuffed(Data(".a\r\nb".utf8)) == Data("..a\r\nb\r\n.\r\n".utf8))
     }
 }
+
+@Suite("Mail tools", .serialized)
+struct MailToolTests {
+    private func context() -> ToolExecutionContext { ToolExecutionContext(workspaceRoot: nil, conversationID: UUID()) }
+
+    @Test func specsGateSendingBehindAdminApprovalAndReadingBehindTheNetworkTier() {
+        let store = MailAccountStore(defaults: TestDefaults.suite("kiln.test.mailtools") ?? .standard)
+        let specs = Dictionary(uniqueKeysWithValues: MailTool.Kind.allCases.map { ($0, MailTool(kind: $0, store: store).spec) })
+        #expect(specs[.send]?.permission == .admin && specs[.send]?.isDestructive == true)
+        #expect(specs[.accounts]?.permission == .read)
+        #expect(specs[.read]?.permission == .execute && specs[.recent]?.permission == .execute)
+        #expect(specs.values.allSatisfy { $0.name.hasPrefix("mail_") })
+    }
+
+    @Test func accountsListNeverShowsPasswords() async throws {
+        let defaults = try #require(TestDefaults.suite("kiln.test.mailtools2"))
+        defaults.removePersistentDomain(forName: "kiln.test.mailtools2")
+        let store = MailAccountStore(defaults: defaults)
+        let tool = MailTool(kind: .accounts, store: store)
+        #expect(try await tool.execute(argumentsJSON: "{}", context: context()).contains("No email accounts"))
+        try store.save(MailAccount(displayName: "A", address: "a@example.com", imapHost: "imap.example.com", smtpHost: "smtp.example.com"), password: nil)
+        let text = try await tool.execute(argumentsJSON: "{}", context: context())
+        #expect(text.contains("a@example.com") && text.contains("imap.example.com:993"))
+        try store.remove(store.accounts()[0])
+    }
+
+    @Test func accountResolutionAndHelpers() throws {
+        let tool = MailTool(kind: .recent, store: MailAccountStore(defaults: TestDefaults.suite("kiln.test.mailtools3") ?? .standard))
+        let a = MailAccount(displayName: "", address: "a@x.com", imapHost: "i", smtpHost: "s"), b = MailAccount(displayName: "", address: "b@x.com", imapHost: "i", smtpHost: "s")
+        #expect(try tool.resolve(nil, in: [a]) == a)
+        #expect(try tool.resolve("B@X.com", in: [a, b]) == b)
+        #expect(throws: (any Error).self) { try tool.resolve(nil, in: [a, b]) }
+        #expect(throws: (any Error).self) { try tool.resolve("c@x.com", in: [a, b]) }
+        #expect(throws: (any Error).self) { try tool.resolve(nil, in: []) }
+        #expect(MailTool.oneLine("a\r\nb") == "a b")
+    }
+
+    @Test func renderedMessagesAreLabelledUntrustedAndTruncated() {
+        var m = MailMessage(); m.from = [MailAddress(email: "x@y.z")]; m.subject = "S"; m.plainText = String(repeating: "a", count: 9000)
+        m.attachments = [MailAttachment(filename: "f.pdf", contentType: "application/pdf", data: Data(count: 10))]
+        let text = MailTool.render(m)
+        #expect(text.hasPrefix(MailTool.untrustedNote) && text.contains("[truncated]") && text.contains("f.pdf (10 bytes)"))
+    }
+}
