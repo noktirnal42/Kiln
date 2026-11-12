@@ -48,7 +48,19 @@ These are planned capabilities, not existing integrations. Build each through a 
 12. **Notification Center and Focus awareness**.
 13. **Menu-bar quick-ask and Share extension**.
 14. **Writing Tools and Services-menu actions**.
-15. **Document, spreadsheet and presentation studio** (largest; after the data sources above exist).
+15. **Weather and radar** (owner request 2026-11-11; see "Weather and radar" below). Placed after the core data sources; it is small once Maps exists, so it can move up if wanted.
+16. **Document, spreadsheet and presentation studio** (largest; after the data sources above exist).
+
+## Weather and radar (requested 2026-11-11)
+
+**Weather: yes.** A Core `Weather` service, a small panel (current conditions, hourly and 7-day forecast, alerts for a place) and agent and MCP tools (`weather_forecast`, `weather_alerts`) that take a place name or coordinates, the same way `maps_*` tools do.
+Candidate sources, none yet verified for current terms or limits: Apple WeatherKit (needs the WeatherKit capability on the Apple developer team; global; counts against a monthly call quota), and the US National Weather Service API (`api.weather.gov`; free, no key, United States only, asks for a descriptive User-Agent and has no SLA).
+Plan: NWS first for US places and alerts (no entitlement work), WeatherKit as the global option once the capability is enabled. Every result shows its source, the time it was issued and, for alerts, the issuing office; stale data says it is stale.
+
+**Weather radar: yes, as an option on the Maps view**, not a separate activity. Maps already draws tile overlays (USGS topo), so radar is another layer in the layer picker with an opacity slider, a play/pause time scrubber over the last couple of hours, a legend (dBZ colours), an attribution line and a visible "updated N minutes ago" stamp. Rules from the existing Maps work apply: show an explicit offline or error state, never a blank layer that looks like "no rain".
+Candidate sources, to verify before building: NOAA/NWS radar mosaics served as WMS or tiles (US coverage, public domain, no key), and RainViewer's public tile feed (global, animated frames, attribution required; check that its current free terms allow this use). Pick one per region and record the choice and the terms in `23-MAPS-AND-NEWS.md`.
+Agent tools: `maps_radar` (show or hide the layer at a place and time; read the latest frame time) and an alerts tool above. Honest limits: radar shows precipitation that is already falling, not a forecast; the layer is only as fresh as the source's last frame; coverage and resolution differ by region; severe-weather decisions belong to official warnings, which the app links to rather than replaces.
+Out of scope for now: lightning, satellite imagery, storm tracks and wind particles. They can follow once the radar layer's frame handling exists.
 
 ## Proposed Maps activity
 
