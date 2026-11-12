@@ -190,8 +190,12 @@ struct MediaToolTests {
 }
 
 @MainActor
+@Suite(.timeLimit(.minutes(2)))
 struct SpeechFileTests {
-    @Test func speechIsSynthesisedToARealAudioFile() async throws {
+    /// Real speech synthesis needs the Mac's audio services. Hosted CI runners do not reliably provide them (the run hung here for
+    /// over an hour), so it runs on a developer's Mac and not under CI, where GitHub sets CI=true.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["CI"] == nil, "needs real audio services; skipped on CI"))
+    func speechIsSynthesisedToARealAudioFile() async throws {
         let root = tempDir(); defer { try? FileManager.default.removeItem(at: root) }
         let module = MediaModule()
         module.gallery = MediaGallery(root: root)
