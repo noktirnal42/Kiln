@@ -60,12 +60,13 @@ Not an activity, but part of the Agent: dictation, spoken replies and a hands-fr
 
 ## Mail, Contacts, Messages, Calendar and GitHub (in development)
 
-Five more activities exist in the development branch. None is in a published release, and none has been tried against a real account yet.
+Six more activities exist in the development branch. None is in a published release, and none has been tried against a real account yet.
 
 - **Mail:** add an account with your name, address and password. Kiln finds the servers (built-in settings, the Thunderbird configuration database, the domain's own autoconfig file, then common names) and proves the sign-in before saving. Then read, reply and compose. Gmail, iCloud and Yahoo need an app-specific password. **Limits:** no browser sign-in, so Outlook.com and Microsoft 365 are not supported; no STARTTLS-only providers; no offline cache, search or folder actions.
 - **Contacts:** a read-only lookup that also completes addresses in Mail and numbers for texts. **Limits:** tested with a fake contact list; needs your macOS permission.
 - **Messages:** your conversations, threads that refresh every few seconds, and sending through the Messages app. **Limits:** needs Full Disk Access to read and Automation permission to send; Apple documents neither, so updates can break it; delivery cannot be confirmed; one recipient per new text; attachments are not sent.
 - **Calendar:** the next 7 days of events and open reminders; agents can add an event or reminder after approval. **Limits:** EventKit has not been exercised against real data; no edit or delete.
+- **Research:** a library of sources with notes and tags, citations in APA, MLA and BibTeX, DOI lookup through Crossref (only the DOI is sent), and a PDF reader that highlights text and saves a new annotated copy (the original is never changed). Agents can read and search PDFs in the project. **Limits:** scanned PDFs have no selectable text and there is no OCR; locked PDFs are refused.
 - **GitHub:** pull requests, CI runs and issues for the open project, read-only, through the `gh` sign-in on your Mac. **Limits:** no comments, reviews or merges.
 
 All five have agent and MCP tools; see [[MCP Server and Tools]] and the permissions in [[Security and Privacy]]. Shortcuts can open any activity or put a question in the message box ("Ask Kiln").
