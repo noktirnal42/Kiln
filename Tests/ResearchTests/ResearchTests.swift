@@ -132,6 +132,10 @@ struct LibraryTests {
         let s = try #require(Crossref.parse(Data(json.utf8)))
         #expect(s.title == "A careful study" && s.authors == ["Lovelace, Ada", "The Group"] && s.year == 1843 && s.venue == "Memoirs" && s.doi == "10.1000/xyz123")
         #expect(Crossref.parse(Data("{}".utf8)) == nil && Crossref.parse(Data("nope".utf8)) == nil)
+        // A 1953 record: personal names in capitals are tidied, initials and organisations are not.
+        let old = #"{"message":{"title":["Structure"],"author":[{"given":"J. D.","family":"WATSON"},{"given":"F. H. C.","family":"CRICK"},{"name":"WORLD HEALTH ORG"}],"issued":{"date-parts":[[1953]]}}}"#
+        #expect(Crossref.parse(Data(old.utf8))?.authors == ["Watson, J. D.", "Crick, F. H. C.", "WORLD HEALTH ORG"])
+        #expect(Crossref.tidyName("McDonald") == "McDonald" && Crossref.tidyName("AB") == "AB" && Crossref.tidyName("de la Cruz") == "de la Cruz")
     }
 
     @Test func libraryAddsDedupesSearchesAndPersists() async throws {

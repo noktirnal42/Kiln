@@ -121,11 +121,19 @@ public enum Crossref {
         return URL(string: "https://api.crossref.org/works/" + encoded)
     }
 
+    /// "WATSON" -> "Watson", "J. D." and mixed-case names are unchanged.
+    static func tidyName(_ name: String) -> String {
+        let letters = name.filter(\.isLetter)
+        guard letters.count > 2, name == name.uppercased(), name != name.lowercased() else { return name }
+        return name.capitalized
+    }
+
     public static func parse(_ data: Data) -> Source? {
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], let m = root["message"] as? [String: Any],
               let title = (m["title"] as? [String])?.first, !title.isEmpty else { return nil }
         let authors = (m["author"] as? [[String: Any]] ?? []).compactMap { a -> String? in
-            let family = a["family"] as? String ?? a["name"] as? String ?? "", given = a["given"] as? String ?? ""
+            // Older records store personal names in capitals ("WATSON"); organisations arrive in "name" and are left alone.
+            let family = (a["family"] as? String).map(tidyName) ?? a["name"] as? String ?? "", given = (a["given"] as? String).map(tidyName) ?? ""
             return family.isEmpty ? nil : (given.isEmpty ? family : "\(family), \(given)")
         }
         let year = ((m["issued"] as? [String: Any])?["date-parts"] as? [[Any]])?.first?.first as? Int
