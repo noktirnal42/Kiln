@@ -71,6 +71,7 @@ public final class BrowserModule: @preconcurrency Module, ModuleDefinition, Modu
         configuration.websiteDataStore = dataStoreOverride ?? WKWebsiteDataStore(forIdentifier: Self.dataStoreIdentifier)
         configuration.preferences.isFraudulentWebsiteWarningEnabled = true
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        BrowserIdentity.apply(to: configuration)
         return configuration
     }()
     /// Scripts run here, so a page cannot replace the functions Kiln uses to read and click it.
