@@ -70,3 +70,17 @@ Apple-silicon speed: MLX 4-bit builds exist for some (for example a community `Q
 5. Re-run this audit every few months: `ollama list`, `ollama.com/huihui_ai`, `ollama.com/library`.
 
 Sources used for the shortlist (blogs and listings, not benchmarks): the `ollama.com/huihui_ai` listing and each model's tags page (sizes, ages), `registry.ollama.ai/library` pages for Qwen 3.5 / 3.6 and Gemma 4, and community guides on abliterated models (Atlas Cloud, DEV Community, bestllmfor.com, insiderllm.com).
+
+## Update 2026-11-12: cleanup and security models installed
+
+The owner approved removing any superseded model. Removed: `qwen3-coder:30b`, `mistral:latest`, `deepseek-coder:1.3b`, `gemma3:4b`, `granite3.3:8b`, `deepseek-r1:8b`, `wissembijaui/qween-coder`,
+`richardyoung/mistral-7b-instruct-v0.3-abliterated`, `jayeshpandit2480/granite4-UNCENSORED`, `SiliconBasedWorld/Qwen2.5-7B-Instruct-1M`. The external drive now has about 40 GB free.
+
+Pulled and tested with `Scripts/test-ollama-tools.sh`:
+
+| Model | Capabilities (Ollama) | Structured tool call | Use |
+|---|---|---|---|
+| `huihui_ai/baronllm-abliterated:8b` | completion, tools | **yes** | Offensive-security agent model |
+| `huihui_ai/foundation-sec-abliterated:8b` | completion only | **no** (empty reply when tools are offered) | Chat and analysis only, not the agent model |
+
+The owner wants more MLX models. Ollama here is 0.40.16; whether it runs MLX builds was not checked. Kiln's MLX provider reads MLX models from the Hugging Face cache; picking and testing an MLX security model is open.
