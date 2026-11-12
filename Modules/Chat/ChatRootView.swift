@@ -67,11 +67,17 @@ struct ChatRootView: View {
             }
             Divider()
             if let error = session.errorText {
-                Text(error)
-                    .font(SSTypography.caption())
-                    .foregroundStyle(SSColor.danger)
-                    .padding(.horizontal, SSSpacing.m)
-                    .padding(.vertical, SSSpacing.xs)
+                HStack(alignment: .firstTextBaseline, spacing: SSSpacing.s) {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 11)).foregroundStyle(SSColor.danger)
+                    Text(error).font(SSTypography.caption()).foregroundStyle(SSColor.danger).textSelection(.enabled)
+                    Spacer(minLength: 0)
+                    Button { session.dismissError() } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)) }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .help("Dismiss").accessibilityLabel("Dismiss this message")
+                }
+                .padding(.horizontal, SSSpacing.m)
+                .padding(.vertical, SSSpacing.xs)
+                .background(SSColor.danger.opacity(0.08))
                 Divider()
             }
             ComposerView(session: session, voice: voice, input: $session.composerText, onSend: send)

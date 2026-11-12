@@ -85,6 +85,18 @@ struct MainWindow: View {
             }
         }
         .onChange(of: workstation.settingsRequests) { _, _ in openSettings() }
+        .onChange(of: app.chatSession?.fileOpenRequest) { _, request in
+            guard let request, let session = app.chatSession else { return }
+            session.fileOpenRequest = nil
+            let root = session.workspaceRoot ?? ""
+            let full = request.path.hasPrefix("/") ? request.path : (root as NSString).appendingPathComponent(request.path)
+            guard FileManager.default.fileExists(atPath: full) else {
+                session.reportError("Could not open \(request.path): the file no longer exists.")
+                return
+            }
+            _ = app.editor.open(URL(fileURLWithPath: full), line: request.line)
+            workstation.select(.develop, app: app)
+        }
         .overlay { paletteOverlay }
         .background { shortcuts }
         .onChange(of: app.requestedActivity, initial: true) { _, activity in

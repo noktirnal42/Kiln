@@ -126,6 +126,8 @@ public final class ChatSession {
     public private(set) var lastTiming: ResponseTiming?
     public private(set) var streamingToolCalls: [ToolCall] = []
     public private(set) var errorText: String?
+    /// Set by a file chip in the thread; the window opens the file in the editor and clears nothing (each request has its own id).
+    public var fileOpenRequest: FileOpenRequest?
     public private(set) var lastUsage: ChatChunk.Usage?
     public private(set) var recentModelIDs: [String] = []
 
@@ -755,6 +757,20 @@ public final class ChatSession {
             return
         }
         await runCompletion()
+    }
+
+    /// Hides the error banner above the message box.
+    public func dismissError() { errorText = nil }
+    public func reportError(_ message: String) { errorText = message }
+
+    /// Edit and resubmit: the conversation goes back to before `messageID` (files are left as they are) and `text` is sent in its place.
+    public func resubmit(_ messageID: UUID, text: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !isStreaming, !trimmed.isEmpty,
+              messages.first(where: { $0.id == messageID })?.role == .user else { return }
+        await rewind(to: messageID, restoreFiles: false)
+        draft = ""
+        await send(trimmed, includeAttachments: false)
     }
 
     public func regenerate() async {
