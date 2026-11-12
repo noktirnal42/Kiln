@@ -19,5 +19,7 @@ enum ActivityCatalog {
         NewsActivity.descriptor,
         MailActivity.descriptor,
         CalendarActivity.descriptor,
+        ContactsActivity.descriptor,
+        MessagesActivity.descriptor,
     ]
 }

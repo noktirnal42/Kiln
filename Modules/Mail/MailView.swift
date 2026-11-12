@@ -262,7 +262,16 @@ struct ComposeSheet: View {
 /// Opens a prefilled text in the Messages app. The person reviews and sends it there; Kiln cannot send, read replies or confirm delivery.
 struct TextMessageSheet: View {
     @Binding var isPresented: Bool
+    var initialTo = ""
+    var body: some View { TextMessageForm(initialTo: initialTo, onClose: { isPresented = false }).frame(width: 500) }
+}
+
+/// The compose form itself, used in a sheet (Mail, Contacts) and as the page of the Messages activity.
+struct TextMessageForm: View {
+    var initialTo = ""
+    var onClose: () -> Void
     @State private var to = ""
+    @State private var seeded = false
     @State private var text = ""
     @State private var suggestions: [(name: String, value: String)] = []
     @State private var note: String?
@@ -299,18 +308,19 @@ struct TextMessageSheet: View {
                 .font(SSTypography.caption()).foregroundStyle(.secondary)
             HStack {
                 Spacer()
-                Button("Close") { isPresented = false }.keyboardShortcut(.cancelAction)
+                Button("Close") { onClose() }.keyboardShortcut(.cancelAction)
                 Button("Open in Messages") {
                     let r = parsed
                     Task {
                         let ok = await SystemMessageComposer().open(recipients: r.valid, body: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: [])
-                        if ok { isPresented = false } else { note = "Messages could not open a compose window. Open the Messages app once and sign in." }
+                        if ok { onClose() } else { note = "Messages could not open a compose window. Open the Messages app once and sign in." }
                     }
                 }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
                     .disabled(parsed.valid.isEmpty || !parsed.invalid.isEmpty || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
-        .padding(SSSpacing.l).frame(width: 500)
+        .padding(SSSpacing.l).frame(maxWidth: 520)
+        .onAppear { if !seeded { seeded = true; if !initialTo.isEmpty { to = initialTo } } }
     }
 
     private func suggest() async {
