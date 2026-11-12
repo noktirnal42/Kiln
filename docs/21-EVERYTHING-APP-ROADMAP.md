@@ -32,6 +32,24 @@ These are planned capabilities, not existing integrations. Build each through a 
 
 **Missing integrations in Kiln today** (none of these exist in `Core` or `Modules`): Calendar and Reminders (EventKit); Contacts (also needed by email address completion); Notes; Files and cloud drives (iCloud Drive, Google Drive, Dropbox); a document, spreadsheet and presentation studio; PDF reading and annotation; a research library with citations; GitHub and issue trackers beyond local git (PRs, CI, issues); Slack and chat-service connectors; Shortcuts and App Intents (so Siri and Shortcuts can call Kiln); Spotlight indexing of conversations and artifacts; Notification Center and Focus awareness; Apple Intelligence Writing Tools and Services-menu actions; Share extension and a menu-bar quick-ask; voice calls and FaceTime hand-off; password-manager hand-off (never storing credentials in chat). Each must follow the parity contract: Core service, GUI, agent and MCP tool, audit record, tests.
 
+**Build order (owner request 2026-11-11, most needed first).** Each item follows the parity contract (Core service, GUI, agent and MCP tool, audit record, tests) and is not "done" until verified against a real account or system.
+
+1. **Email** (above). Slice 1: message model, MIME parsing and composing, threading. Then IMAP/SMTP transport, accounts and Keychain, the mail pane, agent tools.
+2. **Contacts** (Contacts framework): address completion for email and messaging; read-only first, permission shown.
+3. **Apple-compatible messaging**: compose handoff to Messages first; scripting only as an opt-in.
+4. **Calendar and Reminders** (EventKit): agents read the day, propose events and tasks; writes need approval.
+5. **GitHub PRs, CI and issues** (beyond local git): the PR and CI flow the chat parity table already lists.
+6. **Shortcuts and App Intents**: Kiln actions callable from Shortcuts and Siri.
+7. **Spotlight indexing** of conversations and artifacts.
+8. **PDF annotation and a research library with citations**.
+9. **Cloud drives** (iCloud Drive first, then Google Drive and Dropbox).
+10. **Notes**.
+11. **Slack and chat connectors**.
+12. **Notification Center and Focus awareness**.
+13. **Menu-bar quick-ask and Share extension**.
+14. **Writing Tools and Services-menu actions**.
+15. **Document, spreadsheet and presentation studio** (largest; after the data sources above exist).
+
 ## Proposed Maps activity
 
 **First release:** native MapKit view with search, coordinate entry, pins, measurement, layer selection and a shareable map extent. Add a USGS current topographic layer, an explicit legend/attribution and a visible offline/error state. Save map state as a project artifact. Provide read-only agent tools to search locations, inspect the viewport and list sources; require approval for downloads, writes and network actions under the existing policy. MapKit supports native maps and tile overlays; the precise service tiling scheme and projection must be verified against the USGS service before implementation. [Apple MapKit](https://developer.apple.com/documentation/mapkit), [Apple overlay documentation](https://developer.apple.com/documentation/mapkit/displaying-overlays-on-a-map?language=objc), [USGS basemap services](https://www.usgs.gov/faqs/what-are-base-map-services-or-urls-used-national-map)
