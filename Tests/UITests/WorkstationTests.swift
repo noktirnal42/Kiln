@@ -140,7 +140,7 @@ struct WorkstationTests {
         #expect(Set(listed.map(\.id)) == Set(all.map(\.id)))
         #expect(listed.count == all.count, "no activity appears twice")
         #expect(sections.first?.title == "Work")
-        #expect(sections.first { $0.title == "Communication" }?.activities.map(\.id) == ["mail", "messages", "contacts", "calendar"])
+        #expect(sections.first { $0.title == "Communication" }?.activities.map(\.id) == ["mail", "messages", "slack", "contacts", "calendar"])
         #expect(sections.first { $0.title == "More" } == nil, "every registered activity has a home section today")
     }
 
@@ -162,6 +162,13 @@ struct WorkstationTests {
         #expect(!jitter, "sub-point jitter is not movement")
         #expect(moved, "a real move selects the row under the pointer")
         #expect(!restingAgain)
+    }
+
+    @Test func recentModelsThatAreNotOfferedNeverShow() {
+        let recents = ["stub-m1", "ollama-qwen3:8b", "ollama-cloud-gemma4:31b", "nvidia-nim-glm"]
+        #expect(ModelPickerRecents.visible(recents, selected: "nvidia-nim-glm", available: ["ollama-qwen3:8b", "nvidia-nim-glm"]) == ["ollama-qwen3:8b", "nvidia-nim-glm"])
+        #expect(ModelPickerRecents.visible(recents, selected: "stub-m1", available: []) == ["stub-m1"], "while loading, only the model in use shows")
+        #expect(ModelPickerRecents.visible([], selected: "x", available: ["x"]).isEmpty)
     }
 
     // MARK: Status

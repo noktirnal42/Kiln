@@ -25,5 +25,6 @@ enum ActivityCatalog {
         ResearchActivity.descriptor,
         DrivesActivity.descriptor,
         NotesActivity.descriptor,
+        SlackActivity.descriptor,
     ]
 }

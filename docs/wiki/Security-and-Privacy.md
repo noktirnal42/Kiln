@@ -26,7 +26,7 @@ Kiln can run commands, edit files, call providers, inspect binaries and serve an
 
 Provider requests send prompts, selected context and tool results to the provider you chose. Local providers (Ollama, MLX, Apple Foundation Models on-device) keep them on the Mac. Kiln itself has no account and no telemetry service described in the repository documents.
 
-## Permissions for mail, contacts, messages, calendar, notes and drives (development builds)
+## Permissions for mail, contacts, messages, Slack, calendar, notes and drives (development builds)
 
 These activities are in the current source and not in the published preview, and none has been tried with real data. Each asks macOS for its own permission, and Kiln does not ask for any of them until you press the matching Allow button.
 
@@ -34,6 +34,7 @@ These activities are in the current source and not in the published preview, and
 - **Contacts:** read-only. Kiln never creates, edits or deletes contacts.
 - **Calendar and Reminders:** read, and add an event or reminder after approval. Nothing is edited or deleted.
 - **Messages:** reading your conversations needs Full Disk Access for Kiln (macOS has no lighter permission for this), and sending needs Automation permission to control the Messages app. Apple documents no supported interface for either, so a macOS update can break them. Nothing is uploaded.
+- **Slack:** a token you paste (a Slack bot or user token) is kept in the macOS Keychain, checked with Slack before it is saved, never shown again and never given to a model; Disconnect forgets it. Kiln posts only after you press Send or approve an agent's exact message, and refuses whole-channel mentions. A user token can read everything you can; a bot token only sees channels it was invited to.
 - **Cloud Drives:** Kiln reads the folders the provider apps already sync to this Mac and never signs in to a cloud service or handles a token. Copies never overwrite, and saving into a drive needs your approval.
 - **Notes:** reads and adds notes by asking the Notes app, which needs Automation permission for Notes. Kiln never edits or deletes notes and cannot read locked ones.
 - **GitHub:** read-only, through the `gh` sign-in already on your Mac. Kiln never sees the token.

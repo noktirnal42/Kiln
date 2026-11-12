@@ -352,11 +352,13 @@ struct ComposerView: View {
             Button("Attach files or folders…", systemImage: "paperclip") { attachFiles() }
             Button("Reference a project file (@)", systemImage: "at") { if !input.hasSuffix("@") { input += (input.isEmpty || input.hasSuffix(" ") ? "" : " ") + "@" } }
             Button("Slash commands (/)", systemImage: "slash.circle") { if input.isEmpty { input = "/" } }
+            Divider()
+            Button(session.memory.totalTokens > 0 ? "Memory files (\(session.memory.totalTokens.formatted()) tokens)…" : "Memory files…", systemImage: "brain") { session.requestedPane = .memory }
         } label: {
             Image(systemName: "plus").font(.system(size: 13, weight: .medium)).frame(width: 26, height: 26)
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Attach files, reference a file with @, or run a slash command. You can also drop files here.")
+        .help("Attach files, reference a file with @, run a slash command, or open the memory files (KILN.md, AGENTS.md, CLAUDE.md). You can also drop files here.")
         .accessibilityLabel("Add to message")
     }
 

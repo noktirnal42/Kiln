@@ -134,9 +134,7 @@ public struct OpenCodeProvider: ModelProvider {
         if options.temperature == nil { options.temperature = request.temperature }
         if options.top_p == nil { options.top_p = request.topP }
         if options.num_predict == nil { options.num_predict = request.maxTokens }
-        if reasoning?.enabled == true {
-            payload["think"] = ProviderJSON(true)
-        }
+        if let think = Self.thinkValue(reasoning) { payload["think"] = think }
         // Without this the model is never told it has tools, and answers that it cannot act.
         if !request.tools.isEmpty {
             payload["tools"] = OpenAICompatibleTransport.toolsJSON(request.tools)
@@ -383,6 +381,14 @@ public struct OpenCodeProvider: ModelProvider {
     public static func strippedModelID(_ id: String, scope: Scope) -> String {
         let prefix = scope == .cloud ? "ollama-cloud-" : "ollama-"
         return id.hasPrefix(prefix) ? String(id.dropFirst(prefix.count)) : id
+    }
+
+    /// What Ollama's `think` gets: a named level (gpt-oss), true, or an explicit false when the person turned thinking off on a model
+    /// that has the switch. A model that cannot think never gets the field (the registry has already switched reasoning off for it).
+    static func thinkValue(_ reasoning: ReasoningConfig?) -> ProviderJSON? {
+        guard let reasoning else { return nil }
+        if reasoning.enabled { return reasoning.level.map { ProviderJSON($0) } ?? ProviderJSON(true) }
+        return reasoning.chosenOff ? ProviderJSON(false) : nil
     }
 
     static func supportsTools(modelName: String) -> Bool {

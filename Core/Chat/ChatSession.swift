@@ -520,6 +520,35 @@ public final class ChatSession {
     public var selectedModelID: String
     public var reasoning: ReasoningConfig = .default
 
+    // MARK: Reasoning options for the selected model
+
+    /// The catalog entry of every model, so the chat can ask what the selected one offers. Filled when the context window is looked up.
+    public private(set) var modelDescriptors: [String: ModelDescriptor] = [:]
+    @ObservationIgnored private var reasoningChoices = ReasoningChoiceStore(defaults: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil)
+    private var reasoningTick = 0
+
+    /// What the selected model lets the person control about its reasoning (unavailable until the catalog has been read).
+    public var reasoningControl: ReasoningControl {
+        modelDescriptors[selectedModelID].map(ReasoningCapability.control(for:)) ?? .unavailable("Choose a model to see its reasoning options.")
+    }
+
+    /// The person's choice for the selected model, checked against what the model offers.
+    public var reasoningSelection: ReasoningSelection? {
+        _ = reasoningTick
+        return ReasoningCapability.normalized(reasoningChoices.selection(forModel: selectedModelID), for: reasoningControl)
+    }
+
+    public func setReasoning(_ selection: ReasoningSelection) {
+        reasoningChoices.set(selection, forModel: selectedModelID)
+        reasoningTick += 1
+    }
+
+    /// The sampling settings with the person's reasoning choice for this model applied. Until the catalog entry is known the settings go as they are.
+    public var effectiveReasoning: ReasoningConfig {
+        guard modelDescriptors[selectedModelID] != nil else { return reasoning }
+        return reasoning.applying(reasoningSelection, control: reasoningControl)
+    }
+
     private var streamTask: Task<Void, Never>?
     private let recentsKey = "chat.recentModels"
     private var recentsDefaults: UserDefaults?
@@ -825,7 +854,7 @@ public final class ChatSession {
             topP: reasoning.topP,
             tools: []
         )
-        let reasoning = reasoning
+        let reasoning = effectiveReasoning
         let store = conversations
 
         let startedAt = Date()
@@ -963,7 +992,7 @@ public final class ChatSession {
         agentNotice = nil
         let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
         let registry = registry
-        let reasoning = reasoning
+        let reasoning = effectiveReasoning
         let store = conversations
         let model = selectedModelID
         let hooks = HookRunner.load(workspaceRoot: root, home: memoryHome)
@@ -1140,6 +1169,7 @@ public final class ChatSession {
         let models = await registry.allModels()
         for model in models {
             windowCache[model.id] = model.contextWindow
+            modelDescriptors[model.id] = model
             modelMeta[model.id] = (model.providerID, model.isOnDevice || [.ollama, .mlx, .appleFoundation, .applePCC].contains(model.providerType))
         }
         return windowCache[modelID]
@@ -1182,7 +1212,7 @@ public final class ChatSession {
         var profile2 = effectiveProfile(profile)
         profile2.modelID = selectedModelID
         let history = Self.agentHistory(messages: messages, upTo: messages.count, compaction: compactions[conversationID])
-        let registry = registry, reasoning = reasoning
+        let registry = registry, reasoning = effectiveReasoning
         let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
         let outcome = await orchestrator.compact(
             profile: profile2, history: history, contextWindow: window, workspaceRoot: root,

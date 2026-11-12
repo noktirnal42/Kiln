@@ -29,6 +29,10 @@ The composer's **Permissions** menu:
 
 A mode answers once: it never creates a standing grant, never answers a monitor hold, and resets to Ask whenever Kiln launches. Each decision is written to `approvals.jsonl` with how it was given (`mouse`, `keyboard`, `programmatic`, `remote`, `auto-mode`, `bypass-mode`) and how long it waited; mode changes go to the audit chain. These modes are separate from macOS permissions such as Accessibility or the microphone, which they cannot grant.
 
+## Reasoning options
+
+The brain button next to the context meter lists the reasoning options the selected model actually offers: an on/off switch for most Ollama thinking models, named levels where a model has them (low, medium and high for gpt-oss and for OpenRouter reasoning models, low, high and max for NVIDIA GLM 5.3). A model with no options shows the button greyed out, and its tooltip says why. The choice is remembered per model. The memory files (KILN.md, AGENTS.md, CLAUDE.md) are in the composer's **+** menu, and `/memory` still opens them. Request bodies are unit-tested; no live API has been sent a chosen level yet.
+
 ## Context management
 
 Before each model call, if the estimate passes 70% of the window (minus output and tool-schema size), older tool results become short stubs (newest four kept); if still over, the older part is summarised by the model; if that fails, the oldest part is dropped with a note. The composer has a context meter, a compact button and `/compact`. Tool calls from earlier turns are not replayed to the model, only the summary and text.
