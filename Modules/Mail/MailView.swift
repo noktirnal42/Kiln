@@ -142,12 +142,31 @@ struct ComposeSheet: View {
     let close: () -> Void
     @State private var to = ""
     @State private var cc = ""
+    @State private var suggestions: [ContactEntry] = []
+    @State private var contactsAccess = ContactsService().access
+    private let contacts = ContactsService()
 
     var body: some View {
         VStack(alignment: .leading, spacing: SSSpacing.s) {
             Text("New message").font(SSTypography.title())
             Text("From \(draft.from.display)").font(SSTypography.caption()).foregroundStyle(.secondary)
             TextField("To (comma separated)", text: $to)
+                .task(id: to) { await suggest(for: to) }
+            if contactsAccess == .notDetermined {
+                Button("Allow Contacts to complete addresses") { Task { contactsAccess = await contacts.ensureAccess() } }.controlSize(.small).buttonStyle(.link)
+            }
+            if !suggestions.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(suggestions.flatMap { c in c.emails.map { (c, $0) } }.prefix(8), id: \.1) { c, email in
+                            Button { accept(email) } label: {
+                                Text(c.name.isEmpty ? email : "\(c.name) · \(email)").font(.system(size: 11.5)).lineLimit(1)
+                                    .padding(.horizontal, 8).padding(.vertical, 3).background(SSColor.surfaceRaised, in: Capsule())
+                            }.buttonStyle(.plain).accessibilityLabel("Add \(email)")
+                        }
+                    }
+                }
+            }
             TextField("Cc", text: $cc)
             TextField("Subject", text: $draft.subject)
             TextEditor(text: $draft.body).font(.system(size: 13)).frame(minHeight: 180)
@@ -166,6 +185,22 @@ struct ComposeSheet: View {
         }
         .textFieldStyle(.roundedBorder).padding(SSSpacing.l).frame(width: 520)
         .onAppear { to = draft.to.map(\.email).joined(separator: ", "); cc = draft.cc.map(\.email).joined(separator: ", ") }
+    }
+
+    /// The part of the To field after the last comma is the address being typed.
+    private func suggest(for text: String) async {
+        let token = text.split(separator: ",", omittingEmptySubsequences: false).last.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        guard token.count >= 2, !token.contains("@") || token.count >= 3, contacts.access.isAuthorized else { suggestions = []; return }
+        try? await Task.sleep(for: .milliseconds(200))
+        guard !Task.isCancelled else { return }
+        suggestions = (try? await contacts.search(token, limit: 5)) ?? []
+    }
+
+    private func accept(_ email: String) {
+        var parts = to.split(separator: ",", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        if parts.isEmpty { parts = [email] } else { parts[parts.count - 1] = email }
+        to = parts.joined(separator: ", ") + ", "
+        suggestions = []
     }
 
     private var recipientsSummary: String {

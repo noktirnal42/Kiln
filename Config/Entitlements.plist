@@ -11,5 +11,8 @@
 	<!-- Location is requested only from the Maps activity and remains subject to macOS authorization. -->
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
+	<!-- Contacts are read (never written) for address lookup in Mail and by approved agents; still subject to macOS authorization. -->
+	<key>com.apple.security.personal-information.addressbook</key>
+	<true/>
 </dict>
 </plist>

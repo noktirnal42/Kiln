@@ -35,7 +35,7 @@ These are planned capabilities, not existing integrations. Build each through a 
 **Build order (owner request 2026-11-11, most needed first).** Each item follows the parity contract (Core service, GUI, agent and MCP tool, audit record, tests) and is not "done" until verified against a real account or system.
 
 1. **Email** (above). Slice 1: message model, MIME parsing and composing, threading. Then IMAP/SMTP transport, accounts and Keychain, the mail pane, agent tools.
-2. **Contacts** (Contacts framework): address completion for email and messaging; read-only first, permission shown.
+2. **Contacts** (Contacts framework): address completion for email and messaging; read-only first, permission shown. *Status 2026-11-11 (branch `codex/kiln-mail`): `Core/Contacts` service with ranked search, `contacts_status` and `contacts_search` tools, completion chips in the Mail compose sheet, the addressbook entitlement and usage text; tested with a fake source only. Not yet run against the real Contacts database or seen on screen (needs a signed build with the entitlement).*
 3. **Apple-compatible messaging**: compose handoff to Messages first; scripting only as an opt-in.
 4. **Calendar and Reminders** (EventKit): agents read the day, propose events and tasks; writes need approval.
 5. **GitHub PRs, CI and issues** (beyond local git): the PR and CI flow the chat parity table already lists.

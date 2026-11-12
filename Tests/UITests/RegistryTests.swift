@@ -38,7 +38,7 @@ struct ActivityRegistryTests {
 
     @Test func policyPrefixesComeFromTheRegistryAndMatchTheOldList() {
         #expect(Set(ExecutionPolicy.moduleToolPrefixes) ==
-                ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_", "ide_", "image_", "maps_", "news_", "mail_"])
+                ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_", "ide_", "image_", "maps_", "news_", "mail_", "contacts_"])
         #expect(ExecutionPolicy.isModuleTool("media_open") && !ExecutionPolicy.isModuleTool("read_file"))
     }
 
