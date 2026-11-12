@@ -140,7 +140,7 @@ struct WorkstationTests {
         #expect(Set(listed.map(\.id)) == Set(all.map(\.id)))
         #expect(listed.count == all.count, "no activity appears twice")
         #expect(sections.first?.title == "Work")
-        #expect(sections.first { $0.title == "Communication" }?.activities.map(\.id) == ["mail", "messages", "contacts", "calendar"])
+        #expect(sections.first { $0.title == "Communication" }?.activities.map(\.id) == ["mail", "messages", "slack", "contacts", "calendar"])
         #expect(sections.first { $0.title == "More" } == nil, "every registered activity has a home section today")
     }
 
