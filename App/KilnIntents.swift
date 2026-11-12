@@ -1,14 +1,14 @@
 import AppIntents
 
 enum KilnDestination: String, AppEnum {
-    case home, agent, swarm, develop, analyze, lab, audit, browser, devices, media, images, maps, news, mail, calendar, contacts, messages, github
+    case home, agent, swarm, develop, analyze, lab, audit, browser, devices, media, images, maps, news, mail, calendar, contacts, messages, github, research
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Kiln Activity"
     static let caseDisplayRepresentations: [KilnDestination: DisplayRepresentation] = [
         .home: "Home", .agent: "Agent", .swarm: "Swarm", .develop: "Develop",
         .analyze: "Analyze", .lab: "Lab", .audit: "Audit", .browser: "Browser",
         .devices: "Devices", .media: "Media", .images: "Images", .maps: "Maps", .news: "News",
-        .mail: "Mail", .calendar: "Calendar", .contacts: "Contacts", .messages: "Messages", .github: "GitHub"
+        .mail: "Mail", .calendar: "Calendar", .contacts: "Contacts", .messages: "Messages", .github: "GitHub", .research: "Research"
     ]
 }
 

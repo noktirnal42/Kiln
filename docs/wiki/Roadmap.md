@@ -11,11 +11,11 @@ The integration branch contains thirteen registered activities, and the developm
 
 ## In development (tested with fakes; not yet verified against real accounts)
 
-Mail, Contacts, Messages, Calendar and Reminders, GitHub pull requests and CI, and Shortcuts for every activity plus "Ask Kiln". See [[Activities]] for their limits and [[Security and Privacy]] for the permissions they need.
+Mail, Contacts, Messages, Calendar and Reminders, GitHub pull requests and CI, PDF annotation with a research library and citations, and Shortcuts for every activity plus "Ask Kiln". See [[Activities]] for their limits and [[Security and Privacy]] for the permissions they need.
 
 ## Planned, in the owner's priority order
 
-Spotlight indexing of conversations and artifacts; PDF annotation and a research library with citations; cloud drives; Notes; Slack and chat connectors; Notification Center and Focus awareness; a menu-bar quick-ask and Share extension; Writing Tools and Services-menu actions; weather and a radar layer on the Maps view (sources and terms still to be verified); a document, spreadsheet and presentation studio. Details are in the [feature roadmap](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
+Spotlight indexing of conversations and artifacts (on its own branch); cloud drives; Notes; Slack and chat connectors; Notification Center and Focus awareness; a menu-bar quick-ask and Share extension; Writing Tools and Services-menu actions; weather and a radar layer on the Maps view (sources and terms still to be verified); a document, spreadsheet and presentation studio. Details are in the [feature roadmap](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
 
 ## Next
 
