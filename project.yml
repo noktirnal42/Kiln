@@ -142,6 +142,31 @@ targets:
         product: KilnRemoteKit
       - package: KilnDiffusion
         product: KilnDiffusion
+      - target: KilnShare
+        embed: true
+
+  KilnShare:
+    # "Ask Kiln" in the Share menu: hands shared text and web addresses to Kiln through a kiln:// link.
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Share
+        excludes:
+          - Share-Info.plist
+          - Share.entitlements
+      - path: Core/QuickAsk/QuickAsk.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kiln.app.Share
+        PRODUCT_NAME: KilnShare
+        MARKETING_VERSION: "0.2.0"
+        CURRENT_PROJECT_VERSION: "3"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Share/Share-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Share/Share.entitlements
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+        "CODE_SIGN_IDENTITY[sdk=macosx*]": "Apple Development"
 
   KilnTests:
     type: bundle.unit-test
