@@ -21,5 +21,6 @@ enum ActivityCatalog {
         CalendarActivity.descriptor,
         ContactsActivity.descriptor,
         MessagesActivity.descriptor,
+        GitHubActivity.descriptor,
     ]
 }
