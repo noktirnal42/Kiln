@@ -55,7 +55,7 @@ struct MessagesTests {
 
     @Test func statusIsHonestAboutLimits() async throws {
         let text = try await MessagesTool(kind: .status, composer: FakeComposer()).execute(argumentsJSON: "{}", context: ctx)
-        #expect(text.contains("cannot read conversations") && text.contains("no public API"))
+        #expect(text.contains("Full Disk Access") && text.contains("no public API") && text.contains("cannot be confirmed"))
         #expect(MessagesTool(kind: .status, composer: FakeComposer()).spec.permission == .read)
     }
 }

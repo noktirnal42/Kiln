@@ -259,7 +259,7 @@ struct ComposeSheet: View {
 }
 
 
-/// Opens a prefilled text in the Messages app. The person reviews and sends it there; Kiln cannot send, read replies or confirm delivery.
+/// Sends a text through the Messages app when the person presses Send.
 struct TextMessageSheet: View {
     @Binding var isPresented: Bool
     var initialTo = ""
@@ -272,6 +272,7 @@ struct TextMessageForm: View {
     var onClose: () -> Void
     @State private var to = ""
     @State private var seeded = false
+    @State private var sending = false
     @State private var text = ""
     @State private var suggestions: [(name: String, value: String)] = []
     @State private var note: String?
@@ -283,7 +284,7 @@ struct TextMessageForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SSSpacing.s) {
             Text("New text message").font(SSTypography.title())
-            TextField("To: phone numbers or Apple ID emails, comma separated", text: $to).textFieldStyle(.roundedBorder)
+            TextField("To: a phone number or Apple ID email", text: $to).textFieldStyle(.roundedBorder)
                 .task(id: to) { await suggest() }
             if contactsAccess == .notDetermined {
                 Button("Allow Contacts to find numbers") { Task { contactsAccess = await contacts.ensureAccess() } }.controlSize(.small).buttonStyle(.link)
@@ -304,19 +305,25 @@ struct TextMessageForm: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SSColor.hairline))
             if !parsed.invalid.isEmpty { Text("Not a phone number or email: \(parsed.invalid.joined(separator: ", "))").font(SSTypography.caption()).foregroundStyle(SSColor.danger) }
             if let note { Text(note).font(SSTypography.caption()).foregroundStyle(.secondary) }
-            Text("Kiln opens this in Messages for you to review and send. It cannot send for you, read replies or confirm delivery.")
+            Text("Sends through the Messages app on this Mac (macOS asks once to let Kiln control Messages). One person per text here; replies appear in the Messages activity. Delivery is not confirmed.")
                 .font(SSTypography.caption()).foregroundStyle(.secondary)
             HStack {
                 Spacer()
                 Button("Close") { onClose() }.keyboardShortcut(.cancelAction)
-                Button("Open in Messages") {
+                Button(sending ? "Sending…" : "Send") {
                     let r = parsed
+                    let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    sending = true
                     Task {
-                        let ok = await SystemMessageComposer().open(recipients: r.valid, body: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: [])
-                        if ok { onClose() } else { note = "Messages could not open a compose window. Open the Messages app once and sign in." }
+                        defer { sending = false }
+                        do {
+                            let handle = r.valid[0].value
+                            try await MessagesService().send(body: message, toHandle: handle, approval: .init(destination: handle, body: message))
+                            onClose()
+                        } catch { note = error.localizedDescription }
                     }
                 }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
-                    .disabled(parsed.valid.isEmpty || !parsed.invalid.isEmpty || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(parsed.valid.count != 1 || !parsed.invalid.isEmpty || sending || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(SSSpacing.l).frame(maxWidth: 520)

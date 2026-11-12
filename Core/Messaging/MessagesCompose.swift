@@ -60,8 +60,9 @@ public struct SystemMessageComposer: MessageComposer {
 /// What Kiln can and cannot do with Messages, in words the app and the agent both use.
 public enum MessagesCapability {
     public static let statement = """
-    Kiln can open a prefilled message in the Messages app for the person to review and send. \
-    It cannot read conversations, see replies, send silently, or confirm delivery: macOS has no public API for any of that. \
+    Kiln reads your Messages history from the local Messages database (needs Full Disk Access) and sends through the Messages app with Automation \
+    (needs your permission once). Apple documents no public API for this, so it may change with macOS updates, and delivery cannot be confirmed. \
+    The compose handoff (messages_compose) just opens a prefilled draft in Messages for you to send yourself. \
     Whether a message goes as iMessage or SMS is decided by Messages (SMS needs an iPhone set up for text forwarding).
     """
 }

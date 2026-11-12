@@ -17,5 +17,8 @@
 	<!-- Calendar and Reminders are read, and events and reminders are added only after approval; never edited or deleted. Still subject to macOS authorization. -->
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
+	<!-- Sending texts drives the Messages app with Apple Events, after the person allows it in Automation settings. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
 </dict>
 </plist>
