@@ -25,7 +25,7 @@ The other twelve have no shortcut and are in the Work menu and the palette: [Ima
 An overview with a *Get started* checklist and a card for each activity, grouped as **Work**, **Communication** and **Files and knowledge**.
 
 ## Agent
-Converse with a model that has tools. The composer has the model picker, an Agent toggle, a profile menu, a Permissions menu (Ask, Auto, Bypass), a context meter and a compact button, and voice controls (dictate, read replies aloud, hands-free conversation). Finished runs collapse to a one-line summary of tool calls; file names in replies are chips that open the editor; you can edit an earlier message and resend it. Kiln has more than 200 tools, so a run starts with the basics and the agent loads the others by asking (`kiln_tool_search`); the thread says how many tools are loaded. See [[Agent and Approvals]].
+Converse with a model that has tools. The composer has the model picker, an Agent toggle, a profile menu, a Permissions menu (Ask, Auto, Bypass), a reasoning control (the brain button, greyed out when the model offers no options), a context meter and a compact button, and voice controls (dictate, read replies aloud, hands-free conversation). Finished runs collapse to a one-line summary of tool calls; file names in replies are chips that open the editor; you can edit an earlier message and resend it. Kiln has more than 200 tools, so a run starts with the basics and the agent loads the others by asking (`kiln_tool_search`); the thread says how many tools are loaded. See [[Agent and Approvals]].
 **Limits:** small local models often fail tool use. On-demand loading was seen working with one hosted model; a model that ignores the search tool will lack the module tools.
 
 ## Swarm

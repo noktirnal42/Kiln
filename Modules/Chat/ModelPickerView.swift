@@ -78,11 +78,10 @@ struct ModelPickerView: View {
         }
     }
 
-    /// Recents whose provider no longer offers the model (a removed key, an unplugged server, a test stub) are hidden
-    /// once the lists have loaded; the model in use always stays.
+    /// Recents whose provider does not offer the model (a removed key, an unplugged server, a test stub) are hidden, also
+    /// while the lists are still loading, so an unavailable name never flashes up; the model in use always stays.
     private var shownRecents: [String] {
-        guard !loading else { return recents }
-        return recents.filter { id in id == session.selectedModelID || models.contains { $0.id == id } }
+        ModelPickerRecents.visible(recents, selected: session.selectedModelID, available: Set(models.map(\.id)))
     }
 
     private var grouped: [String: [ModelDescriptor]] {
@@ -163,17 +162,12 @@ struct ReasoningPanelView: View {
         VStack(spacing: SSSpacing.s) {
             DisclosureGroup(isExpanded: $isExpanded) {
                 VStack(alignment: .leading, spacing: SSSpacing.s) {
-                    Toggle("Reasoning enabled", isOn: $reasoning.enabled)
+                    Text("The reasoning level for the selected model is the brain button in the message bar. It lists only what the model offers.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
 
                     Picker("Budget", selection: $reasoning.budget) {
                         ForEach(ReasoningBudget.allCases, id: \.self) { budget in
                             Text(budget.rawValue).tag(budget)
-                        }
-                    }
-
-                    Picker("Depth", selection: $reasoning.depth) {
-                        ForEach(ReasoningDepth.allCases, id: \.self) { depth in
-                            Text(depth.displayName).tag(depth)
                         }
                     }
 
@@ -220,5 +214,12 @@ extension ReasoningDepth {
         case .deep: return "Deep (6-10 steps)"
         case .exhaustive: return "Exhaustive (10+ steps)"
         }
+    }
+}
+
+enum ModelPickerRecents {
+    /// The recent models that can be picked now, in their saved order, plus the one in use.
+    static func visible(_ recents: [String], selected: String, available: Set<String>) -> [String] {
+        recents.filter { $0 == selected || available.contains($0) }
     }
 }

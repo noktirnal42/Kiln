@@ -32,7 +32,7 @@ feature cannot ship as GUI-only.
 | Skills (`list_skills`, `read_skill`) | partial | Authoring UI, project and user scopes, install from a folder or URL |
 | Slash commands (custom, project-level) | have (built 2026-11-09; unit-tested, not seen in the running app) | Palette (⌘K) entries for custom commands |
 | Hooks (pre/post tool, on stop, on prompt) | have (built 2026-11-09; unit-tested, not seen in the running app) | Hook results shown in the thread |
-| Memory files (`AGENTS.md`, `CLAUDE.md`, `KILN.md`) | have (built 2026-11-09; unit-tested; the pane sits behind the brain button beside the context meter) | `@import` lines, nested per-directory files; the brain button is planned to become the reasoning control and Memory to move (see section 8 of doc 30) |
+| Memory files (`AGENTS.md`, `CLAUDE.md`, `KILN.md`) | have (built 2026-11-09; unit-tested; the pane sits behind the brain button beside the context meter) | `@import` lines, nested per-directory files; the brain button is now the reasoning control and Memory moved to the composer's "+" menu (2026-11-12, see section 8 of doc 30) |
 | Plan mode (read-only exploration, then approve a plan) | have (built 2026-11-09; unit-tested, not seen in the running app) | Plan card polish |
 | Checkpoints and rewind (files and conversation) | have (built 2026-11-09; unit-tested; edit and resend was seen on screen 2026-11-12) | Commands are listed as not undone |
 | Parallel sessions, worktree isolation, background tasks | partial (swarm, remote, a sessions list with fork and resume) | Runs do not continue in the background while another conversation is open; worktree per task |
