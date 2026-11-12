@@ -133,6 +133,23 @@ struct WorkstationTests {
         #expect(CommandRanking.rank(commands, query: "list email").first?.id == "tool", "tool names still rank for their own words")
     }
 
+    @Test func homeGroupsEveryActivityExactlyOnce() {
+        let all = Activity.allCases.filter { $0 != .home }
+        let sections = HomeSections.grouped(all)
+        let listed = sections.flatMap(\.activities)
+        #expect(Set(listed.map(\.id)) == Set(all.map(\.id)))
+        #expect(listed.count == all.count, "no activity appears twice")
+        #expect(sections.first?.title == "Work")
+        #expect(sections.first { $0.title == "Communication" }?.activities.map(\.id) == ["mail", "messages", "contacts", "calendar"])
+        #expect(sections.first { $0.title == "More" } == nil, "every registered activity has a home section today")
+    }
+
+    @Test func anUnlistedActivityStillAppearsUnderMore() {
+        let sections = HomeSections.grouped([Activity("mail"), Activity("brand-new")])
+        #expect(sections.map(\.title) == ["Communication", "More"])
+        #expect(sections.last?.activities.map(\.id) == ["brand-new"])
+    }
+
     // MARK: Status
 
     @Test func approvalsOutrankStreamingWhenDecidingTheAgentState() {
