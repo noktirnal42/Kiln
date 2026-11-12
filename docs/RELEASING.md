@@ -42,7 +42,7 @@ gh release create v<version> dist/Kiln-<version>.zip dist/Kiln-<version>.dmg dis
   --title "Kiln <version>" --notes-file release-notes.md
 ```
 
-State in the notes what was and was not verified (see "Not verified" in `docs/11-CURRENT-STATE.md`). `site/support.html` and the README point at the Releases page; v0.1.0 (preview) was published on 2026-11-03 from `c41409f` (notes in `docs/releases/v0.1.0.md`) and v0.1.1 the same day from `76eca6a` (notes in `docs/releases/v0.1.1.md`). Bump `MARKETING_VERSION` in `project.yml` before archiving: the script names the artifacts from the built app's version, and `/releases/latest` only follows non-pre-releases, so link the Releases page while the builds are previews. Tag the commit the artifact was built from.
+Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml` for a new release (builds from `main` already say 0.2.0 (3), ahead of the published 0.1.1). State in the notes what was and was not verified (see "Not verified" in `docs/11-CURRENT-STATE.md`). `site/support.html` and the README point at the Releases page; v0.1.0 (preview) was published on 2026-11-03 from `c41409f` (notes in `docs/releases/v0.1.0.md`) and v0.1.1 the same day from `76eca6a` (notes in `docs/releases/v0.1.1.md`). Bump `MARKETING_VERSION` in `project.yml` before archiving: the script names the artifacts from the built app's version, and `/releases/latest` only follows non-pre-releases, so link the Releases page while the builds are previews. Tag the commit the artifact was built from.
 
 ## Updates
 
