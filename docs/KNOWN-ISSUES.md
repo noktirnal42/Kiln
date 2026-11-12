@@ -14,7 +14,7 @@ Mail, Contacts, Messages, Calendar, Notes, Cloud Drives, Research, GitHub, Slack
 
 ## Notifications and Focus are unverified
 
-The notification policy, the coordinator and the tools are tested with fakes; no real notification has been posted from a build, and the Settings card has not been seen. Focus status is optional and a hint at best: Apple requires authorization, and developers report `isFocused` may read "off" while a Focus is on unless the app has the Communication Notifications capability, which Kiln does not have (adding a managed entitlement to a notarized build risks one that will not launch, so it was left out). Kiln cannot read other apps' notifications (macOS offers no API), uses the ordinary interruption level (time-sensitive needs an entitlement), and a notification only opens Kiln: approvals are answered in the app.
+The notification policy, the coordinator and the tools are tested with fakes; no real notification has been posted from a build (the Settings card was seen on screen, with its permission buttons left alone). Focus status is optional and a hint at best: Apple requires authorization, and developers report `isFocused` may read "off" while a Focus is on unless the app has the Communication Notifications capability, which Kiln does not have (adding a managed entitlement to a notarized build risks one that will not launch, so it was left out). Kiln cannot read other apps' notifications (macOS offers no API), uses the ordinary interruption level (time-sensitive needs an entitlement), and a notification only opens Kiln: approvals are answered in the app.
 
 ## Reasoning options are unverified against live APIs
 
