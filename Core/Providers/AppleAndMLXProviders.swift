@@ -114,6 +114,7 @@ public struct ApplePrivateCloudProvider: ModelProvider {
     public init() {}
 
     public func checkAvailability() async -> ProviderAvailability {
+        #if compiler(>=6.4)
         guard #available(macOS 27.0, *) else {
             return .unavailable("Private Cloud Compute requires macOS 27 or later.")
         }
@@ -123,6 +124,9 @@ public struct ApplePrivateCloudProvider: ModelProvider {
         case .unavailable(.systemNotReady): return .unavailable("Private Cloud Compute is not ready. Check Apple Intelligence, network access, and the app's entitlement.")
         case .unavailable: return .unavailable("Private Cloud Compute is unavailable on this Mac.")
         }
+        #else
+        return .unavailable("This build does not include the macOS 27 SDK required for Private Cloud Compute.")
+        #endif
     }
 
     public func fetchModels() async throws -> [ModelDescriptor] {
@@ -134,6 +138,7 @@ public struct ApplePrivateCloudProvider: ModelProvider {
     }
 
     public func streamChat(_ request: ChatRequest, reasoning: ReasoningConfig?) async throws -> AsyncThrowingStream<ChatChunk, Error> {
+        #if compiler(>=6.4)
         guard #available(macOS 27.0, *) else { throw ProviderError.engineUnavailable("Private Cloud Compute requires macOS 27 or later.") }
         let model = PrivateCloudComputeLanguageModel()
         guard model.isAvailable else {
@@ -160,6 +165,9 @@ public struct ApplePrivateCloudProvider: ModelProvider {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+        #else
+        throw ProviderError.engineUnavailable("This build does not include the macOS 27 SDK required for Private Cloud Compute.")
+        #endif
     }
 }
 
@@ -218,12 +226,12 @@ public struct MLXProvider: ModelProvider {
             throw ProviderError.notFound("model '\(request.model)' is not in the model store at \(current.root.path)")
         }
         let engine = MLXEngineCache.shared.engine(for: URL(fileURLWithPath: model.path))
-        guard let prompt = request.messages.last(where: { $0.role == .user })?.content else {
-            throw ProviderError.invalidResponse("no user message to answer")
+        guard !request.messages.isEmpty else { throw ProviderError.invalidResponse("no messages to answer") }
+        let turns = request.messages.map { message in
+            ChatTurn(role: message.role.rawValue, text: message.content, toolCallID: message.metadata["tool_call_id"],
+                     calls: message.toolCalls.map { .init(id: $0.id, name: $0.name, arguments: $0.arguments) })
         }
-        let lastUser = request.messages.lastIndex(where: { $0.role == .user }) ?? request.messages.endIndex
-        let history = request.messages[..<lastUser].map { ChatTurn(role: $0.role.rawValue, text: $0.content) }
-        let stream = engine.streamRespond(prompt: prompt, history: Array(history))
+        let stream = engine.streamConversation(turns)
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {

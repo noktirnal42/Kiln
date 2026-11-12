@@ -46,5 +46,16 @@ struct LiveMLXStoreTests {
         for try await chunk in second { answer += chunk.delta?.content ?? "" }
         print("MLX history reply=\(answer.debugDescription)")
         #expect(answer.lowercased().contains("kiwi"), "history was not used: \(answer)")
+
+        // Agent continuation ends in a tool result, not another user message. The model must see it.
+        let toolReply = try await registry.streamChat(ChatRequest(messages: [
+            ChatMessage(role: .user, content: "What is the secret word returned by the lookup tool?"),
+            ChatMessage(role: .assistant, content: "", toolCalls: [ToolCall(id: "call-1", name: "lookup", arguments: "{}")]),
+            ChatMessage(role: .tool, content: "The secret word is persimmon.", metadata: ["tool_call_id": "call-1", "tool_name": "lookup"]),
+        ], model: "mlx-\(repo)"))
+        var toolAnswer = ""
+        for try await chunk in toolReply { toolAnswer += chunk.delta?.content ?? "" }
+        print("MLX tool-history reply=\(toolAnswer.debugDescription)")
+        #expect(toolAnswer.lowercased().contains("persimmon"), "tool result was not used: \(toolAnswer)")
     }
 }

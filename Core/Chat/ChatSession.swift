@@ -66,7 +66,56 @@ public final class ChatSession {
     public private(set) var conversationID: UUID?
     public private(set) var conversationTitle: String
     public private(set) var messages: [MessageSnapshot]
-    public private(set) var isStreaming = false
+    public private(set) var isStreaming = false {
+        didSet {
+            // A finished run sends the next queued message, unless the person stopped it (then the queue waits for them).
+            if oldValue, !isStreaming, !queuePaused, errorText == nil, !queuedMessages.isEmpty {
+                Task { [weak self] in await self?.sendNextQueued() }
+            }
+        }
+    }
+
+    // MARK: Composer context (shared by the Agent view and the dock, so both show the same draft state)
+    /// Files, folders and images attached to the next message.
+    public var attachments: [ComposerAttachment] = []
+    /// Shared by the centered thread and the compact dock, retained separately for each open conversation.
+    public var composerText = ""
+    private struct ComposerDraft {
+        var text: String
+        var attachments: [ComposerAttachment]
+    }
+    private var composerDrafts: [UUID: ComposerDraft] = [:]
+
+    private func switchComposer(to id: UUID, preserveCurrent: Bool = false) {
+        if let conversationID {
+            composerDrafts[conversationID] = ComposerDraft(text: composerText, attachments: attachments)
+        }
+        guard !preserveCurrent else { return }
+        let saved = composerDrafts[id]
+        composerText = saved?.text ?? ""
+        attachments = saved?.attachments ?? []
+    }
+    /// Messages typed while a run was going, oldest first.
+    public private(set) var queuedMessages: [QueuedMessage] = []
+    /// Set when the person pressed Stop: queued messages stay put until they send one or press Send now.
+    public private(set) var queuePaused = false
+
+    public func attach(_ urls: [URL]) {
+        for url in urls where !attachments.contains(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
+            attachments.append(ComposerAttachment(url: url))
+        }
+    }
+    public func removeAttachment(_ id: UUID) { attachments.removeAll { $0.id == id } }
+    public func removeQueued(_ id: UUID) { queuedMessages.removeAll { $0.id == id } }
+
+    /// Sends the oldest queued message now (when idle) and resumes automatic sending.
+    public func sendNextQueued() async {
+        guard !isStreaming, !queuedMessages.isEmpty else { return }
+        queuePaused = false
+        let next = queuedMessages.removeFirst()
+        attachments = next.attachments
+        await send(next.text)
+    }
     public private(set) var streamingText = ""
     public private(set) var streamingReasoning = ""
     /// How long the last reply took to start and to finish. First-token time is provider latency; the rest is streaming.
@@ -92,6 +141,8 @@ public final class ChatSession {
     /// Tool calls of the current (or last) agent run, in order.
     public private(set) var agentActivity: [ToolCallRecord] = []
     public private(set) var agentRound = 0
+    /// When the current agent run began, for the live "Running swift test · 1m 26s" line.
+    public private(set) var runStartedAt: Date?
     public private(set) var agentNotice: String?
     private var agentStop: AgentStopFlag?
 
@@ -225,6 +276,56 @@ public final class ChatSession {
     public func forkLatest(of id: UUID) async {
         await loadConversation(id)
         if let last = messages.last { await fork(at: last.id) }
+    }
+
+    // MARK: Task list (the agent's kiln_todo_write)
+    public private(set) var todoItems: [TodoItem] = []
+
+    func syncTodos(_ id: UUID) {
+        if id == conversationID { todoItems = TodoBoard.shared.items(for: id) }
+    }
+
+    public func clearTodos() { if let conversationID { TodoBoard.shared.clear(conversationID) } }
+
+    // MARK: Diff of a run
+    /// Bumped after a file is reverted so open diff cards read the files again.
+    public private(set) var diffRevision = 0
+
+    /// What the run started by `messageID` changed, file by file (computed off the main thread).
+    public func runDiff(for messageID: UUID) async -> [RunFileDiff] {
+        guard let store = checkpointStore, let conversationID, let workspaceRoot,
+              let manifest = store.all(conversationID: conversationID).first(where: { $0.messageID == messageID }) else { return [] }
+        let root = URL(fileURLWithPath: workspaceRoot, isDirectory: true)
+        return await Task.detached(priority: .userInitiated) { RunDiff.files(manifest: manifest, store: store, workspaceRoot: root) }.value
+    }
+
+    /// Puts one file of that run back as it was. Says what happened in the notice line; a file changed since is left alone.
+    public func revertFile(_ path: String, in messageID: UUID) async {
+        guard !isStreaming, let store = checkpointStore, let conversationID, let workspaceRoot,
+              let manifest = store.all(conversationID: conversationID).first(where: { $0.messageID == messageID }) else { return }
+        let result = store.revert(file: path, in: manifest, workspaceRoot: URL(fileURLWithPath: workspaceRoot, isDirectory: true))
+        agentNotice = result
+        await platformAudit.record("checkpoint.file_reverted", ["path": .string(path), "result": .string(result)])
+        diffRevision += 1
+    }
+
+    /// Recheck every file at the moment it is restored; the diff may have become stale while the dialog was open.
+    public func revertFiles(_ paths: [String], in messageID: UUID) async {
+        guard !isStreaming, let store = checkpointStore, let conversationID, let workspaceRoot,
+              let manifest = store.all(conversationID: conversationID).first(where: { $0.messageID == messageID }) else { return }
+        let root = URL(fileURLWithPath: workspaceRoot, isDirectory: true)
+        var results: [String] = []
+        for path in paths {
+            guard !isStreaming else {
+                results.append("Stopped undoing changes because a new run started.")
+                break
+            }
+            let result = store.revert(file: path, in: manifest, workspaceRoot: root)
+            results.append(result)
+            await platformAudit.record("checkpoint.file_reverted", ["path": .string(path), "result": .string(result)])
+        }
+        agentNotice = results.joined(separator: " ")
+        diffRevision += 1
     }
 
     // MARK: Checkpoints and rewind
@@ -419,7 +520,9 @@ public final class ChatSession {
            let saved = try? JSONDecoder().decode([UUID: ConversationCompaction].self, from: data) {
             compactions = saved
         }
-        recentsDefaults = UserDefaults.standard
+        // Unit tests switch between stub models; they must not write those into the real app's recent models.
+        TodoBoard.shared.observe { [weak self] id in Task { @MainActor in self?.syncTodos(id) } }
+        recentsDefaults = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? UserDefaults.standard : nil
         recentModelIDs = recentsDefaults?.stringArray(forKey: recentsKey) ?? []
     }
 
@@ -433,10 +536,13 @@ public final class ChatSession {
 
     // MARK: Conversation lifecycle
 
-    public func newConversation() async {
+    public func newConversation(preserveComposer: Bool = false) async {
         stopStreaming()
+        queuedMessages = []
+        todoItems = []
         do {
             let summary = try await conversations.createConversation(title: "New Conversation", modelID: selectedModelID.isEmpty ? nil : selectedModelID)
+            switchComposer(to: summary.id, preserveCurrent: preserveComposer)
             conversationID = summary.id
             conversationTitle = summary.title
             messages = []
@@ -453,7 +559,9 @@ public final class ChatSession {
         do {
             let page = try await conversations.messages(conversationID: id)
             let summaries = try await conversations.conversations()
+            if conversationID != id { switchComposer(to: id) }
             conversationID = id
+            todoItems = TodoBoard.shared.items(for: id)
             conversationTitle = summaries.first { $0.id == id }?.title ?? "Conversation"
             messages = page.messages
             if let model = summaries.first(where: { $0.id == id })?.modelID, !model.isEmpty {
@@ -525,9 +633,12 @@ public final class ChatSession {
         try? await conversations.deleteConversation(id)
         conversationListGeneration += 1
         compactions[id] = nil
+        composerDrafts[id] = nil
         saveCompactions()
         if conversationID == id {
             conversationID = nil
+            composerText = ""
+            attachments = []
             contextNotes = []
             contextUsage = nil
             messages = []
@@ -549,7 +660,14 @@ public final class ChatSession {
 
     public func send(_ text: String) async {
         var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isStreaming else { return }
+        guard !trimmed.isEmpty else { return }
+        if isStreaming {
+            // Keep typing while the agent works: the message waits its turn instead of being dropped.
+            queuedMessages.append(QueuedMessage(text: trimmed, attachments: attachments))
+            attachments = []
+            return
+        }
+        queuePaused = false
         switch SlashCommands.resolve(trimmed, commands: availableCommands()) {
         case .plainMessage: break
         case .builtIn(let command, let arguments):
@@ -567,18 +685,24 @@ public final class ChatSession {
             return
         }
         if conversationID == nil {
-            await newConversation()
+            await newConversation(preserveComposer: true)
             guard conversationID != nil else { return }
         }
         guard let conversationID else { return }
         errorText = nil
+
+        let titleSource = trimmed
+        let expansion = ContextExpander.expand(prompt: trimmed, attachments: attachments, workspaceRoot: workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) })
+        attachments = []
+        if !expansion.skipped.isEmpty { agentNotice = "Not attached: " + expansion.skipped.joined(separator: "; ") }
+        trimmed = expansion.text
 
         do {
             if let user = try await conversations.appendMessage(conversationID: conversationID, role: .user, content: trimmed) {
                 messages.append(user)
             }
             if conversationTitle == ConversationTitle.placeholder {
-                await renameConversation(to: ConversationTitle.make(from: trimmed))
+                await renameConversation(to: ConversationTitle.make(from: titleSource))
             }
             try await conversations.setConversationModel(conversationID, modelID: selectedModelID.isEmpty ? nil : selectedModelID)
         } catch {
@@ -604,6 +728,7 @@ public final class ChatSession {
     }
 
     public func stopStreaming() {
+        queuePaused = true
         agentStop?.stop()
         streamTask?.cancel()
         streamTask = nil
@@ -761,6 +886,7 @@ public final class ChatSession {
         agentStop = stop
         agentActivity = []
         agentRound = 0
+        runStartedAt = Date()
         agentNotice = nil
         let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
         let registry = registry

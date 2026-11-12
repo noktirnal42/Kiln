@@ -20,5 +20,13 @@ enum MapsActivity {
             .tool("maps_set_layer", "Change map layer", .write),
             .tool("maps_search_places", "Search for a place", .execute),
             .tool("maps_search_historical", "Find historical USGS maps", .execute),
+            .tool("maps_bookmark", "Create a named region bookmark", .write),
+            .tool("maps_category_search", "Search for places by category", .execute),
+            .tool("maps_export_gpx", "Export map routes and pins as GPX", .write),
+            .tool("maps_flyover", "Activate 3D flyover view", .execute),
+            .tool("maps_import_gpx", "Import GPX or KML file", .execute),
+            .tool("maps_offline_download", "Download offline map region", .execute),
+            .tool("maps_save_state", "Save current map state as artifact", .write),
+            .tool("maps_transit_routing", "Calculate transit/walking/cycling directions", .execute),
         ], registerTools: { context in MapsTool.register(into: context.registry) })
 }

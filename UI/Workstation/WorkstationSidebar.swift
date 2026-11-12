@@ -5,6 +5,7 @@ import AppKit
 /// tools that share that conversation. It replaces an icon rail whose entries each opened a separate screen.
 struct WorkstationSidebar: View {
     @Bindable var workstation: WorkstationModel
+    var chatVisible = false
     @Environment(AppModel.self) private var app
     @State private var history = ChatHistoryModel()
 
@@ -28,6 +29,7 @@ struct WorkstationSidebar: View {
             header
             VStack(alignment: .leading, spacing: SSSpacing.m) {
                 newChat
+                scheduledTasks
                 ProjectSwitcher()
             }
             .padding(.horizontal, SSSpacing.s)
@@ -38,10 +40,6 @@ struct WorkstationSidebar: View {
                     .padding(.bottom, SSSpacing.m)
             }
             .frame(maxHeight: .infinity, alignment: .top)
-            Divider()
-            tools
-                .padding(.horizontal, SSSpacing.s)
-                .padding(.vertical, SSSpacing.s)
             Divider()
             footer
         }
@@ -78,7 +76,7 @@ struct WorkstationSidebar: View {
     private var newChat: some View {
         Button {
             Task { await app.chatSession?.newConversation() }
-            workstation.select(.agent, app: app)
+            if !chatVisible { workstation.select(.agent, app: app) }
         } label: {
             Label("New chat", systemImage: "square.and.pencil")
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,6 +85,22 @@ struct WorkstationSidebar: View {
         }
         .buttonStyle(.plain)
         .help("Start a new conversation (⌘N)")
+    }
+
+    private var scheduledTasks: some View {
+        Button {
+            workstation.select(.agent, app: app)
+            app.chatSession?.requestedPane = .schedules
+        } label: {
+            Label("Scheduled tasks", systemImage: "calendar.badge.clock")
+                .font(.system(size: 12.5))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, SSSpacing.s).padding(.vertical, 5)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("View and manage scheduled tasks")
+        .disabled(app.chatSession == nil)
     }
 
     @ViewBuilder
@@ -106,10 +120,10 @@ struct WorkstationSidebar: View {
     }
 
     private func chatRow(_ item: ConversationSummary) -> some View {
-        let selected = workstation.selected == .agent && app.chatSession?.conversationID == item.id
+        let selected = chatVisible && app.chatSession?.conversationID == item.id
         return Button {
             Task { await app.chatSession?.loadConversation(item.id) }
-            workstation.select(.agent, app: app)
+            if !chatVisible { workstation.select(.agent, app: app) }
         } label: {
             Text(item.title)
                 .font(.system(size: 12.5))
@@ -125,29 +139,6 @@ struct WorkstationSidebar: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
         .contextMenu {
             Button("Delete", role: .destructive) { Task { await app.chatSession?.deleteConversation(item.id) } }
-        }
-    }
-
-    private var tools: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            SSSectionLabel("Workstation").padding(.horizontal, SSSpacing.s).padding(.bottom, 2)
-            ForEach(Activity.allCases.filter(\.descriptor.showsInSidebar)) { activity in
-                let selected = workstation.selected == activity
-                Button { workstation.select(activity, app: app) } label: {
-                    HStack(spacing: SSSpacing.s) {
-                        Image(systemName: activity.symbol).frame(width: 18)
-                            .foregroundStyle(selected ? SSColor.accent : .secondary)
-                        Text(activity.title).font(.system(size: 13, weight: selected ? .semibold : .regular))
-                        Spacer()
-                    }
-                    .padding(.horizontal, SSSpacing.s).padding(.vertical, 6)
-                    .background(selected ? SSColor.accent.opacity(0.16) : .clear, in: RoundedRectangle(cornerRadius: 7))
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? .isSelected : [])
-                .help("\(activity.title) — \(activity.summary)" + (activity.shortcutKey.map { " (⌘\($0))" } ?? ""))
-            }
         }
     }
 

@@ -4,7 +4,7 @@ import Foundation
 /// agent and external MCP clients can use what the person can. All are named `kiln_*`.
 public enum PlatformTools {
     public static var all: [any ToolExecuting] {
-        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool(), UsageReportTool(), ScheduleListTool(), ScheduleWriteTool()]
+        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool(), UsageReportTool(), ScheduleListTool(), ScheduleWriteTool(), TodoWriteTool()]
     }
 }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct MarkdownBlockView: View {
     let text: String
@@ -23,15 +24,7 @@ struct MarkdownBlockView: View {
 
         case .codeFence(let language, let code):
             VStack(alignment: .leading, spacing: 0) {
-                if let language {
-                    Text(language)
-                        .font(SSTypography.caption())
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, SSSpacing.s)
-                        .padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.12))
-                        .clipShape(UnevenRoundedRectangle(topLeadingRadius: SSCornerRadius.small, topTrailingRadius: SSCornerRadius.small))
-                }
+                CodeBlockHeader(language: language, code: code)
                 CodeSpanView(spans: CodeHighlighter.highlight(code, language: language))
                     .padding(SSSpacing.s)
             }
@@ -134,5 +127,35 @@ struct CodeSpanView: View {
             result += text
         }
         return result
+    }
+}
+
+/// The strip above a code block: the language on the left, Copy on the right (it says "Copied" for a moment).
+struct CodeBlockHeader: View {
+    let language: String?
+    let code: String
+    @State private var copied = false
+
+    var body: some View {
+        HStack(spacing: SSSpacing.xs) {
+            Text(language ?? "code").font(SSTypography.caption()).foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(code, forType: .string)
+                copied = true
+                Task { try? await Task.sleep(for: .seconds(1.5)); copied = false }
+            } label: {
+                Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    .font(SSTypography.caption())
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(copied ? SSColor.success : Color.secondary)
+            .help("Copy this code")
+            .accessibilityLabel("Copy code")
+        }
+        .padding(.horizontal, SSSpacing.s).padding(.vertical, 2)
+        .background(Color.secondary.opacity(0.12))
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: SSCornerRadius.small, topTrailingRadius: SSCornerRadius.small))
     }
 }

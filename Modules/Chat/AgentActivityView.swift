@@ -28,22 +28,29 @@ struct AgentActivityView: View {
         session.isStreaming || (session.messages.last?.toolCalls.isEmpty ?? true)
     }
 
+    /// Claude Code's way: finished steps fold into one grey sentence ("Ran 2 commands and read 3 files ›"), and a single live line says what is
+    /// happening now with the elapsed time. Only an approval that needs you stays in view.
     private var live: some View {
         let records = session.agentActivity
-        let hidden = max(0, records.count - Self.liveRowLimit)
-        return VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: SSSpacing.xs) {
-                ProgressView().controlSize(.mini)
-                Text("Working · step \(max(1, session.agentRound))").font(SSTypography.caption()).foregroundStyle(.secondary)
-                if hidden > 0 {
-                    Text("· " + ToolActivitySummary.line(for: records.map(Self.item)))
-                        .font(SSTypography.caption()).foregroundStyle(.tertiary).lineLimit(1)
-                }
+        let done = records.filter { $0.status.isTerminal }
+        let waiting = records.filter { $0.status == .awaitingApproval }
+        return VStack(alignment: .leading, spacing: 4) {
+            if !done.isEmpty {
+                ToolRunSummaryView(line: ToolActivitySummary.line(for: done.map(Self.item)), records: done)
             }
-            ForEach(records.suffix(Self.liveRowLimit)) { record in
-                ToolCallRow(record: record, compact: true)
-            }
+            ForEach(waiting) { ToolCallRow(record: $0, compact: true) }
+            LiveStatusLine(status: liveStatus(records), since: session.runStartedAt)
         }
+    }
+
+    private func liveStatus(_ records: [ToolCallRecord]) -> String {
+        if let waiting = records.last(where: { $0.status == .awaitingApproval }) {
+            return ToolPhrase.liveStatus(name: waiting.toolName, argumentsJSON: waiting.argumentsJSON, awaitingApproval: true)
+        }
+        if let running = records.last(where: { !$0.status.isTerminal }) {
+            return ToolPhrase.liveStatus(name: running.toolName, argumentsJSON: running.argumentsJSON)
+        }
+        return session.streamingReasoning.isEmpty ? (session.streamingText.isEmpty ? "Working" : "Writing") : "Thinking"
     }
 
     private var finished: some View {
@@ -105,11 +112,11 @@ struct StoredToolRunView: View {
             if expanded {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
+                        let title = ToolPhrase.title(name: call.name, argumentsJSON: call.arguments)
                         HStack(spacing: SSSpacing.xs) {
-                            Text(call.name.isEmpty ? "tool call" : call.name)
-                                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            Text(ToolCallRow.summary(call.arguments))
-                                .font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
+                            Text(title.verb).font(.system(size: 12)).foregroundStyle(.secondary)
+                            Text(title.object).font(.system(size: 11.5, design: .monospaced)).foregroundStyle(.primary.opacity(0.85))
+                                .lineLimit(1).truncationMode(.middle)
                         }
                     }
                 }
@@ -129,15 +136,17 @@ struct ToolCallRow: View {
     @State private var expanded = false
 
     var body: some View {
+        let title = ToolPhrase.title(name: record.toolName, argumentsJSON: record.argumentsJSON)
         VStack(alignment: .leading, spacing: 2) {
             Button { expanded.toggle() } label: {
                 HStack(spacing: SSSpacing.xs) {
-                    Image(systemName: symbol).font(.system(size: compact ? 10 : 12)).foregroundStyle(color).frame(width: 14)
-                    Text(record.toolName).font(.system(size: compact ? 11 : 12, weight: .medium, design: .monospaced))
-                    Text(Self.summary(record.argumentsJSON))
-                        .font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
+                    // Success is the normal case and says nothing; only waiting, failed and blocked steps carry an icon and a word.
+                    if record.status != .succeeded { Image(systemName: symbol).font(.system(size: compact ? 10 : 12)).foregroundStyle(color).frame(width: 14) }
+                    Text(title.verb).font(.system(size: compact ? 12 : 13)).foregroundStyle(.secondary)
+                    Text(title.object).font(.system(size: compact ? 11.5 : 12.5, design: .monospaced)).foregroundStyle(.primary.opacity(0.85))
+                        .lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 0)
-                    if !compact || record.status == .awaitingApproval || record.status == .failed || record.status == .denied {
+                    if record.status == .awaitingApproval || record.status == .failed || record.status == .denied || (!compact && record.status != .succeeded) {
                         Text(label).font(SSTypography.caption()).foregroundStyle(color)
                     }
                 }
@@ -145,8 +154,11 @@ struct ToolCallRow: View {
                 .padding(.horizontal, record.status == .awaitingApproval ? 6 : 0)
                 .background(record.status == .awaitingApproval ? SSColor.warning.opacity(0.14) : Color.clear,
                             in: RoundedRectangle(cornerRadius: 5))
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("\(title.verb) \(title.object), \(label)")
+            .accessibilityHint(expanded ? "Hides the details" : "Shows the details")
             if expanded {
                 let detail = record.errorText ?? record.resultText ?? record.argumentsJSON
                 Text(String(detail.prefix(1500)))
@@ -342,8 +354,9 @@ struct AgentModeBar: View {
                 .labelsHidden().controlSize(.small).frame(maxWidth: 150)
                 PermissionModeMenu(center: ApprovalCenter.shared)
                 if session.workspaceRoot == nil {
-                    Label("No project — pick one in the sidebar", systemImage: "folder.badge.questionmark")
+                    Label("No project", systemImage: "folder.badge.questionmark")
                         .font(SSTypography.caption()).foregroundStyle(SSColor.warning)
+                        .lineLimit(1).fixedSize()
                         .help("Without a project folder the agent can't read or change files.")
                 }
             }
@@ -368,7 +381,7 @@ struct AgentModeBar: View {
         .sheet(isPresented: $showSessions) { SessionsPaneView(session: session) }
         .sheet(isPresented: $showUsage) { UsagePaneView(session: session) }
         .sheet(isPresented: $showSchedules) { SchedulesPaneView(session: session) }
-        .onChange(of: session.requestedPane) { _, pane in
+        .onChange(of: session.requestedPane, initial: true) { _, pane in
             switch pane { case .memory: showMemory = true; case .commands: showCommands = true; case .hooks: showHooks = true; case .sessions: showSessions = true; case .usage: showUsage = true; case .schedules: showSchedules = true; case nil: break }
             session.requestedPane = nil
         }
@@ -413,5 +426,28 @@ struct PlanCardView: View {
         }
         .padding(SSSpacing.m)
         .background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+/// "Running swift test  1m 26s": what is happening now and for how long. One line, replacing a stack of progress rows.
+struct LiveStatusLine: View {
+    let status: String
+    let since: Date?
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            HStack(spacing: SSSpacing.xs) {
+                ProgressView().controlSize(.mini)
+                Text(status).font(.system(size: 12.5)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                if let since { Text(Self.elapsed(context.date.timeIntervalSince(since))).font(.system(size: 11)).monospacedDigit().foregroundStyle(.tertiary) }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Working: \(status)")
+        }
+    }
+
+    static func elapsed(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds))
+        return total < 60 ? "\(total)s" : "\(total / 60)m \(String(format: "%02d", total % 60))s"
     }
 }

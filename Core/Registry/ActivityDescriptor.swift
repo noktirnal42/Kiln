@@ -24,7 +24,7 @@ struct ToolRegistrationContext {
 
 /// Everything the shell needs to know about one activity, declared once in the module's own folder.
 ///
-/// The sidebar, ⌘-number shortcuts, command palette, starter prompts, the execution policy's module-tool prefixes and the
+/// The Work menu, ⌘-number shortcuts, command palette, starter prompts, the execution policy's module-tool prefixes and the
 /// Workstation Agent's tool list and prompt are all derived from the registered descriptors, so adding an activity is
 /// one descriptor and one line in `ActivityCatalog`, not an edit to six shared files.
 struct ActivityDescriptor: Identifiable, Sendable {
@@ -49,7 +49,7 @@ struct ActivityDescriptor: Identifiable, Sendable {
     /// The module that renders this activity, when one does.
     var moduleIdentifier: String?
     var content: Content = .module
-    /// Listed under "Workstation" in the sidebar. Home and Agent have their own places.
+    /// Listed in the Work menu. Home and Agent have their own places.
     var showsInSidebar = true
     /// The agent panel stays beside this activity. False only where it would be a second copy (Agent itself).
     var showsAgentDock = true

@@ -117,12 +117,14 @@ enum WorkstationStatus {
 final class WorkstationModel {
     private static let dockKey = "workstation.dockVisible"
 
-    /// The browser presents an address and search field as soon as the workstation opens.
-    var selected: Activity = .browser
+    /// Chat is the spine of the workstation; other surfaces open alongside it when space permits.
+    var selected: Activity = .agent
     var showPalette = false
     var sidebarVisible = true
     var showApprovals = false
     var showModules = false
+    /// Bumped to ask the window to open Settings (the window owns `openSettings`).
+    var settingsRequests = 0
 
     /// Injected so tests never write into the real app's preferences (they run inside the app host).
     private let defaults: UserDefaults
@@ -138,6 +140,11 @@ final class WorkstationModel {
 
     /// The dock is the agent beside your work; on the Agent activity it would just be a second copy.
     var dockShown: Bool { dockVisible && selected.showsAgentDock }
+
+    /// These lighter surfaces work beside the full conversation. Develop and Analyze retain the central workspace.
+    var usesRightCanvas: Bool {
+        ["browser", "maps", "devices", "media", "news"].contains(selected.id)
+    }
 
     func select(_ activity: Activity, app: AppModel) {
         selected = activity
@@ -179,7 +186,7 @@ final class WorkstationModel {
         list.append(WorkstationCommand(
             id: "settings.show", title: "Settings…", subtitle: "Provider keys, the local model store and About",
             symbol: "gearshape", keywords: ["preferences", "api key", "providers", "about"], shortcut: "⌘,",
-            run: { NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) }))
+            run: { [weak self] in self?.settingsRequests += 1 }))
         list += projectCommands(app: app)
         list += slashCommands(app: app)
         list += DevelopCommands.all(app: app, select: { [weak self] in self?.select(.develop, app: app) })

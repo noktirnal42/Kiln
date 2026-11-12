@@ -3,11 +3,9 @@ import SwiftUI
 /// The agent beside your work. Same conversation as the Agent activity, in a narrow column, so you
 /// can ask about whatever is on screen without leaving it.
 struct AgentDockView: View {
-    let session: ChatSession
+    @Bindable var session: ChatSession
     let context: Activity
     @Bindable var workstation: WorkstationModel
-
-    @State private var input = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,7 +19,7 @@ struct AgentDockView: View {
                     .padding(.horizontal, SSSpacing.m).padding(.vertical, SSSpacing.xs)
             }
             Divider()
-            ComposerView(session: session, input: $input, onSend: send)
+            ComposerView(session: session, input: $session.composerText, onSend: send)
         }
         .frame(width: 360)
         .background(SSColor.canvas)
@@ -91,9 +89,8 @@ struct AgentDockView: View {
     }
 
     private func send() {
-        guard !session.isStreaming else { return }   // keep the draft while a reply is still running
-        let text = input
-        input = ""
+        let text = session.composerText
+        session.composerText = ""
         Task { await session.send(text) }
     }
 

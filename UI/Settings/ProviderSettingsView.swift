@@ -94,6 +94,14 @@ struct ProviderSettingsView: View {
                     row(entry)
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                    Picker("Appearance", selection: Binding(get: { app.themeManager.appearance }, set: { app.themeManager.apply($0) })) {
+                        ForEach(ThemeManager.Appearance.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented).fixedSize()
+                    Text("Kiln follows the system by default. Light, Dark and High Contrast apply to every window.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
                     Stepper(value: $firstChunkTimeout, in: 10...600, step: 15) {
                         Text("Wait for a first reply: \(Int(firstChunkTimeout)) s")
                     }

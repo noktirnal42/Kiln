@@ -41,9 +41,9 @@ struct ModelPickerView: View {
             }
 
             List {
-                if !recents.isEmpty && search.isEmpty {
+                if !shownRecents.isEmpty && search.isEmpty {
                     Section("Recents") {
-                        ForEach(recents, id: \.self) { modelID in
+                        ForEach(shownRecents, id: \.self) { modelID in
                             row(for: modelID, descriptor: models.first { $0.id == modelID })
                         }
                     }
@@ -76,6 +76,13 @@ struct ModelPickerView: View {
         .task {
             await loadModels()
         }
+    }
+
+    /// Recents whose provider no longer offers the model (a removed key, an unplugged server, a test stub) are hidden
+    /// once the lists have loaded; the model in use always stays.
+    private var shownRecents: [String] {
+        guard !loading else { return recents }
+        return recents.filter { id in id == session.selectedModelID || models.contains { $0.id == id } }
     }
 
     private var grouped: [String: [ModelDescriptor]] {

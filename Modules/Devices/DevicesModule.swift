@@ -29,7 +29,7 @@ public final class DevicesModule: @preconcurrency Module, ModuleDefinition, Modu
     public private(set) var frameSize: CGSize = .zero
     public private(set) var frameError: String?
     public var liveRefresh = true
-    public var refreshInterval: Double = 1.5
+    public var refreshInterval: Double = 0.8
 
     private var context: ModuleContext?
     @ObservationIgnored private var liveTask: Task<Void, Never>?
@@ -117,7 +117,28 @@ public final class DevicesModule: @preconcurrency Module, ModuleDefinition, Modu
         message = working
         do { message = try await work() } catch { message = error.localizedDescription }
         busyIDs.remove(device.id)
+        // Look at the screen first: listing 70+ simulators takes several seconds and used to delay the mirror behind it.
+        await followUp()
         await refresh()
+    }
+
+    /// An action (launch, open a URL, install) changes the screen a moment later. Look right away and again as it settles,
+    /// instead of waiting for the next poll, so the mirror reacts to what was just pressed.
+    private func followUp() async {
+        for delay in [0.3, 1.0, 2.5] {
+            try? await Task.sleep(for: .seconds(delay))
+            await captureFrame()
+        }
+    }
+
+    /// Brings this device's window in Simulator.app forward: the way to tap, swipe and type on an Apple simulator,
+    /// because `simctl` has no input commands.
+    public func openInSimulator(_ device: DeviceInfo) {
+        guard device.platform == .apple else { return }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-a", "Simulator", "--args", "-CurrentDeviceUDID", device.id]
+        do { try process.run(); message = "Opened \(device.name) in Simulator." } catch { message = error.localizedDescription }
     }
 
     private func runValue<T>(_ device: DeviceInfo, _ working: String, _ work: @escaping () async throws -> T) async -> T? {

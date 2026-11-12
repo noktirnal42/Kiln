@@ -76,6 +76,41 @@ struct TextToolCallTests {
         #expect(TextToolCall.parse(#"Sure! {"name":"read_file","arguments":{}}"#, offered: offered) == nil)
         #expect(TextToolCall.parse(#"{"name":"read_file","arguments":{},"run":"rm -rf /"}"#, offered: offered) == nil)
     }
+
+    @Test func severalCallsInARowAreAllRecognisedInOrder() {
+        let text = #"{"name": "list_directory", "arguments": {"path": "/"}} {"name": "read_file", "arguments": {"path": "Package.swift"}}"#
+        let calls = TextToolCall.parseAll(text, offered: offered)
+        #expect(calls.map(\.name) == ["list_directory", "read_file"])
+        #expect(calls.map(\.index) == [0, 1])
+        #expect(Set(calls.map(\.id)).count == 2, "each call gets its own id")
+        #expect(calls[1].arguments.contains("Package.swift"))
+    }
+
+    @Test func commaSeparatedLinesAndArraysWorkToo() {
+        let lines = "{\"name\":\"read_file\",\"arguments\":{\"path\":\"a\"}},\n{\"name\":\"read_file\",\"arguments\":{\"path\":\"b\"}}"
+        #expect(TextToolCall.parseAll(lines, offered: offered).count == 2)
+        #expect(TextToolCall.parseAll("[" + lines + "]", offered: offered).count == 2)
+        #expect(TextToolCall.parseAll("```json\n" + lines + "\n```", offered: offered).count == 2)
+    }
+
+    @Test func braceCharactersInsideStringsDoNotBreakSplitting() {
+        let text = #"{"name":"read_file","arguments":{"path":"we{ird}.txt"}} {"name":"list_directory","arguments":{}}"#
+        #expect(TextToolCall.parseAll(text, offered: offered).map(\.name) == ["read_file", "list_directory"])
+    }
+
+    @Test func manyCallsAreAllOrNothing() {
+        let good = #"{"name":"read_file","arguments":{}}"#
+        #expect(TextToolCall.parseAll(good + #" {"name":"echo","arguments":{}}"#, offered: offered).isEmpty, "one unknown tool and none run")
+        #expect(TextToolCall.parseAll(good + " and then " + good, offered: offered).isEmpty, "prose between calls")
+        #expect(TextToolCall.parseAll(good + #" {"name":"read_file","arguments"#, offered: offered).isEmpty, "a truncated second call")
+        #expect(TextToolCall.parseAll("Sure: " + good, offered: offered).isEmpty)
+        #expect(TextToolCall.parseAll(String(repeating: good, count: 9), offered: offered).isEmpty, "more than eight calls is not a plan, it is a loop")
+        #expect(TextToolCall.parseAll("", offered: offered).isEmpty)
+    }
+
+    @Test func aSingleCallStillParsesTheSameWay() {
+        #expect(TextToolCall.parseAll(#"{"name":"read_file","arguments":{"path":"x"}}"#, offered: offered).count == 1)
+    }
 }
 
 @MainActor

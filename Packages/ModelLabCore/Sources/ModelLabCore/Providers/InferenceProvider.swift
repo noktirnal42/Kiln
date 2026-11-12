@@ -1,13 +1,25 @@
 import Foundation
 
 public struct ChatTurn: Identifiable, Sendable {
+    public struct Call: Sendable {
+        public let id: String
+        public let name: String
+        public let arguments: String
+        public init(id: String, name: String, arguments: String) {
+            self.id = id; self.name = name; self.arguments = arguments
+        }
+    }
     public let id = UUID()
     public let role: String
     public var text: String
+    public var toolCallID: String?
+    public var calls: [Call]
 
-    public init(role: String, text: String) {
+    public init(role: String, text: String, toolCallID: String? = nil, calls: [Call] = []) {
         self.role = role
         self.text = text
+        self.toolCallID = toolCallID
+        self.calls = calls
     }
 }
 

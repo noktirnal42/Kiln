@@ -162,14 +162,60 @@ enum TextToolCall {
             if let fence = body.range(of: "```", options: .backwards) { body = String(body[..<fence.lowerBound]) }
             body = body.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        guard body.hasPrefix("{"), body.hasSuffix("}"),
-              let object = (try? JSONSerialization.jsonObject(with: Data(body.utf8))) as? [String: Any],
+        guard body.hasPrefix("{"), body.hasSuffix("}") else { return nil }
+        return call(from: body, offered: offered)
+    }
+
+    private static func call(from body: String, offered: Set<String>) -> ToolCall? {
+        guard let object = (try? JSONSerialization.jsonObject(with: Data(body.utf8))) as? [String: Any],
               let name = object["name"] as? String, offered.contains(name),
               Set(object.keys).isSubset(of: ["name", "arguments", "parameters"]) else { return nil }
         let arguments = (object["arguments"] ?? object["parameters"]) as? [String: Any] ?? [:]
         guard let data = try? JSONSerialization.data(withJSONObject: arguments),
               let json = String(data: data, encoding: .utf8) else { return nil }
         return ToolCall(id: "call_\(UUID().uuidString)", name: name, arguments: json, index: 0)
+    }
+
+    /// A reply made only of several such calls: written one after another (`{...} {...}`), comma separated, one per line,
+    /// or as a JSON array. All or nothing: one prose word, one unknown tool or one malformed object and no call is made.
+    static func parseAll(_ text: String, offered: Set<String>, limit: Int = 8) -> [ToolCall] {
+        var body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if body.hasPrefix("```") {
+            body = body.drop { $0 != "\n" }.dropFirst().description
+            if let fence = body.range(of: "```", options: .backwards) { body = String(body[..<fence.lowerBound]) }
+            body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if body.hasPrefix("["), body.hasSuffix("]") { body = String(body.dropFirst().dropLast()) }
+        var segments: [String] = []
+        var depth = 0, start: String.Index?, inString = false, escaped = false
+        var index = body.startIndex
+        while index < body.endIndex {
+            let c = body[index]
+            if inString {
+                if escaped { escaped = false } else if c == "\\" { escaped = true } else if c == "\"" { inString = false }
+            } else if c == "\"" {
+                if depth == 0 { return [] }                       // a string outside any object: prose
+                inString = true
+            } else if c == "{" {
+                if depth == 0 { start = index }
+                depth += 1
+            } else if c == "}" {
+                depth -= 1
+                if depth < 0 { return [] }
+                if depth == 0, let s = start { segments.append(String(body[s...index])); start = nil }
+            } else if depth == 0, !(c.isWhitespace || c == ",") {
+                return []                                         // anything between objects but spaces and commas
+            }
+            index = body.index(after: index)
+        }
+        guard depth == 0, !inString, !segments.isEmpty, segments.count <= limit else { return [] }
+        var calls: [ToolCall] = []
+        for (position, segment) in segments.enumerated() {
+            guard var call = call(from: segment, offered: offered) else { return [] }
+            call.index = position
+            calls.append(call)
+        }
+        return calls
     }
 }
 
@@ -508,12 +554,14 @@ public final class AgentOrchestrator: Sendable {
                 yield: yield
             )
             // Small local models often write a tool call as JSON text instead of a structured call.
-            // Accept that only when the whole reply is one call to a tool this run actually offered.
-            if turn.toolCalls.isEmpty,
-               let call = TextToolCall.parse(turn.text, offered: Set(offered.map(\.name))) {
-                turn.toolCalls = [call]
-                turn.text = ""
-                yield(.textReset)
+            // Accept that only when the whole reply is calls to tools this run actually offered (one, or several in a row).
+            if turn.toolCalls.isEmpty {
+                let calls = TextToolCall.parseAll(turn.text, offered: Set(offered.map(\.name)))
+                if !calls.isEmpty {
+                    turn.toolCalls = calls
+                    turn.text = ""
+                    yield(.textReset)
+                }
             }
 
             summary.totalTokens += turn.usageTotalTokens

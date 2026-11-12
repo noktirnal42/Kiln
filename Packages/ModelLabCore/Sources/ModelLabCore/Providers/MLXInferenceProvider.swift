@@ -67,6 +67,40 @@ public actor MLXInferenceProvider: InferenceProvider {
         }
     }
 
+    /// Generate after the actual last turn, which can be a tool result rather than a user message.
+    public nonisolated func streamConversation(_ turns: [ChatTurn]) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task { await self.runConversation(turns, continuation: continuation) }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func runConversation(_ turns: [ChatTurn], continuation: AsyncThrowingStream<String, Error>.Continuation) async {
+        do {
+            guard let modelDirectory, capability().isAvailable, !turns.isEmpty else {
+                throw InferenceError.invalidInput("A local model and at least one message are required.")
+            }
+            let container = try await ensureContainer(from: modelDirectory)
+            let messages = try turns.map { turn -> Chat.Message in
+                switch turn.role {
+                case "system": return .system(turn.text)
+                case "user": return .user(turn.text)
+                case "assistant":
+                    let calls = try turn.calls.map { call -> MLXLMCommon.ToolCall in
+                        let arguments = try JSONDecoder().decode([String: JSONValue].self, from: Data(call.arguments.utf8))
+                        return MLXLMCommon.ToolCall(function: .init(name: call.name, arguments: arguments), id: call.id)
+                    }
+                    return .assistant(turn.text, toolCalls: calls.isEmpty ? nil : calls)
+                case "tool": return .tool(turn.text, id: turn.toolCallID)
+                default: throw InferenceError.invalidInput("Unsupported chat role: \(turn.role)")
+                }
+            }
+            let session = ChatSession(container, history: Array(messages.dropLast()))
+            for try await chunk in session.streamResponse(to: [messages[messages.count - 1]]) { continuation.yield(chunk) }
+            continuation.finish()
+        } catch { continuation.finish(throwing: error) }
+    }
+
     /// Keeps `ChatSession` (non-Sendable) entirely inside the actor's
     /// isolation domain; only the Sendable `String` chunks and `Error`
     /// cross the continuation boundary.

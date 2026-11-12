@@ -70,7 +70,7 @@ struct ActivityRegistryTests {
 
     @Test func capabilitiesAreSearchOnlyPaletteCommandsThatOpenTheirActivity() throws {
         let suiteName = "kiln.tests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = TestDefaults.suite(suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let workstation = WorkstationModel(defaults: defaults)
         let capabilityCommands = workstation.capabilityCommands { workstation.selected = $0 }

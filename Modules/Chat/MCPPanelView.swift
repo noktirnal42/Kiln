@@ -13,24 +13,20 @@ struct MCPPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("MCP Servers").font(SSTypography.title())
-                Spacer()
+            SSPaneHeader(title: "MCP servers") {
                 Button("Rescan") { Task { await loadAll() } }
                 if hiddenCount > 0 {
                     Button("Show \(hiddenCount) hidden") { Task { await service.unhideAllServers(); await loadAll() } }
                 }
             }
-            .padding(SSSpacing.m)
-            Divider()
             HSplitView {
                 serverList
-                    .frame(minWidth: 320, idealWidth: 380)
+                    .frame(minWidth: 260, idealWidth: 340)
                 toolPalette
-                    .frame(minWidth: 380)
+                    .frame(minWidth: 260)
             }
         }
-        .frame(minWidth: 760, minHeight: 520)
+        .frame(minHeight: 320)
         .task { await loadAll() }
     }
 

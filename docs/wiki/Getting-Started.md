@@ -35,7 +35,7 @@ Kiln needs no provider to start, but a chat needs a model. The Home activity sho
 
 ## Moving around
 
-The sidebar lists the activities, and the shortcut order is the sidebar order: ⌘1 Home, ⌘2 Agent, ⌘3 Swarm, ⌘4 Develop, ⌘5 Analyze, ⌘6 Lab, ⌘7 Audit, ⌘8 Browser, ⌘9 Devices, ⌘0 Media. ⌘K opens the command palette and ⌘, opens Settings. See [[Activities]].
+In the `codex/kiln-qa-completion` development branch, the toolbar opens Chat, Code and common surfaces; the Work menu lists the other activities. Shortcuts follow registry order: ⌘1 Home, ⌘2 Agent, ⌘3 Swarm, ⌘4 Develop, ⌘5 Analyze, ⌘6 Lab, ⌘7 Audit, ⌘8 Browser, ⌘9 Devices, ⌘0 Media. ⌘K opens the command palette and ⌘, opens Settings. Packaged releases can have a different layout. See [[Activities]].
 
 ---
 

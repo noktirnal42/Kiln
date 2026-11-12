@@ -40,9 +40,17 @@ struct MessageBubble: View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack {
                 Spacer(minLength: 60)
-                Text(message.content)
-                    .font(.system(size: 14))
-                    .textSelection(.enabled)
+                let parts = ContextExpander.split(message.content)
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(parts.visible)
+                        .font(.system(size: 14))
+                        .textSelection(.enabled)
+                    if !parts.attached.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(parts.attached, id: \.self) { ComposerChip(symbol: "paperclip", title: $0, tint: SSColor.accent) }
+                        }
+                    }
+                }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 9)
                     .background(Color.primary.opacity(0.08))
@@ -59,9 +67,13 @@ struct MessageBubble: View {
             if !reasoningText.isEmpty { reasoningView }
 
             if !message.content.isEmpty {
-                MarkdownBlockView(text: message.content)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if !isStreaming, ToolPhrase.looksLikeToolCallText(message.content) {
+                    ToolCallTextNotice(text: message.content, retry: { Task { await session.regenerate() } })
+                } else {
+                    MarkdownBlockView(text: message.content)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
 
             if isStreaming { ThinkingDots(label: message.content.isEmpty && reasoningText.isEmpty ? "Working" : nil) }
@@ -134,7 +146,8 @@ struct MessageBubble: View {
             }
             // Never fully transparent: SwiftUI drops opacity-0 controls from the accessibility tree, which left these
             // actions unreachable for VoiceOver and keyboard users. To the eye they still appear only on hover.
-            .opacity(hovering ? 1 : 0.01)
+            // Replies keep their actions in view, quietly (as in Codex); a message of yours shows them on hover.
+        .opacity(hovering ? 1 : (message.role == .assistant ? 0.5 : 0.01))
             .animation(.easeOut(duration: 0.12), value: hovering)
         }
     }
@@ -191,8 +204,9 @@ struct ThinkingDots: View {
                     .animation(.easeInOut(duration: 0.6).repeatForever().delay(Double(index) * 0.2), value: phase)
             }
             if let label {
-                Text(waited > 15 ? "Still waiting for the model to start responding" : label)
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(waited > 60 ? "No answer after \(Int(waited)) s. The provider may be busy: Stop, then pick another model from the model menu."
+                     : waited > 15 ? "Still waiting for the model to start responding" : label)
+                    .font(.system(size: 12)).foregroundStyle(waited > 60 ? SSColor.warning : .secondary)
             }
         }
     }
@@ -216,6 +230,29 @@ struct ToolCallChipsView: View {
                 .padding(.vertical, SSSpacing.xs)
                 .background(Color.secondary.opacity(0.08))
                 .clipShape(RoundedRectangle(cornerRadius: SSCornerRadius.small))
+            }
+        }
+    }
+}
+
+/// A model that answers with a tool call written out as text did not make the call, so nothing ran: say so, and keep the text one click away.
+struct ToolCallTextNotice: View {
+    let text: String
+    let retry: () -> Void
+    @State private var showing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle").font(.system(size: 11)).foregroundStyle(SSColor.warning)
+                Text("This model wrote a tool call as text instead of making it, so nothing ran.").font(.system(size: 13))
+                Button(showing ? "Hide" : "Show text") { showing.toggle() }.buttonStyle(.borderless).font(SSTypography.caption())
+                Button("Try again", action: retry).buttonStyle(.borderless).font(SSTypography.caption())
+            }
+            if showing {
+                Text(text).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary).textSelection(.enabled)
+                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(SSColor.surface, in: RoundedRectangle(cornerRadius: 6))
             }
         }
     }

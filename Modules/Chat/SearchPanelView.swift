@@ -13,15 +13,12 @@ struct SearchPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Workspace Search").font(SSTypography.title())
-                Spacer()
+            SSPaneHeader(title: "Workspace search") {
                 if let root = indexedRoot {
-                    Text(root).font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
+                    Text(root).font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
                 }
                 Button("Open Folder…") { openFolder() }
             }
-            .padding(SSSpacing.m)
             HStack {
                 TextField("Search file names…", text: $query)
                     .textFieldStyle(.roundedBorder)
@@ -29,18 +26,15 @@ struct SearchPanelView: View {
                 Button("Search") { search() }
                     .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty || indexedRoot == nil)
             }
-            .padding(.horizontal, SSSpacing.m)
+            .padding(SSSpacing.m)
             if searching {
                 ProgressView().padding(SSSpacing.s)
             }
             Divider()
             if hits.isEmpty {
-                ContentUnavailableView {
-                    Label(indexedRoot == nil ? "No Folder Open" : "No Results", systemImage: "magnifyingglass")
-                } description: {
-                    Text(indexedRoot == nil ? "Open a workspace folder to index file names (FTS5 + Spotlight)." : "Nothing matched '\(query)'.")
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                SSEmptyState(symbol: "magnifyingglass",
+                             title: indexedRoot == nil ? "No folder open" : (query.isEmpty ? "Search file names" : "No results"),
+                             message: indexedRoot == nil ? "Open a project folder to index its file names." : (query.isEmpty ? "Type part of a file name and press Return." : "Nothing matched “\(query)”."))
             } else {
                 Text("\(resultCount) results — merged from FTS5 index and Spotlight")
                     .font(SSTypography.caption())
@@ -73,7 +67,7 @@ struct SearchPanelView: View {
                 }
             }
         }
-        .frame(minWidth: 680, minHeight: 480)
+        .frame(minHeight: 320)
         .task(id: projectRoot) {
             indexedRoot = await service.indexedRootPath()
             if let projectRoot, indexedRoot != projectRoot {

@@ -20,6 +20,9 @@ struct ModelLabModelsView: View {
     @State private var hfLoading = false
     @State private var storeModels: [InstalledModel] = []
     @State private var storeScanned = false
+    @State private var storeQuery = ""
+    @State private var storeFitsOnly = false
+    @State private var storeSort: InstalledModelCatalog.Sort = .name
 
     var body: some View {
         SSMasterDetail(masterWidth: 300) {
@@ -46,16 +49,28 @@ struct ModelLabModelsView: View {
                     }
                 }
                 Section("Local model store") {
+                    TextField("Filter installed models", text: $storeQuery)
+                    Toggle("Estimated to fit this Mac", isOn: $storeFitsOnly)
+                        .help("An estimate based on model size and memory, not a guarantee of runtime support.")
+                    Picker("Sort", selection: $storeSort) {
+                        Text("Name").tag(InstalledModelCatalog.Sort.name)
+                        Text("Smallest first").tag(InstalledModelCatalog.Sort.smallest)
+                        Text("Largest first").tag(InstalledModelCatalog.Sort.largest)
+                    }
                     if storeModels.isEmpty {
                         Text(storeScanned ? "No language models found. Choose your model store folder in Settings (⌘,)." : "Looking…")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    ForEach(storeModels) { model in
+                    ForEach(InstalledModelCatalog.select(storeModels, query: storeQuery, fitsOnly: storeFitsOnly, sort: storeSort, hardware: module.hardware)) { model in
                         HStack {
                             Image(systemName: "externaldrive")
-                            Text(model.repoID)
+                            VStack(alignment: .leading) {
+                                Text(model.repoID)
+                                Text(fitLabel(model)).font(.caption2).foregroundStyle(.secondary)
+                            }
                             Spacer()
-                            Text(HardwareProfile.formatBytes(Int64(model.totalBytes))).font(.caption).foregroundStyle(.secondary)
+                            Text(model.totalBytes > 0 && model.totalBytes <= UInt64(Int64.max) ? HardwareProfile.formatBytes(Int64(model.totalBytes)) : "Unknown size")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -87,6 +102,16 @@ struct ModelLabModelsView: View {
                 SSEmptyState(symbol: "cube", title: "Select a model",
                              message: "Models you trained or imported are under Library. Search Hugging Face in the list to add one.")
             }
+        }
+    }
+
+    private func fitLabel(_ model: InstalledModel) -> String {
+        switch InstalledModelCatalog.fit(model, hardware: module.hardware) {
+        case .estimatedFit: "Estimated memory fit"
+        case .tight: "Memory may be tight"
+        case .tooLarge: "Exceeds recommended memory"
+        case .unavailable: "MLX unavailable on this Mac"
+        case .unknown: "Memory fit unknown"
         }
     }
 
@@ -139,7 +164,8 @@ private struct HFModelRow: View {
             }
             Spacer()
             if let verdictText {
-                Text(verdictText).font(.caption2).foregroundStyle(verdictText.contains("fits") ? .green : .orange)
+                Text(verdictText).font(.caption2).foregroundStyle(verdictText.hasPrefix("Estimated memory fit") ? .green : .orange)
+                    .help("A memory estimate only; model architecture and runtime support are not verified.")
             }
             Button("Register") { register() }
                 .buttonStyle(.bordered).controlSize(.small)
@@ -149,21 +175,23 @@ private struct HFModelRow: View {
             // HardwareProfile; nil → "unknown size" is shown honestly.
             do {
                 let details = try await HuggingFaceModelProvider().fetchDetails(id: result.id)
-                let weightBytes = details.files
-                    .filter { $0.path.hasSuffix(".safetensors") || $0.path.hasSuffix(".gguf") || $0.path.hasSuffix(".bin") }
-                    .compactMap(\.sizeBytes)
-                    .reduce(0, +)
-                if weightBytes == 0 {
-                    verdictText = nil
+                let weights = details.files.filter { $0.path.hasSuffix(".safetensors") }
+                let sizes = weights.compactMap(\.sizeBytes)
+                let weightBytes = sizes.reduce(Int64(0)) { total, size in
+                    guard size > 0, total <= Int64.max - 2 * 1_073_741_824 - size else { return Int64.max }
+                    return total + size
+                }
+                if weights.isEmpty || sizes.count != weights.count || weightBytes <= 0 || weightBytes == Int64.max {
+                    verdictText = "Memory fit unknown"
                 } else {
                     switch module.hardware.canLoad(weightsBytes: weightBytes, forTraining: false) {
-                    case .fits: verdictText = "Fits (\(HardwareProfile.formatBytes(weightBytes)) weights)"
+                    case .fits: verdictText = "Estimated memory fit (\(HardwareProfile.formatBytes(weightBytes)) weights)"
                     case .tight: verdictText = "Tight on \(module.hardware.memoryGB) GB (\(HardwareProfile.formatBytes(weightBytes)) weights)"
                     case .doesNotFit: verdictText = "Too large for \(module.hardware.memoryGB) GB (\(HardwareProfile.formatBytes(weightBytes)) weights)"
                     }
                 }
             } catch {
-                verdictText = nil
+                verdictText = "Memory fit unknown"
             }
         }
     }

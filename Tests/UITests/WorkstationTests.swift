@@ -11,16 +11,28 @@ struct WorkstationTests {
     /// A throwaway preferences suite, so nothing here touches the real app's settings.
     private func isolatedDefaults() -> UserDefaults {
         let name = "kiln.tests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = TestDefaults.suite(name)!
         defaults.removePersistentDomain(forName: name)
         return defaults
     }
 
     // MARK: Activities
 
-    @Test func workstationStartsWithBrowser() {
+    @Test func workstationStartsWithChat() {
         let model = WorkstationModel(defaults: isolatedDefaults())
-        #expect(model.selected == .browser)
+        #expect(model.selected == .agent)
+    }
+
+    @Test func canvasSurfacesKeepChatCentralAndDeepWorkKeepsItsSpace() {
+        let model = WorkstationModel(defaults: isolatedDefaults())
+        for activity in [Activity.browser, .maps, .devices, .media, .news] {
+            model.selected = activity
+            #expect(model.usesRightCanvas)
+        }
+        for activity in [Activity.agent, .develop, .analyze] {
+            model.selected = activity
+            #expect(!model.usesRightCanvas)
+        }
     }
 
     @Test func everyActivityHasAUniqueShortcutInRailOrder() {

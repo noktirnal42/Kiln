@@ -62,6 +62,85 @@ earlier QA (Python unit tests, `pip install pytest`, Swift and Xcode version pro
 without asking; that is what the checkpoint test above ran into. Owner decision: revoke in Approvals (shield icon
 in the sidebar footer) → Standing grants.
 
-## Open items
+## OpenCode's uncommitted work (found mid-session)
 
-(continued below as they are found)
+OpenCode left about 20 untracked files in the checkout (`Core/Capabilities`, `Core/ModelRouting`, `Core/Notifications`,
+`Core/Settings`, `Core/Agent/SlashCommands.swift`, `Core/Swarm/SwarmCoordinator.swift`, `Core/Voice/VoiceManager.swift`,
+`Core/Devices/DevicesService.swift`, `Modules/{Notifications,Settings,Swarm,Voice}`, `Modules/Devices/DevicesTools.swift`, docs 24-28,
+and `ENABLE_CAPABILITY_REGISTRY` in `project.yml`). After `xcodegen generate` they broke the build: six files had syntax errors,
+`SlashCommands.swift` duplicated `Core/Platform/SlashCommands.swift` (same product file name), and most of the rest
+re-implements features that exist and are tested. Docs 24-28 say "implementation complete" and quote 592 tests, which is
+not true of the code. Everything was **moved unchanged** to the shared notes folder
+`.../side-session-notes/local_cb5577b1-.../opencode-quarantine/` (with a README); nothing was deleted. Worth a second look:
+`Core/ModelRouting` (routing rules), `Core/Settings/SettingsLayers.swift` (user/project settings layers),
+`Core/Notifications`. Its `docs/29-VISUAL-QA-2026-11-10.md` is about the committed Maps/News work and was left in place (untracked).
+Codex committed Maps and News (`ae74b83`..`45c9655`) on this branch during the session; those are not part of this QA.
+
+## Open items (not done in this session)
+
+- **Not yet seen on screen:** the Develop debugger UI and a Swarm run. Seen since: Settings and its About sheet, light mode on Browser and Analyze,
+  Images generation (SD-Turbo, MLX, 56.8 s including the first model load from the drive; `verified-images-generation-sd-turbo.jpg`),
+  Send to Media then the Media viewer (`verified-media-viewer.jpg`), and Devices booting an iPad simulator and showing its live screen
+  (`verified-devices-booted-ipad.jpg`; the very first boot kept the row busy for about three minutes while the simulator migrated its data).
+- **Palette:** the Maps and News activities are Codex's; their toolbars clip at narrow widths (see docs/29).
+- **Cleanup (done):** 12 merged worktrees (11 under `.claude/worktrees/`, plus `../kiln-codex-integration`) were removed and 20 merged
+  `claude/*` and `codex/*` branches deleted with `git branch -d` after `git branch --merged HEAD`; prunable `/private/tmp/kiln-*` entries pruned.
+  **Kept because they are not merged:** `claude/image-studio-8ff931` (+2 commits, worktree with an untracked upscale screenshot),
+  `claude/integration-registry-bf14c5` (+1), `codex/axiom-core-tests` (+2), `codex/ghidra-setup` (+2), `codex/lab-agent-start` (+2). Their owners should
+  say whether to merge or drop them. Build folders under `/private/tmp/claude-501/` are kept (`build-triage` is in use); the leaked `stub-m1` selection is fixed (below).
+  Test chats `hooks/`, the empty "New Conversation" and the checkpoint-test chat and the `kiln-qa-re-sample` project were deleted through the app.
+  The demo project `~/KilnDemo/DemoPackage` is untouched (the checkpoint test file was rewound away).
+- **Parity (doc 17):** a Permissions pane (per-tool and per-path rules) and approval notifications remain; the approvals sheet now
+  shows and revokes grants but has no rules editor.
+- Full test suite not run (other agents were building); targeted suites pass: 49 tests (Workstation, registry, editor settings, usage, push).
+
+## Added after the OpenCode review
+
+- Fixed: Git tab explains "No repository" / "Working tree clean"; after 60 s without a reply the thread says the provider may be busy and suggests Stop and another model.
+- Verified: Devices (shared header, simulator list, empty detail guidance) and Images Create at a 1416 pt window with the agent dock.
+- **Fixed (the `stub-m1` mystery):** `ChatSession.recordRecent` wrote to `UserDefaults.standard`, so any unit test that switched models put `stub-m1` at the top of the real recent-models list (and so into the status bar after relaunch). It now writes nothing under XCTest, and the value was removed from the real defaults. `defaults read` can lag `cfprefsd`; read the plist with `plutil -p` to see the file.
+- Another set of leaked test preferences appeared (`kiln.tests.*`, `kiln.news.tests.*`, `kiln.remote.test.*` in `~/Library/Preferences` and the container); the News tests (Codex) do not remove their suites.
+- A blind click on a stale element index pressed Play on a simulator (iPad A16 booted); it was shut down with `simctl shutdown all`.
+- Added: an Appearance control (System, Light, Dark, High Contrast) in Settings; `ThemeManager` existed but nothing used it. The palette's "Settings…" entry now opens the window (it used a selector that did nothing); the menu bar route always worked.
+
+## Test status at the end of the session
+
+Full suite on this branch (`c3bc270` plus Codex's Maps/News work in the tree): **884 tests in 185 suites passed** (82 s, nothing else building).
+The suites still leave preference files behind in `~/Library/Preferences` (246 more appeared in this run: `kiln.tests.*`, `kiln-tests-*`,
+`kiln.news.tests.*`, `kiln.migration.*`); they were deleted again by pattern. The remaining leakers use `UserDefaults(suiteName:)` without
+`removePersistentDomain` (ContextSessionTests, UnifiedShellTests, AppleMLXAndRegistryTests, WorkstationTests/RegistryTests `isolatedDefaults`,
+News tests, BundlePreferencesMigrationTests). A shared test helper that removes the suite in a `defer` would fix them.
+
+## Finishing pass
+
+- Test suites now clean up all preference suites (`Tests/Support/TestDefaults.swift`); a run leaves 0 files behind (was hundreds).
+- Fixed: Images result actions collapse to icons instead of scrolling Delete off the edge; Devices Boot/Shut down buttons have per-device accessibility labels.
+- The generated test image ("a small red kiln glowing…") is in Images → History and Media → Gallery of the real app; deleting needs a right-click or the Delete action, which background control cannot press. Delete it from the app if unwanted.
+- Still open: Permissions pane (per-tool/per-path rules), approval notifications beyond the existing Dock badge, Develop debugger UI check, Swarm run.
+
+## Devices: owner report that the simulator controls "did not work on screen"
+
+Checked on a booted iPad (A16): Launch (Settings, Safari) and Open URL (example.com) did run in the simulator, but the mirror showed the old frame
+for 10-15 s because the action waited for a 74-device `simctl list` before looking at the screen. Fixed: after an action the mirror is captured at 0.3, 1.0
+and 2.5 s before the list refreshes, and the poll interval is 0.8 s (a capture itself takes about 1.4 s on an iPad).
+**Not fixable with Apple's tools:** tapping, swiping and typing on the mirrored screen of an Apple simulator. `simctl` has no input command, so the view says so
+(it used to be a small grey line) and offers **Open in Simulator** (opens that device's window in Simulator.app). Android emulators do get touch and keys through `adb`.
+Real input would need a HID bridge: `idb` (not installed here), or a private SimulatorKit client, or XCUITest-driven taps. Brief for whoever takes it: add an `AppleInputBackend`
+behind `DeviceService.Input` that prefers `idb ui tap/swipe/text` when `idb_companion` is present, show the install hint when it is not, and keep the Simulator.app fallback.
+
+## Chat slice 2: diff card and task list (2026-11-10)
+
+- **Diff card** (`Core/Platform/RunDiff.swift`, `Modules/Chat/RunCards.swift`): after a run that edited files, the thread shows "Changed N files +a −d" with a unified diff per file and a confirmed
+  **Revert** per file (restores the saved copy, or moves a file the run created to the Trash; refuses when the file changed after the run). Seen working on screen, including both reverts.
+  A `.task` on an empty `Group` never ran, so the card first did not appear; it is on a `VStack` now.
+- **Task list** (`kiln_todo_write`, `Core/Platform/TodoList.swift`): the agent writes the whole list; a card above the composer shows it. 9 unit tests pass; **not seen on screen**:
+  the local 7B model wrote a `todos.txt` file instead of calling the tool, Ollama Cloud answered "payment required", and `gemma4:e4b` was too slow to finish. A line in the agent prompt now says to use the tool.
+- The model picker hides recents that no provider offers (a leaked `stub-m1` kept appearing there; something outside this checkout's tests still writes it into the real `chat.recentModels`).
+- Owner todo for the next session: see `docs/30-CHAT-MAPS-LAYOUT-PLAN.md` section 6 (chat display and tool calls, round limit, Shift+Return, full chat audit).
+
+## Local models and capability detection (2026-11-11)
+
+- Kiln now asks Ollama `/api/show` for each local model's capabilities (tools, vision, thinking) and trained context instead of guessing from the name; the shown window is `min(trained, 8192)` because Kiln runs local models at `num_ctx` 8192. Unit tests pass; full suite green (934 tests).
+- `huihui_ai/qwen3.5-abliterated:9b` is installed and makes real structured tool calls (checked with `Scripts/test-ollama-tools.sh`).
+- **Not done:** security models (`foundation-sec-abliterated:8b`, `baronllm-abliterated:8b`) could not be pulled, the external model drive is full (1.6 GB free). Owner decides which old models to remove; the audit and commands are in `docs/32-LOCAL-MODELS.md`.
+- **Not seen on screen:** the live status line, the task-list card and the new model in the picker; the screen was locked during the last session, so screenshots failed. Re-check once the screen is unlocked (select the qwen3.5 model, run a multi-tool task).

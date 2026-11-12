@@ -4,6 +4,7 @@ import SwiftUI
 /// command palette over everything.
 struct MainWindow: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.openSettings) private var openSettings
     @State private var workstation = WorkstationModel()
     /// Sidebar (244) + the narrowest tool (about 600) + the panel (360), with some air.
     static let dockMinimumWindowWidth: CGFloat = 1240
@@ -13,16 +14,30 @@ struct MainWindow: View {
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     if workstation.sidebarVisible {
-                        WorkstationSidebar(workstation: workstation)
+                        WorkstationSidebar(workstation: workstation,
+                                           chatVisible: workstation.selected == .agent || (workstation.dockShown && geometry.size.width >= Self.dockMinimumWindowWidth))
                         Divider()
                     }
-                    activityContent
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .background(SSColor.canvas)
-                    // The agent panel yields before the work does: below this width the tool in front needs the room.
-                    if workstation.dockShown, geometry.size.width >= Self.dockMinimumWindowWidth, let session = app.chatSession {
-                        Divider()
-                        AgentDockView(session: session, context: workstation.selected, workstation: workstation)
+                    if let session = app.chatSession,
+                       workstation.selected == .agent || (workstation.usesRightCanvas && workstation.dockVisible && geometry.size.width >= Self.dockMinimumWindowWidth) {
+                        HSplitView {
+                            ChatRootView(session: session)
+                                .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+                            if workstation.selected != .agent {
+                                activityContent
+                                    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                    .background(SSColor.canvas)
+                            }
+                        }
+                    } else {
+                        activityContent
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                            .background(SSColor.canvas)
+                        // Deep work keeps the large central surface with the compact conversation alongside it.
+                        if workstation.dockShown, geometry.size.width >= Self.dockMinimumWindowWidth, let session = app.chatSession {
+                            Divider()
+                            AgentDockView(session: session, context: workstation.selected, workstation: workstation)
+                        }
                     }
                 }
                 StatusBar(workstation: workstation)
@@ -32,6 +47,44 @@ struct MainWindow: View {
         .background(SSColor.canvas)
         .tint(SSColor.accent)
         .navigationTitle("Kiln — \(workstation.selected.title)")
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button { workstation.sidebarVisible.toggle() } label: {
+                    Label("Toggle sidebar", systemImage: "sidebar.left")
+                }
+                .help(workstation.sidebarVisible ? "Hide sidebar (⌃⌘S)" : "Show sidebar (⌃⌘S)")
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { workstation.select(.agent, app: app) } label: {
+                    Label("Chat", systemImage: "bubble.left.and.text.bubble.right")
+                }
+                .help("Open chat")
+                Button { workstation.select(.develop, app: app) } label: {
+                    Label("Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+                .help("Open Develop")
+                ForEach([Activity.browser, .maps, .devices]) { activity in
+                    Button {
+                        workstation.select(workstation.selected == activity ? .agent : activity, app: app)
+                    } label: {
+                        Label(activity.title, systemImage: activity.symbol)
+                    }
+                    .help("\(activity.title) — \(activity.summary)")
+                    .accessibilityAddTraits(workstation.selected == activity ? .isSelected : [])
+                }
+                Menu {
+                    ForEach(Activity.allCases.filter(\.descriptor.showsInSidebar)) { activity in
+                        Button { workstation.select(activity, app: app) } label: {
+                            Label(activity.title, systemImage: activity.symbol)
+                        }
+                    }
+                } label: {
+                    Label("Work", systemImage: "square.grid.2x2")
+                }
+                .help("Open a workspace")
+            }
+        }
+        .onChange(of: workstation.settingsRequests) { _, _ in openSettings() }
         .overlay { paletteOverlay }
         .background { shortcuts }
         .onChange(of: app.requestedActivity, initial: true) { _, activity in
