@@ -42,6 +42,16 @@ public struct MailService: Sendable {
         public var isUnread: Bool { !flags.contains("\\Seen") }
     }
 
+    /// Proves the incoming and outgoing settings and the password work, without reading or sending any mail.
+    public static func verify(_ account: MailAccount, password: String) async throws {
+        let imap = try IMAPClient(host: account.imapHost, port: account.imapPort, security: account.imapSecurity, timeout: 15)
+        try await imap.connect()
+        do { try await imap.login(user: account.username, password: password) } catch { await imap.logout(); throw error }
+        await imap.logout()
+        let smtp = try SMTPClient(host: account.smtpHost, port: account.smtpPort, security: account.smtpSecurity, timeout: 15)
+        try await smtp.verifyLogin(user: account.username, password: password)
+    }
+
     public func folders() async throws -> [IMAPClient.Mailbox] {
         try await withClient { try await $0.listMailboxes() }
     }

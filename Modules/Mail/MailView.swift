@@ -25,9 +25,13 @@ struct MailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, SSSpacing.m).padding(.vertical, 4)
             }
             if state.account == nil {
-                VStack(spacing: SSSpacing.m) {
-                    SSEmptyState(symbol: "envelope", title: "No mail account yet", message: "Add an account to read and write email. Passwords are kept in your Keychain; Kiln never shows them again.")
-                    Button("Add an account") { addingAccount = true }.buttonStyle(.borderedProminent)
+                // Built here rather than with SSEmptyState, which fills the pane and pushed the button to the bottom edge.
+                VStack(spacing: SSSpacing.s) {
+                    Image(systemName: "envelope").font(.system(size: 28)).foregroundStyle(.secondary)
+                    Text("No mail account yet").font(SSTypography.headline())
+                    Text("Add an account to read and write email. Passwords are kept in your Keychain; Kiln never shows them again.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 360)
+                    Button("Add an account") { addingAccount = true }.buttonStyle(.borderedProminent).padding(.top, SSSpacing.s)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -109,32 +113,71 @@ struct AddMailAccountSheet: View {
     @State private var name = ""
     @State private var address = ""
     @State private var password = ""
+    @State private var working = false
+    @State private var failure: String?
+    @State private var showAdvanced = false
     @State private var imapHost = ""
     @State private var smtpHost = ""
+    @State private var imapPort = "993"
+    @State private var smtpPort = "465"
+    @State private var imapSecurity = MailSecurity.tls
+    @State private var smtpSecurity = MailSecurity.tls
+
+    private var domain: String? { MailAutoconfig.domain(of: address) }
+    private var guide: MailProviderGuide.Note? { domain.flatMap(MailProviderGuide.note(for:)) }
+    private var canContinue: Bool { !address.isEmpty && !password.isEmpty && !working && (!showAdvanced || (!imapHost.isEmpty && !smtpHost.isEmpty)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: SSSpacing.m) {
             Text("Add a mail account").font(SSTypography.title())
-            TextField("Your name", text: $name)
-            TextField("Email address", text: $address).onChange(of: address) { _, v in
-                if let preset = MailAccount.preset(for: v) { imapHost = preset.imapHost; smtpHost = preset.smtpHost }
+            Text("Enter your details. Kiln finds the servers and checks the sign-in before saving anything.").font(SSTypography.caption()).foregroundStyle(.secondary)
+            TextField("Name", text: $name)
+            TextField("Email address", text: $address).onSubmit { if canContinue { go() } }
+            SecureField("Password", text: $password).onSubmit { if canContinue { go() } }
+            if let guide {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "info.circle").foregroundStyle(SSColor.accent)
+                    Text(guide.text).font(SSTypography.caption()).foregroundStyle(.secondary)
+                    if let url = guide.url { Link("Open", destination: url).font(SSTypography.caption()) }
+                }
             }
-            SecureField("Password or app password", text: $password)
-            TextField("Incoming server (IMAP)", text: $imapHost)
-            TextField("Outgoing server (SMTP)", text: $smtpHost)
-            Text("Connections use TLS (ports 993 and 465). Gmail, iCloud, Outlook and Yahoo need an app-specific password. The password is saved in your Keychain.")
-                .font(SSTypography.caption()).foregroundStyle(.secondary)
-            if let message = state.message { Text(message).font(SSTypography.caption()).foregroundStyle(SSColor.danger) }
+            DisclosureGroup("Advanced: set the servers yourself", isExpanded: $showAdvanced) {
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Incoming server (IMAP)", text: $imapHost)
+                    HStack {
+                        TextField("Port", text: $imapPort).frame(width: 80)
+                        Picker("Incoming security", selection: $imapSecurity) { ForEach(MailSecurity.allCases, id: \.self) { Text($0.label).tag($0) } }.labelsHidden().fixedSize()
+                    }
+                    TextField("Outgoing server (SMTP)", text: $smtpHost)
+                    HStack {
+                        TextField("Port", text: $smtpPort).frame(width: 80)
+                        Picker("Outgoing security", selection: $smtpSecurity) { ForEach(MailSecurity.allCases, id: \.self) { Text($0.label).tag($0) } }.labelsHidden().fixedSize()
+                    }
+                    Text("Unencrypted connections are accepted only for localhost, to test with a local mail server.").font(SSTypography.caption()).foregroundStyle(.secondary)
+                }.padding(.top, 4)
+            }
+            if let failure { Text(failure).font(SSTypography.caption()).foregroundStyle(SSColor.danger).fixedSize(horizontal: false, vertical: true) }
             HStack {
+                if working { ProgressView().controlSize(.small); Text("Finding servers and checking your sign-in…").font(SSTypography.caption()).foregroundStyle(.secondary) }
                 Spacer()
                 Button("Cancel") { isPresented = false }.keyboardShortcut(.cancelAction)
-                Button("Add") {
-                    state.add(MailAccount(displayName: name, address: address, imapHost: imapHost, smtpHost: smtpHost), password: password)
-                    if state.message == nil { isPresented = false }
-                }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(address.isEmpty || password.isEmpty || imapHost.isEmpty || smtpHost.isEmpty)
+                Button("Continue") { go() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent).disabled(!canContinue)
             }
         }
-        .textFieldStyle(.roundedBorder).padding(SSSpacing.l).frame(width: 440)
+        .textFieldStyle(.roundedBorder).padding(SSSpacing.l).frame(width: 460)
+    }
+
+    private func go() {
+        failure = nil; working = true
+        let manual: MailAccount? = showAdvanced ? Int(imapPort).flatMap { imap in Int(smtpPort).map { smtp in
+            MailAccount(displayName: name, address: address, imapHost: imapHost, imapPort: imap, imapSecurity: imapSecurity, smtpHost: smtpHost, smtpPort: smtp, smtpSecurity: smtpSecurity)
+        } } : nil
+        if showAdvanced && manual == nil { failure = "Ports must be numbers."; working = false; return }
+        Task {
+            let error = await state.setUp(name: name, address: address, password: password, manual: manual)
+            working = false
+            if let error { failure = error; if error.contains("Open Advanced") { showAdvanced = true } } else { isPresented = false }
+        }
     }
 }
 

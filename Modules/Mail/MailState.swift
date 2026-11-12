@@ -29,6 +29,19 @@ final class MailState {
         } catch { message = error.localizedDescription }
     }
 
+    /// Finds the servers, proves the sign-in works, then saves. Returns an explanation on failure, nil on success.
+    func setUp(name: String, address: String, password: String, manual: MailAccount?) async -> String? {
+        do {
+            let account = try await MailSetup.run(name: name, address: address, password: password, manual: manual)
+            try store.save(account, password: password)
+            load(); selectedAccountID = account.id; message = nil
+            Task { await refresh() }
+            return nil
+        } catch {
+            return MailSetup.explain(error, provider: MailAutoconfig.domain(of: address))
+        }
+    }
+
     func remove(_ account: MailAccount) {
         try? store.remove(account)
         selectedAccountID = nil; rows = []; folders = []

@@ -156,6 +156,12 @@ struct MailAccountTests {
         #expect(a.validationProblem == nil)
         a.address = "nope"
         #expect(a.validationProblem == "Enter a full email address.")
+        a.address = "a@b.c"; a.smtpPort = 0
+        #expect(a.validationProblem == "Ports must be between 1 and 65535.")
+        a.smtpPort = 70000
+        #expect(a.validationProblem == "Ports must be between 1 and 65535.")
+        a.smtpPort = 2525
+        #expect(a.validationProblem == nil)
     }
 
     @Test func storeKeepsSettingsInPreferencesAndPasswordsOutOfThem() throws {
@@ -172,5 +178,68 @@ struct MailAccountTests {
         #expect(store.accounts().isEmpty && store.password(for: account) == nil)
         var bad = account; bad.address = "x"
         #expect(throws: MailTransportError.self) { try store.save(bad, password: nil) }
+    }
+}
+
+@Suite("Mail setup")
+struct MailSetupTests {
+    private let thunderbirdXML = """
+    <clientConfig version="1.1"><emailProvider id="example.org">
+      <incomingServer type="imap"><hostname>imap.example.org</hostname><port>993</port><socketType>SSL</socketType><username>%EMAILLOCALPART%</username></incomingServer>
+      <incomingServer type="imap"><hostname>imap.example.org</hostname><port>143</port><socketType>STARTTLS</socketType></incomingServer>
+      <outgoingServer type="smtp"><hostname>smtp.example.org</hostname><port>465</port><socketType>SSL</socketType><username>%EMAILADDRESS%</username></outgoingServer>
+    </emailProvider></clientConfig>
+    """
+
+    @Test func configXMLYieldsImplicitTLSServersAndUsernames() throws {
+        let account = try MailAutoconfig.parse(xml: Data(thunderbirdXML.utf8), address: "sam@example.org", displayName: "Sam").get()
+        #expect(account.imapHost == "imap.example.org" && account.imapPort == 993 && account.imapSecurity == .tls)
+        #expect(account.smtpHost == "smtp.example.org" && account.smtpPort == 465)
+        #expect(account.username == "sam")
+    }
+
+    @Test func starttlsOnlyAndBrokenConfigsAreReportedHonestly() {
+        let startOnly = "<clientConfig><emailProvider><incomingServer type=\"imap\"><hostname>i.x.org</hostname><port>143</port><socketType>STARTTLS</socketType></incomingServer><outgoingServer type=\"smtp\"><hostname>s.x.org</hostname><port>587</port><socketType>STARTTLS</socketType></outgoingServer></emailProvider></clientConfig>"
+        #expect(MailAutoconfig.parse(xml: Data(startOnly.utf8), address: "a@x.org") == .failure(.needsStartTLS))
+        #expect(MailAutoconfig.parse(xml: Data("<nothing/>".utf8), address: "a@x.org") == .failure(.notFound))
+        #expect(MailAutoconfig.parse(xml: Data("not xml at all".utf8), address: "a@x.org") == .failure(.notFound))
+    }
+
+    @Test func addressDomainsAndProviderGuidance() {
+        #expect(MailAutoconfig.domain(of: "Sam@Example.ORG") == "example.org")
+        #expect(MailAutoconfig.domain(of: "sam@localhost") == nil && MailAutoconfig.domain(of: "@x.org") == nil && MailAutoconfig.domain(of: "no") == nil)
+        #expect(MailProviderGuide.note(for: "gmail.com")?.url?.host == "myaccount.google.com")
+        #expect(MailProviderGuide.note(for: "example.org") == nil)
+    }
+
+    @Test func discoveryUsesPresetsAndRefusesOAuthOnlyProviders() async throws {
+        let found = try await MailAutoconfig.discover(address: "ada@icloud.com", displayName: "Ada", probe: false)
+        #expect(found.account.imapHost == "imap.mail.me.com" && found.account.displayName == "Ada" && found.note != nil)
+        await #expect(throws: MailAutoconfig.Failure.needsOAuth("Outlook.com")) { try await MailAutoconfig.discover(address: "x@outlook.com", probe: false) }
+        await #expect(throws: MailAutoconfig.Failure.badAddress) { try await MailAutoconfig.discover(address: "nope", probe: false) }
+    }
+
+    @Test func setupDiscoversVerifiesAndStopsOnABadPassword() async throws {
+        let discover: MailSetup.Discover = { addr, name in
+            MailAutoconfig.Found(account: MailAccount(displayName: name, address: addr, imapHost: "imap.example.org", smtpHost: "smtp.example.org"), source: "test")
+        }
+        let good = try await MailSetup.run(name: "Sam", address: " sam@example.org ", password: "pw", discover: discover, verify: { _, _ in })
+        #expect(good.address == "sam@example.org" && good.displayName == "Sam")
+        await #expect(throws: MailTransportError.self) {
+            _ = try await MailSetup.run(name: "Sam", address: "sam@example.org", password: "bad", discover: discover,
+                                        verify: { _, _ in throw MailTransportError.authenticationFailed("no") })
+        }
+        // Manual settings skip discovery entirely.
+        let manual = MailAccount(displayName: "", address: "sam@example.org", imapHost: "mail.example.org", smtpHost: "mail.example.org")
+        let used = try await MailSetup.run(name: "S", address: "sam@example.org", password: "pw", manual: manual,
+                                           discover: { _, _ in throw MailAutoconfig.Failure.notFound }, verify: { _, _ in })
+        #expect(used.imapHost == "mail.example.org")
+        await #expect(throws: MailAutoconfig.Failure.badAddress) { _ = try await MailSetup.run(name: "", address: "bad", password: "pw", verify: { _, _ in }) }
+    }
+
+    @Test func authenticationFailuresExplainTheAppPasswordRule() {
+        let text = MailSetup.explain(MailTransportError.authenticationFailed("x"), provider: "gmail.com")
+        #expect(text.contains("refused") && text.contains("app password"))
+        #expect(MailSetup.explain(MailTransportError.timedOut, provider: nil) == MailTransportError.timedOut.localizedDescription)
     }
 }

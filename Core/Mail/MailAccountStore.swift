@@ -39,6 +39,7 @@ public struct MailAccount: Identifiable, Codable, Equatable, Sendable {
     public var validationProblem: String? {
         if !address.contains("@") || address.hasPrefix("@") || address.hasSuffix("@") { return "Enter a full email address." }
         if imapHost.isEmpty || smtpHost.isEmpty { return "Enter the incoming and outgoing server names." }
+        if !(1...65535).contains(imapPort) || !(1...65535).contains(smtpPort) { return "Ports must be between 1 and 65535." }
         if imapSecurity == .none && !["localhost", "127.0.0.1", "::1"].contains(imapHost) { return "Incoming mail must use TLS." }
         if smtpSecurity == .none && !["localhost", "127.0.0.1", "::1"].contains(smtpHost) { return "Outgoing mail must use TLS." }
         return nil

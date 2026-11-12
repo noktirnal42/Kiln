@@ -20,6 +20,8 @@ public enum MailSecurity: String, Codable, Sendable, CaseIterable {
     case tls
     /// No encryption. Only accepted for loopback hosts (tests and local servers); a real server needs TLS.
     case none
+
+    public var label: String { self == .tls ? "TLS (encrypted)" : "None (localhost only)" }
 }
 
 /// A buffered, line-oriented connection for IMAP and SMTP. One reader at a time.

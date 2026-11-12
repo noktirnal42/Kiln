@@ -32,6 +32,19 @@ public actor SMTPClient {
         await connection.close()
     }
 
+    /// Connects and signs in without sending anything, to prove the settings and password work.
+    public func verifyLogin(user: String, password: String) async throws {
+        try await connection.connect()
+        let greeting = try await reply()
+        try expect(greeting, codes: 220)
+        try await send("EHLO \(heloName)", expect: 250)
+        let token = Data(([0] + Array(user.utf8) + [0] + Array(password.utf8))).base64EncodedString()
+        let auth = try await sendRaw("AUTH PLAIN \(token)")
+        _ = try? await sendRaw("QUIT")
+        await connection.close()
+        guard auth.code == 235 else { throw MailTransportError.authenticationFailed(auth.text) }
+    }
+
     /// Lines starting with "." get a second ".", and the data ends with CRLF.CRLF.
     static func dotStuffed(_ message: Data) -> Data {
         var text = String(decoding: message, as: UTF8.self).replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
