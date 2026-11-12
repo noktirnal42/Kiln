@@ -30,6 +30,7 @@ Develop → MCP lists servers imported from Claude Code, Codex and OpenCode conf
 | Contacts (in development) | `contacts_status`, `contacts_search` | Read-only; needs the macOS Contacts permission |
 | Messages (in development) | `messages_conversations`, `messages_read`, `messages_send`, `messages_compose` | Reading needs Full Disk Access; sending needs Automation permission and approval of the conversation and exact text; delivery is not confirmed |
 | Calendar and Reminders (in development) | `calendar_events`, `calendar_create_event`, `reminders_list`, `reminders_create` | Reads gated by macOS permission; creating needs approval; no edit or delete |
+| Cloud drives (in development) | `drive_locations`, `drive_list`, `drive_search`, `drive_read`, `drive_copy_to_project`, `drive_save` | Reads stay inside the chosen drive; copies never overwrite; `drive_save` needs approval; file text is untrusted |
 | GitHub (in development) | `github_prs`, `github_pr`, `github_issues`, `github_runs` | Read-only, through the `gh` sign-in on the Mac; text from GitHub users is untrusted |
 
 ## What is not exposed
