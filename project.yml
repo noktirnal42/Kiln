@@ -121,6 +121,7 @@ targets:
         INFOPLIST_KEY_NSRemindersFullAccessUsageDescription: Kiln reads your reminders so approved agents can list them, and adds one only after you approve it.
         INFOPLIST_KEY_NSAppleEventsUsageDescription: Kiln asks Messages to send a text only when you press Send, or when you approve an agent's request to send one.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: Kiln listens when you dictate or hold a voice conversation with the model.
+        INFOPLIST_KEY_NSFocusStatusUsageDescription: Kiln can read whether a Focus is on, so it holds back notices that can wait. It asks only when you press the button in Settings.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Kiln turns your speech into text for dictation and voice conversations, on this Mac when possible.
         ENABLE_TESTABILITY: YES
         # Xcode also writes (and XcodeGen presets) an SDK-conditional identity that wins over the

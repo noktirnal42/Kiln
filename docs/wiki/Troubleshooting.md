@@ -16,6 +16,8 @@ Before reporting, record the commit or build, macOS and Xcode versions, hardware
 
 ## Agent and approvals
 
+**I get no notifications.** Settings → Notifications shows whether macOS allows them, and each kind can be turned off. Kiln only sends one when it is not the front app, a run was longer than your minimum, and (for finished runs and scheduled tasks) no Focus is on. Approvals are still sent in Focus; macOS's own Focus settings then decide what shows. A denied permission is changed in System Settings, Notifications.
+
 **"To save context, N of M tools are loaded".** The model's context window is too small for all 200-plus tool definitions, so a run starts with the basics and the agent loads the others by asking. If a model never asks, it will not use the module tools (mail, calendar, maps and so on); pick a model with a larger window. The context meter reads lower during a run than when idle because idle also counts the system prompt and loaded tools.
 
 **A message does not send in Messages.** The red text under the thread is the error. A permission refusal means Kiln needs Automation permission for Messages (System Settings, Privacy & Security, Automation); an "unknown" script error is usually a macOS change, so please report it with the text. Reading needs Full Disk Access.

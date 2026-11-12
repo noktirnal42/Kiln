@@ -39,37 +39,44 @@ public protocol AttentionSink: AnyObject {
     func needsApproval(tool: String, conversation: String, pending: Int)
     func cleared(pending: Int)
     func scheduledTaskFinished(name: String)
+    func runFinished(conversation: String, outcome: NotificationEvent.RunOutcome, seconds: Double)
 }
 
-extension AttentionSink { public func scheduledTaskFinished(name: String) {} }
+extension AttentionSink {
+    public func scheduledTaskFinished(name: String) {}
+    public func runFinished(conversation: String, outcome: NotificationEvent.RunOutcome, seconds: Double) {}
+}
 
+/// Sends the notices through `NotificationCoordinator`, which applies the person's preferences, Focus and whether Kiln is in front.
 @MainActor
 public final class SystemAttentionSink: AttentionSink {
-    private var asked = false
-    public init() {}
+    private let coordinator: NotificationCoordinator
+    public init(coordinator: NotificationCoordinator = .shared) { self.coordinator = coordinator }
 
     public func needsApproval(tool: String, conversation: String, pending: Int) {
         NSApp?.dockTile.badgeLabel = "\(pending)"
-        // Only interrupt when Kiln isn't in front; a visible approval sheet is enough otherwise.
-        guard NSApp?.isActive != true else { return }
-        let center = UNUserNotificationCenter.current()
-        if !asked { asked = true; center.requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in } }
-        let content = UNMutableNotificationContent()
-        content.title = "Kiln needs your approval"
-        content.body = "\(conversation): the agent wants to use \(tool)."
-        center.add(UNNotificationRequest(identifier: "kiln.approval", content: content, trigger: nil))
+        let coordinator = coordinator
+        Task { await coordinator.deliver(.approval, title: "Kiln needs your approval", body: "\(conversation): the agent wants to use \(tool).", id: "kiln.approval") }
     }
 
     public func scheduledTaskFinished(name: String) {
-        let center = UNUserNotificationCenter.current()
-        let content = UNMutableNotificationContent()
-        content.title = "Scheduled task finished"
-        content.body = name
-        center.add(UNNotificationRequest(identifier: "kiln.schedule.\(UUID().uuidString)", content: content, trigger: nil))
+        let coordinator = coordinator
+        Task { await coordinator.deliver(.scheduledTaskFinished, title: "Scheduled task finished", body: name, id: "kiln.schedule.\(UUID().uuidString)") }
+    }
+
+    public func runFinished(conversation: String, outcome: NotificationEvent.RunOutcome, seconds: Double) {
+        let title: String
+        switch outcome {
+        case .completed: title = "Kiln finished"
+        case .failed: title = "Kiln stopped with an error"
+        case .paused: title = "Kiln paused and is waiting for you"
+        }
+        let coordinator = coordinator
+        Task { await coordinator.deliver(.runFinished(outcome, seconds: seconds), title: title, body: conversation, id: "kiln.run.\(UUID().uuidString)") }
     }
 
     public func cleared(pending: Int) {
         NSApp?.dockTile.badgeLabel = pending > 0 ? "\(pending)" : nil
-        if pending == 0 { UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["kiln.approval"]) }
+        if pending == 0 { coordinator.clearApprovalNotice() }
     }
 }
