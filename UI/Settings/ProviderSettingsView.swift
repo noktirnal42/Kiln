@@ -80,6 +80,7 @@ struct ProviderSettingsView: View {
     @AppStorage("computerUse.enabled") private var computerUseEnabled = false
     @AppStorage("provider.firstChunkTimeout") private var firstChunkTimeout = 90.0
     @AppStorage(ToolSummaryStyle.defaultsKey) private var toolSummaryStyle = ToolSummaryStyle.sentence.rawValue
+    @AppStorage(SpotlightMode.defaultsKey) private var spotlightMode = SpotlightMode.off.rawValue
     /// Live: macOS can say "Kiln: on" for another copy of Kiln while this copy is not trusted, so show what this copy sees.
     @State private var accessibilityTrusted = AXIsProcessTrusted()
 
@@ -100,6 +101,15 @@ struct ProviderSettingsView: View {
                     }
                     .pickerStyle(.segmented).fixedSize()
                     Text("Kiln follows the system by default. Light, Dark and High Contrast apply to every window.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                    Picker("Search conversations in Spotlight", selection: $spotlightMode) {
+                        ForEach(SpotlightMode.allCases) { Text($0.label).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented).fixedSize()
+                    .onChange(of: spotlightMode) { _, _ in Task { await app.chatSession?.spotlight?.rebuild() } }
+                    Text("Off by default. Spotlight is shared by everyone who uses this Mac account. Titles only adds conversation names; Titles and text also adds what was said, with secrets removed first. Choosing Off removes everything Kiln added.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {

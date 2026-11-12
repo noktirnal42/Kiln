@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import AppIntents
+import CoreSpotlight
 
 @main
 struct KilnApp: App {
@@ -19,6 +20,13 @@ struct KilnApp: App {
             MainWindow()
                 .environment(appModel)
                 .onOpenURL { appModel.openWebURL($0) }
+                .onContinueUserActivity(CSSearchableItemActionType) { activity in
+                    // A Spotlight result for one of our conversations: open it in the Agent.
+                    guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                          let id = ConversationSpotlight.conversationID(from: identifier), let session = appModel.chatSession else { return }
+                    appModel.requestedActivity = .agent
+                    Task { await session.loadConversation(id) }
+                }
                 .task {
                     await appModel.bootstrap()
                 }
