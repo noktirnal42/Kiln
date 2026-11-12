@@ -81,7 +81,7 @@ struct WorkstationTests {
         let list = [
             command("fuzzy", "Take extra mini nail"),   // t-e-r-m-i-n-a-l as a scattered subsequence only
             command("substring", "Subterminal"),         // contains it, but not at a word start
-            command("word", "Go to Terminal"),           // a word starts with it
+            command("word", "Open Terminal"),            // a word starts with it
             command("prefix", "Terminal tools"),         // the title starts with it
             command("exact", "terminal"),
         ]
@@ -123,6 +123,14 @@ struct WorkstationTests {
 
     @Test func rankingIsCaseInsensitive() {
         #expect(CommandRanking.rank([command("a", "Go to Audit")], query: "AUDIT").count == 1)
+    }
+
+    @Test func goToAnActivityOutranksItsAgentToolsWhenTheNameIsTyped() {
+        let commands = [command("tool", "Mail: List email accounts"), command("mail", "Go to Mail"), command("notes", "Go to Notes")]
+        #expect(CommandRanking.rank(commands, query: "mail").first?.id == "mail")
+        #expect(CommandRanking.rank(commands, query: "mai").first?.id == "mail", "a prefix of the activity name also wins")
+        #expect(CommandRanking.rank(commands, query: "go to mail").first?.id == "mail")
+        #expect(CommandRanking.rank(commands, query: "list email").first?.id == "tool", "tool names still rank for their own words")
     }
 
     // MARK: Status

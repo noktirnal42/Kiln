@@ -95,15 +95,23 @@ struct ResearchView: View {
             HSplitView {
                 VStack(spacing: 0) {
                     TextField("Search the library", text: $state.query).textFieldStyle(.roundedBorder).padding(8)
-                    List(selection: $state.selectedID) {
-                        ForEach(state.filtered) { s in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(s.title).fontWeight(.medium).lineLimit(2)
-                                Text(([s.authors.first.map { Citations.split($0).family }, s.year.map(String.init)].compactMap { $0 }).joined(separator: " · ")).font(SSTypography.caption()).foregroundStyle(.secondary)
-                            }.tag(s.id).padding(.vertical, 2)
-                        }
-                    }.listStyle(.plain)
-                    if state.sources.isEmpty { Text("Add a DOI or a PDF to start your library.").font(SSTypography.caption()).foregroundStyle(.secondary).padding() }
+                    if state.sources.isEmpty {
+                        VStack(spacing: SSSpacing.s) {
+                            Image(systemName: "books.vertical").font(.system(size: 28)).foregroundStyle(.secondary)
+                            Text("Your library is empty").font(SSTypography.headline())
+                            Text("Add a DOI or a PDF with the buttons at the top right.").font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity).padding()
+                    }
+                    if !state.sources.isEmpty {
+                        List(selection: $state.selectedID) {
+                            ForEach(state.filtered) { s in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(s.title).fontWeight(.medium).lineLimit(2)
+                                    Text(([s.authors.first.map { Citations.split($0).family }, s.year.map(String.init)].compactMap { $0 }).joined(separator: " · ")).font(SSTypography.caption()).foregroundStyle(.secondary)
+                                }.tag(s.id).padding(.vertical, 2)
+                            }
+                        }.listStyle(.plain)
+                    }
                 }.frame(minWidth: 240, idealWidth: 280)
                 detail.frame(minWidth: 360)
             }

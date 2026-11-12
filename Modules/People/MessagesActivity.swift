@@ -153,7 +153,7 @@ struct MessagesView: View {
                 Button("Try again") { Task { await state.refresh(full: true) } }
             }
             Text("Kiln reads the Messages database on this Mac to show your conversations, and sends through the Messages app. Nothing is uploaded. This is not an Apple-supported interface and may change with macOS updates.")
-                .font(SSTypography.caption()).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 420)
+                .font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 420)
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

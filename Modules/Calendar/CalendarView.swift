@@ -8,6 +8,7 @@ struct CalendarView: View {
     @State private var newReminder = ""
     @State private var message: String?
     @State private var busy = false
+    @State private var loaded = false
     private let service = CalendarService()
 
     var body: some View {
@@ -21,7 +22,7 @@ struct CalendarView: View {
             if let message { Text(message).font(SSTypography.caption()).foregroundStyle(SSColor.danger).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, SSSpacing.m).padding(.vertical, 4) }
             HSplitView {
                 section(title: "Events", symbol: "calendar", access: eventsAccess, what: "Calendar", allow: { eventsAccess = await service.ensureEvents(); await load() }) {
-                    if events.isEmpty { Text("Nothing in the next 7 days.").font(SSTypography.caption()).foregroundStyle(.secondary) }
+                    if loaded, events.isEmpty { Text("Nothing in the next 7 days.").font(SSTypography.caption()).foregroundStyle(.secondary) }
                     ForEach(events) { e in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(e.title.isEmpty ? "(no title)" : e.title).fontWeight(.medium).lineLimit(2)
@@ -36,7 +37,7 @@ struct CalendarView: View {
                         TextField("Add a reminder", text: $newReminder).textFieldStyle(.roundedBorder).onSubmit { add() }
                         Button("Add") { add() }.disabled(newReminder.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-                    if reminders.isEmpty { Text("No open reminders.").font(SSTypography.caption()).foregroundStyle(.secondary) }
+                    if loaded, reminders.isEmpty { Text("No open reminders.").font(SSTypography.caption()).foregroundStyle(.secondary) }
                     ForEach(reminders) { r in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(r.title).lineLimit(2)
@@ -65,7 +66,7 @@ struct CalendarView: View {
     }
 
     private func load() async {
-        busy = true; defer { busy = false }
+        busy = true; defer { busy = false; loaded = true }
         eventsAccess = service.eventsAccess; remindersAccess = service.remindersAccess
         let start = Calendar.current.startOfDay(for: Date())
         do {

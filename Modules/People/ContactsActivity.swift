@@ -36,7 +36,7 @@ struct ContactsView: View {
                         Button("Allow access to Contacts") { Task { access = await service.ensureAccess() } }.buttonStyle(.borderedProminent)
                     }
                     Text("Kiln only reads contacts, to complete email addresses and let approved agents look people up. It never changes them.")
-                        .font(SSTypography.caption()).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 360)
+                        .font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 360)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 TextField("Search by name, company or email", text: $query).textFieldStyle(.roundedBorder).padding(SSSpacing.m)
