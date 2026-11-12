@@ -76,3 +76,5 @@ public struct MailAccountStore {
         try? keychain.delete(module: Self.keychainModule, key: account.id.uuidString)
     }
 }
+
+extension MailAccountStore: @unchecked Sendable {}   // UserDefaults and the Keychain wrapper are safe to use from any thread

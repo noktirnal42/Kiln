@@ -152,6 +152,47 @@ struct MailTransportTests {
         }
     }
 
+    @Test func serviceReadsRecentMessagesNewestFirstAndThreadsThem() async throws {
+        func raw(_ id: String, _ subject: String, _ extra: String = "") -> String {
+            "Message-ID: <\(id)>\r\nSubject: \(subject)\r\n\(extra)Date: Tue, 10 Nov 2026 09:30:00 -0700\r\n\r\nbody\r\n"
+        }
+        let one = raw("a", "Plan"), two = raw("b", "Re: Plan", "In-Reply-To: <a>\r\n")
+        let server = try ScriptedMailServer(greeting: "* OK ready") { line, _ in
+            let parts = line.split(separator: " ", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { return [] }
+            let tag = parts[0], cmd = parts[1]
+            if cmd.hasPrefix("LOGIN") { return [crlf("\(tag) OK")] }
+            if cmd.hasPrefix("EXAMINE") { return [crlf("* 2 EXISTS"), crlf("\(tag) OK")] }
+            if cmd.hasPrefix("UID SEARCH") { return [crlf("* SEARCH 1 2"), crlf("\(tag) OK")] }
+            if cmd.hasPrefix("UID FETCH") {
+                return [crlf("* 1 FETCH (UID 1 FLAGS (\\Seen) BODY[] {\(one.utf8.count)}"), Data(one.utf8), crlf(")"),
+                        crlf("* 2 FETCH (UID 2 FLAGS () BODY[] {\(two.utf8.count)}"), Data(two.utf8), crlf(")"), crlf("\(tag) OK")]
+            }
+            return [crlf("\(tag) OK")]
+        }
+        let port = try await server.start()
+        defer { server.stop() }
+        let account = MailAccount(displayName: "Me", address: "me@example.com", imapHost: "127.0.0.1", imapPort: port, imapSecurity: .none, smtpHost: "127.0.0.1", smtpSecurity: .none)
+        let service = MailService(account: account, password: "pw")
+        let recent = try await service.recent()
+        #expect(recent.map(\.uid) == [2, 1])
+        #expect(recent[0].isUnread && !recent[1].isUnread)
+        let threads = try await service.threads()
+        #expect(threads.count == 1 && threads[0].messages.count == 2)
+        await #expect(throws: MailServiceError.noPassword) { try await MailService(account: account, password: nil).recent() }
+    }
+
+    @Test func sendingNeedsAMatchingApproval() async throws {
+        let account = MailAccount(displayName: "Me", address: "me@example.com", imapHost: "127.0.0.1", imapSecurity: .none, smtpHost: "127.0.0.1", smtpSecurity: .none)
+        let service = MailService(account: account, password: "pw")
+        let draft = MailDraft(from: account.sender, to: [MailAddress(email: "a@example.com")], subject: "Hi", body: "text")
+        for wrong in [SendApproval(accountID: UUID(), recipients: ["a@example.com"], subject: "Hi"),
+                      SendApproval(accountID: account.id, recipients: ["other@example.com"], subject: "Hi"),
+                      SendApproval(accountID: account.id, recipients: ["a@example.com"], subject: "Changed")] {
+            await #expect(throws: MailServiceError.notApproved) { try await service.send(draft, approval: wrong) }
+        }
+    }
+
     @Test func unencryptedMailIsRefusedForRemoteHosts() {
         #expect(throws: MailTransportError.self) { try IMAPClient(host: "imap.example.com", port: 143, security: .none) }
         #expect(throws: MailTransportError.self) { try SMTPClient(host: "smtp.example.com", port: 25, security: .none) }
