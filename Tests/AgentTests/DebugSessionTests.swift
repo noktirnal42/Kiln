@@ -190,6 +190,7 @@ struct DebugSessionTests {
         await session.start(program: fixture.program, workingDirectory: fixture.root)
         try await waitFor(session) { if case .paused = $0 { true } else { false } }
         #expect(session.isPaused)
+        for _ in 0..<100 where session.frames.isEmpty { try await Task.sleep(nanoseconds: 50_000_000) }
         #expect(session.frames.first?.name.contains("first") == true)
         await session.resume()
         try await waitFor(session) { if case .finished = $0 { true } else { false } }
