@@ -69,7 +69,7 @@ struct OpenCodeProviderTests {
         MockURLProtocol.route("/api/tags", json: ProviderTestFixtures.ollamaTags())
         MockURLProtocol.route("/api/chat", sseEvents: ProviderTestFixtures.ollamaSSE(deltas: ["Hel", "lo"]))
         let provider = stubbedProvider()
-        let request = ChatRequest(messages: [ChatMessage(role: .user, content: "hi")], model: "ollama-qwen3:8b")
+        let request = ChatRequest(messages: [ChatMessage(role: .user, content: "hi", images: [ChatImage(data: Data([0, 1, 2]), mimeType: "image/png")])], model: "ollama-qwen3:8b")
         let stream = try await provider.streamChat(request, reasoning: ReasoningConfig.default)
         let chunks = try await collect(stream)
         let contents = chunks.compactMap { $0.delta?.content }.filter { !$0.isEmpty }
@@ -81,6 +81,8 @@ struct OpenCodeProviderTests {
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
         #expect(json["model"] as? String == "qwen3:8b")
         #expect(json["think"] as? Bool == true)
+        let messages = try #require(json["messages"] as? [[String: Any]])
+        #expect(messages.first?["images"] as? [String] == ["AAEC"])
         let options = try #require(json["options"] as? [String: Any])
         #expect(options["num_ctx"] as? Int == 8192)
     }

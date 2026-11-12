@@ -69,6 +69,30 @@ public enum ToolActivitySummary {
     }
 }
 
+/// How a finished run's collapsed line reads: Claude Code's sentence, or Codex's "Worked for 42s".
+public enum ToolSummaryStyle: String, CaseIterable, Identifiable, Sendable {
+    case sentence, worked
+    public static let defaultsKey = "chat.toolSummaryStyle"
+    public var id: String { rawValue }
+    public var label: String { self == .sentence ? "What it did" : "How long it worked" }
+
+    /// "42s", "1m 26s", "1h 05m".
+    public static func duration(_ seconds: TimeInterval) -> String {
+        let total = max(0, Int(seconds))
+        if total < 60 { return "\(total)s" }
+        if total < 3600 { return "\(total / 60)m \(String(format: "%02d", total % 60))s" }
+        return "\(total / 3600)h \(String(format: "%02d", (total % 3600) / 60))m"
+    }
+
+    /// The line for a run of `items` that took `seconds` (unknown when nil). The sentence is the fallback when no duration is known.
+    public func line(for items: [ToolActivityItem], seconds: TimeInterval?) -> String {
+        let sentence = ToolActivitySummary.line(for: items)
+        guard self == .worked, let seconds, seconds >= 1 else { return sentence }
+        let failures = items.filter(\.failed).count
+        return "Worked for \(Self.duration(seconds))" + (failures > 0 ? " · \(failures) failed" : "")
+    }
+}
+
 /// How one tool call reads in the thread: a verb and what it acted on ("Ran" `swift test`), and the live status line text.
 public enum ToolPhrase {
     public struct Title: Equatable, Sendable {

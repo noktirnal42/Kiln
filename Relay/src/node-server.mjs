@@ -1,5 +1,7 @@
 // The same relay on plain Node: for tests, and for self-hosting on any machine you control (put it behind TLS).
 import http from "node:http";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Room } from "./room.mjs";
 
@@ -26,7 +28,14 @@ export function startRelay({ port = 0, host = "127.0.0.1" } = {}) {
   return new Promise((resolve) => server.listen(port, host, () => resolve({ server, port: server.address().port, close: () => { wss.clients.forEach((c) => c.terminate()); server.close(); } })));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run only when started directly. Compare real paths: import.meta.url is already resolved, while argv[1] is as typed, so a symlinked
+// folder (/tmp is /private/tmp on macOS) or a path with spaces used to make the relay exit silently without starting.
+function isMain() {
+  try { return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); }
+  catch { return false; }
+}
+
+if (isMain()) {
   const { port } = await startRelay({ port: Number(process.env.PORT ?? 8787), host: process.env.HOST ?? "0.0.0.0" });
   console.log(`kiln relay listening on :${port}`);
 }

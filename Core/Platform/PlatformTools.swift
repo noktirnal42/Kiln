@@ -4,7 +4,38 @@ import Foundation
 /// agent and external MCP clients can use what the person can. All are named `kiln_*`.
 public enum PlatformTools {
     public static var all: [any ToolExecuting] {
-        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool(), UsageReportTool(), ScheduleListTool(), ScheduleWriteTool(), TodoWriteTool()]
+        [MemoryReadTool(), MemoryWriteTool(), CommandListTool(), CommandExpandTool(), CommandWriteTool(), HooksListTool(), CheckpointListTool(), UsageReportTool(), ScheduleListTool(), ScheduleWriteTool(), TodoWriteTool(), RoundLimitReadTool(), RoundLimitWriteTool()]
+    }
+}
+
+public struct RoundLimitReadTool: ToolExecuting {
+    let limits: AgentRoundLimits
+    public init() { limits = .shared }
+    init(limits: AgentRoundLimits) { self.limits = limits }
+    public var spec: ToolSpec {
+        ToolSpec(name: "kiln_round_limit_read", summary: "Read a profile's agent step limit", detail: "Reads the maximum model rounds for the named agent profile.", parameters: [ToolParam(name: "profile", type: "string", description: "Agent profile name", required: true)], permission: .read)
+    }
+    struct Args: Decodable, Sendable { var profile: String }
+    public func execute(argumentsJSON: String, context: ToolExecutionContext) async throws -> String {
+        let args = try ToolArgs.decode(Args.self, from: argumentsJSON)
+        guard AgentProfile.builtIns.contains(where: { $0.name == args.profile }) else { throw AgentRunError.permissionDenied("Unknown agent profile.") }
+        return "\(args.profile): \(limits.limit(for: args.profile)) steps per run."
+    }
+}
+
+public struct RoundLimitWriteTool: ToolExecuting {
+    let limits: AgentRoundLimits
+    public init() { limits = .shared }
+    init(limits: AgentRoundLimits) { self.limits = limits }
+    public var spec: ToolSpec {
+        ToolSpec(name: "kiln_round_limit_set", summary: "Set a profile's agent step limit", detail: "Changes the limit for future runs, not one already in progress. Requires approval; budget and approval rules still apply.", parameters: [ToolParam(name: "profile", type: "string", description: "Agent profile name", required: true), ToolParam(name: "steps", type: "integer", description: "Maximum model rounds, 1–10000", required: true)], permission: .write)
+    }
+    struct Args: Decodable, Sendable { var profile: String; var steps: Int }
+    public func execute(argumentsJSON: String, context: ToolExecutionContext) async throws -> String {
+        let args = try ToolArgs.decode(Args.self, from: argumentsJSON)
+        guard AgentProfile.builtIns.contains(where: { $0.name == args.profile }), limits.set(args.steps, for: args.profile) else { throw AgentRunError.permissionDenied("Choose a known profile and a limit from 1 to 10000.") }
+        await context.services.audit?.record("agent.round_limit_changed", ["profile": .string(args.profile), "steps": .int(args.steps), "source": .string("tool")])
+        return "\(args.profile) will pause after \(args.steps) steps on its next run."
     }
 }
 

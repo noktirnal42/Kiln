@@ -96,6 +96,9 @@ struct ToolRunSummaryView: View {
 /// Persisted tool calls (name and arguments only: results are not kept) under a reply, collapsed the same way.
 struct StoredToolRunView: View {
     let calls: [ToolCall]
+    /// How long the run took, when it is known (the gap between the question and the saved reply).
+    var seconds: TimeInterval?
+    @AppStorage(ToolSummaryStyle.defaultsKey) private var styleRaw = ToolSummaryStyle.sentence.rawValue
     @State private var expanded = false
 
     var body: some View {
@@ -126,7 +129,8 @@ struct StoredToolRunView: View {
     }
 
     private var line: String {
-        ToolActivitySummary.line(for: calls.map { ToolActivityItem(name: $0.name, argumentsJSON: $0.arguments) })
+        (ToolSummaryStyle(rawValue: styleRaw) ?? .sentence)
+            .line(for: calls.map { ToolActivityItem(name: $0.name, argumentsJSON: $0.arguments) }, seconds: seconds)
     }
 }
 
@@ -352,6 +356,23 @@ struct AgentModeBar: View {
                     }
                 }
                 .labelsHidden().controlSize(.small).frame(maxWidth: 150)
+                if let profile = session.agentProfile {
+                    Menu {
+                        ForEach(AgentRoundLimits.presets, id: \.self) { limit in
+                            Button {
+                                session.setRoundLimit(limit, for: profile)
+                            } label: {
+                                if session.roundLimit(for: profile) == limit { Label("\(limit) steps", systemImage: "checkmark") }
+                                else { Text("\(limit) steps") }
+                            }
+                        }
+                    } label: {
+                        Text("\(session.roundLimit(for: profile)) steps").font(SSTypography.caption())
+                    }
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                    .help("Maximum model rounds for \(profile.name); changes apply to the next run")
+                    .accessibilityLabel("Step limit: \(session.roundLimit(for: profile))")
+                }
                 PermissionModeMenu(center: ApprovalCenter.shared)
                 if session.workspaceRoot == nil {
                     Label("No project", systemImage: "folder.badge.questionmark")
@@ -447,7 +468,6 @@ struct LiveStatusLine: View {
     }
 
     static func elapsed(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds))
-        return total < 60 ? "\(total)s" : "\(total / 60)m \(String(format: "%02d", total % 60))s"
+        ToolSummaryStyle.duration(seconds)
     }
 }

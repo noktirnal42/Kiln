@@ -73,6 +73,7 @@ public final class Message {
     public var tokenCount: Int
     public var order: Int
     public var toolCallsJSON: Data?
+    @Attribute(.externalStorage) public var imagesJSON: Data?
     public var modelID: String?
     public var createdAt: Date
     public var conversation: Conversation?
@@ -84,6 +85,7 @@ public final class Message {
         tokenCount: Int = 0,
         order: Int = 0,
         toolCallsJSON: Data? = nil,
+        imagesJSON: Data? = nil,
         modelID: String? = nil
     ) {
         self.id = UUID()
@@ -93,6 +95,7 @@ public final class Message {
         self.tokenCount = tokenCount
         self.order = order
         self.toolCallsJSON = toolCallsJSON
+        self.imagesJSON = imagesJSON
         self.modelID = modelID
         self.createdAt = Date()
     }

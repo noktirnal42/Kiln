@@ -230,8 +230,22 @@ struct BrowserToolsTests {
         server.standardOutput = FileHandle.nullDevice
         server.standardError = FileHandle.nullDevice
         try server.run()
-        defer { server.terminate() }
-        try await Task.sleep(for: .milliseconds(800))
+        defer { if server.isRunning { server.terminate() } }
+        let address = URL(string: "http://127.0.0.1:\(port)/index.html")!
+        var ready = false
+        for _ in 0..<100 {
+            guard server.isRunning else { break }
+            var request = URLRequest(url: address)
+            request.timeoutInterval = 1
+            if let (data, response) = try? await URLSession.shared.data(for: request),
+               (response as? HTTPURLResponse)?.statusCode == 200,
+               String(data: data, encoding: .utf8)?.contains("Hello from loopback") == true {
+                ready = true
+                break
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        try #require(ready, "Loopback HTTP server did not start or the chosen port was unavailable")
 
         let registry = ToolRegistry()
         BrowserAgentTools.register(module: makeModule(), into: registry)

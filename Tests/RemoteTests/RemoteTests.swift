@@ -271,9 +271,17 @@ struct RemoteRelayTests {
         process.arguments = [script]
         process.environment = ProcessInfo.processInfo.environment.merging(["PORT": "\(port)", "HOST": "127.0.0.1"]) { $1 }
         process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        // Keep the relay's error output so a startup failure says why (a missing package, a port in use) instead of just "exited".
+        let log = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-relay-\(port).log")
+        FileManager.default.createFile(atPath: log.path, contents: nil)
+        process.standardError = try FileHandle(forWritingTo: log)
         try process.run()
         return process
+    }
+
+    private func relayLog(port: Int) -> String {
+        let log = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-relay-\(port).log")
+        return (try? String(contentsOf: log, encoding: .utf8)) ?? ""
     }
 
     @Test("a device reaches the Mac only through the relay, with no direct connection", .enabled(if: RemoteRelayTests.nodeAvailable)) func throughRelay() async throws {
@@ -281,7 +289,7 @@ struct RemoteRelayTests {
         let relay = try startRelay(port: relayPort)
         defer { if relay.isRunning { relay.terminate() } }
         try await Task.sleep(for: .milliseconds(800))
-        try #require(relay.isRunning, "Relay exited during startup; run npm ci --omit=dev --ignore-scripts in Relay and check that the port is available.")
+        try #require(relay.isRunning, "Relay exited during startup (status \(relay.terminationStatus)). Its error output: \(relayLog(port: relayPort).prefix(600)). Run npm ci --omit=dev --ignore-scripts in Relay and check that the port is available.")
         let backend = FakeBackend()
         _ = await backend.open("c1")
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-relay-\(UUID().uuidString)")

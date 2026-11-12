@@ -10,7 +10,15 @@ struct MessageBubble: View {
     var liveReasoning = ""
     @State private var showReasoning = false
     @State private var hovering = false
+    @State private var editing = false
+    @State private var editText = ""
 
+    /// Time from the question to this saved reply; nil while streaming or when there is no question before it.
+    private var workedSeconds: TimeInterval? {
+        guard !isStreaming, let index = session.messages.firstIndex(where: { $0.id == message.id }),
+              let question = session.messages[..<index].last(where: { $0.role == .user }) else { return nil }
+        return message.createdAt.timeIntervalSince(question.createdAt)
+    }
     private var isUser: Bool { message.role == .user }
     private var reasoningText: String {
         isStreaming ? liveReasoning : (message.reasoning ?? "")
@@ -23,6 +31,9 @@ struct MessageBubble: View {
         .onHover { hovering = $0 }
         .contextMenu {
             Button("Copy") { copy() }
+            if message.role == .user {
+                Button("Edit and resend…") { beginEdit() }.disabled(session.isStreaming)
+            }
             Button("Fork from here") { Task { await session.fork(at: message.id) } }
             if message.role == .user {
                 Button("Rewind to here (restore files)") { Task { await session.rewind(to: message.id, restoreFiles: true) } }
@@ -39,12 +50,31 @@ struct MessageBubble: View {
     private var userBody: some View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack {
-                Spacer(minLength: 60)
+                Spacer(minLength: editing ? 0 : 60)
                 let parts = ContextExpander.split(message.content)
                 VStack(alignment: .trailing, spacing: 6) {
-                    Text(parts.visible)
-                        .font(.system(size: 14))
-                        .textSelection(.enabled)
+                    if editing {
+                        VStack(alignment: .trailing, spacing: 6) {
+                            TextEditor(text: $editText)
+                                .font(.system(size: 14)).frame(maxWidth: .infinity, minHeight: 60, maxHeight: 180)
+                                .scrollContentBackground(.hidden)
+                                .padding(4).background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 6))
+                                .accessibilityLabel("Edit message")
+                            HStack(spacing: 6) {
+                                Spacer(minLength: 0)
+                                Button("Cancel") { editing = false }.keyboardShortcut(.cancelAction)
+                                Button("Resend") { editing = false; Task { await session.resubmit(message.id, text: editText) } }
+                                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                                    .disabled(editText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }.controlSize(.small)
+                            Text("Resending removes the replies after this message. Files the agent changed stay as they are.")
+                                .font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true)
+                        }
+                    } else {
+                        Text(parts.visible)
+                            .font(.system(size: 14))
+                            .textSelection(.enabled)
+                    }
                     if !parts.attached.isEmpty {
                         HStack(spacing: 4) {
                             ForEach(parts.attached, id: \.self) { ComposerChip(symbol: "paperclip", title: $0, tint: SSColor.accent) }
@@ -76,10 +106,30 @@ struct MessageBubble: View {
                 }
             }
 
+            if !isStreaming, !message.content.isEmpty {
+                let mentions = FileMentions.extract(from: message.content, root: session.workspaceRoot)
+                if !mentions.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(mentions) { mention in
+                            Button { session.fileOpenRequest = FileOpenRequest(path: mention.path, line: mention.line) } label: {
+                                Label(mention.line.map { "\(mention.name):\($0)" } ?? mention.name, systemImage: "doc.text")
+                                    .font(.system(size: 11.5, design: .monospaced)).lineLimit(1)
+                                    .padding(.horizontal, 7).padding(.vertical, 3)
+                                    .background(SSColor.surfaceRaised, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(SSColor.hairline))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Open \(mention.path) in the editor")
+                            .accessibilityLabel("Open \(mention.path) in the editor")
+                        }
+                    }
+                }
+            }
+
             if isStreaming { ThinkingDots(label: message.content.isEmpty && reasoningText.isEmpty ? "Working" : nil) }
 
             if !message.toolCalls.isEmpty {
-                StoredToolRunView(calls: message.toolCalls)
+                StoredToolRunView(calls: message.toolCalls, seconds: workedSeconds)
             }
 
             if !isStreaming { actionRow }
@@ -115,6 +165,11 @@ struct MessageBubble: View {
         }
     }
 
+    private func beginEdit() {
+        editText = ContextExpander.split(message.content).visible
+        editing = true
+    }
+
     // MARK: Actions
 
     private var actionRow: some View {
@@ -131,6 +186,9 @@ struct MessageBubble: View {
             }
             HStack(spacing: 2) {
                 actionButton("doc.on.doc", "Copy") { copy() }
+                if message.role == .user && !session.isStreaming {
+                    actionButton("pencil", "Edit and resend") { beginEdit() }
+                }
                 if message.role == .assistant {
                     actionButton("arrow.clockwise", "Regenerate") { Task { await session.regenerate() } }
                 }

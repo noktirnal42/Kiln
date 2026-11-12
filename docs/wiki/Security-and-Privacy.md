@@ -26,6 +26,17 @@ Kiln can run commands, edit files, call providers, inspect binaries and serve an
 
 Provider requests send prompts, selected context and tool results to the provider you chose. Local providers (Ollama, MLX, Apple Foundation Models on-device) keep them on the Mac. Kiln itself has no account and no telemetry service described in the repository documents.
 
+## Permissions for mail, contacts, messages and calendar (in development)
+
+These activities exist only in the development branch and are not in a published release. Each asks macOS for its own permission, and Kiln does not ask for any of them until you press the matching Allow button.
+
+- **Mail:** account passwords are stored in the macOS Keychain, never in preferences or logs. Kiln connects over TLS only (plain connections are accepted only for localhost). Sending needs an explicit Send in the window, or your approval of an agent's exact recipients and subject.
+- **Contacts:** read-only. Kiln never creates, edits or deletes contacts.
+- **Calendar and Reminders:** read, and add an event or reminder after approval. Nothing is edited or deleted.
+- **Messages:** reading your conversations needs Full Disk Access for Kiln (macOS has no lighter permission for this), and sending needs Automation permission to control the Messages app. Apple documents no supported interface for either, so a macOS update can break them. Nothing is uploaded.
+- **GitHub:** read-only, through the `gh` sign-in already on your Mac. Kiln never sees the token.
+- **Untrusted text:** mail, texts, calendar entries and GitHub text come from other people. Kiln labels them untrusted for agents, and sending or creating anything still needs your approval.
+
 ## Privacy do's
 
 - Keep keys in Settings; never in source, screenshots or issues.

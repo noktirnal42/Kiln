@@ -9,11 +9,13 @@ struct ActivityRegistryTests {
 
     @Test func theActivitiesKeepTheirOrderSidebarAndShortcuts() {
         #expect(registry.descriptors.map(\.id) ==
-                ["home", "agent", "swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news"])
+                ["home", "agent", "swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news",
+                 "mail", "calendar", "contacts", "messages", "github"])
         #expect(Activity.allCases.compactMap { $0.shortcutKey.map(String.init) } == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
         // Home has the logo and Agent has New chat; the rest are the sidebar's Workstation list, in order.
         #expect(Activity.allCases.filter(\.descriptor.showsInSidebar).map(\.id) ==
-                ["swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news"])
+                ["swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news",
+                 "mail", "calendar", "contacts", "messages", "github"])
     }
 
     @Test func idsAreUniqueAndEveryActivityIsComplete() {
@@ -38,7 +40,7 @@ struct ActivityRegistryTests {
 
     @Test func policyPrefixesComeFromTheRegistryAndMatchTheOldList() {
         #expect(Set(ExecutionPolicy.moduleToolPrefixes) ==
-                ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_", "ide_", "image_", "maps_", "news_"])
+                ["re_", "lab_", "swarm_", "mcp_", "computer_", "browser_", "device_", "media_", "ide_", "image_", "maps_", "news_", "mail_", "contacts_", "messages_", "calendar_", "reminders_", "github_"])
         #expect(ExecutionPolicy.isModuleTool("media_open") && !ExecutionPolicy.isModuleTool("read_file"))
     }
 

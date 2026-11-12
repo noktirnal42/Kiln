@@ -21,6 +21,8 @@ public enum AgentEvent: Sendable {
     case contextCompacted(ContextCompaction)
     /// Estimated tokens in the request about to be sent, against the model's window. Not audited.
     case contextMeasured(used: Int, window: Int)
+    /// In-memory model context at a step-limit pause. Never write this event to the audit log.
+    case pausedContext([ChatMessage])
     case finished(AgentRunSummary)
 }
 
@@ -485,7 +487,7 @@ public final class AgentOrchestrator: Sendable {
 
         var history = initialHistory
         if !profile.systemPrompt.isEmpty {
-            history.insert(ChatMessage(role: .system, content: profile.systemPrompt), at: 0)
+            history.insert(ChatMessage(role: .system, content: profile.systemPrompt, metadata: ["kiln_profile_system": "1"]), at: 0)
         }
         if !hookNotes.isEmpty { finalPrompt += "\n\n[Notes from hooks]\n" + hookNotes.joined(separator: "\n") }
         history.append(ChatMessage(role: .user, content: finalPrompt, metadata: [ContextMetadata.prompt: "1"]))
@@ -658,6 +660,9 @@ public final class AgentOrchestrator: Sendable {
 
         if let hooks { _ = await hooks.run(.stop, payload: ["rounds": summary.rounds, "tool_calls": summary.toolCallsExecuted]) }
         summary.finalText = assistantText
+        if summary.pausedAfterRounds != nil {
+            yield(.pausedContext(history.filter { $0.metadata["kiln_profile_system"] != "1" }))
+        }
         yield(.finished(summary))
     }
 

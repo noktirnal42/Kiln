@@ -79,6 +79,7 @@ struct ProviderSettingsView: View {
     @State private var model = ProviderSettingsModel()
     @AppStorage("computerUse.enabled") private var computerUseEnabled = false
     @AppStorage("provider.firstChunkTimeout") private var firstChunkTimeout = 90.0
+    @AppStorage(ToolSummaryStyle.defaultsKey) private var toolSummaryStyle = ToolSummaryStyle.sentence.rawValue
     /// Live: macOS can say "Kiln: on" for another copy of Kiln while this copy is not trusted, so show what this copy sees.
     @State private var accessibilityTrusted = AXIsProcessTrusted()
 
@@ -102,11 +103,31 @@ struct ProviderSettingsView: View {
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                    Picker("Finished steps in chat", selection: $toolSummaryStyle) {
+                        ForEach(ToolSummaryStyle.allCases) { Text($0.label).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented).fixedSize()
+                    Text("After a run, the steps fold into one line: what it did (\"Ran 2 commands and read 3 files\") or how long it worked (\"Worked for 42s\"). Click the line to see each step.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
                     Stepper(value: $firstChunkTimeout, in: 10...600, step: 15) {
                         Text("Wait for a first reply: \(Int(firstChunkTimeout)) s")
                     }
                     Text("Hosted models sometimes queue a request for a minute or more before answering. A request with no reply by then is reported as stalled instead of hanging.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                if let session = app.chatSession {
+                    VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                        Text("Agent step limits").font(SSTypography.headline())
+                        ForEach(session.agentProfiles, id: \.name) { profile in
+                            Stepper(value: Binding(get: { session.roundLimit(for: profile) }, set: { session.setRoundLimit($0, for: profile) }), in: AgentRoundLimits.allowed, step: 50) {
+                                Text("\(profile.name): \(session.roundLimit(for: profile)) steps")
+                            }
+                        }
+                        Text("Each run pauses at its profile's limit. Changes apply to the next run; approvals and budgets still apply.")
+                            .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    }
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
                     Toggle("Computer use", isOn: $computerUseEnabled)

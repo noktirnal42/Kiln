@@ -11,5 +11,14 @@
 	<!-- Location is requested only from the Maps activity and remains subject to macOS authorization. -->
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
+	<!-- Contacts are read (never written) for address lookup in Mail and by approved agents; still subject to macOS authorization. -->
+	<key>com.apple.security.personal-information.addressbook</key>
+	<true/>
+	<!-- Calendar and Reminders are read, and events and reminders are added only after approval; never edited or deleted. Still subject to macOS authorization. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+	<!-- Sending texts drives the Messages app with Apple Events, after the person allows it in Automation settings. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
 </dict>
 </plist>
