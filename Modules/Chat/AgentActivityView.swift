@@ -96,6 +96,9 @@ struct ToolRunSummaryView: View {
 /// Persisted tool calls (name and arguments only: results are not kept) under a reply, collapsed the same way.
 struct StoredToolRunView: View {
     let calls: [ToolCall]
+    /// How long the run took, when it is known (the gap between the question and the saved reply).
+    var seconds: TimeInterval?
+    @AppStorage(ToolSummaryStyle.defaultsKey) private var styleRaw = ToolSummaryStyle.sentence.rawValue
     @State private var expanded = false
 
     var body: some View {
@@ -126,7 +129,8 @@ struct StoredToolRunView: View {
     }
 
     private var line: String {
-        ToolActivitySummary.line(for: calls.map { ToolActivityItem(name: $0.name, argumentsJSON: $0.arguments) })
+        (ToolSummaryStyle(rawValue: styleRaw) ?? .sentence)
+            .line(for: calls.map { ToolActivityItem(name: $0.name, argumentsJSON: $0.arguments) }, seconds: seconds)
     }
 }
 
@@ -464,7 +468,6 @@ struct LiveStatusLine: View {
     }
 
     static func elapsed(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds))
-        return total < 60 ? "\(total)s" : "\(total / 60)m \(String(format: "%02d", total % 60))s"
+        ToolSummaryStyle.duration(seconds)
     }
 }

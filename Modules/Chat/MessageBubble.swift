@@ -11,6 +11,12 @@ struct MessageBubble: View {
     @State private var showReasoning = false
     @State private var hovering = false
 
+    /// Time from the question to this saved reply; nil while streaming or when there is no question before it.
+    private var workedSeconds: TimeInterval? {
+        guard !isStreaming, let index = session.messages.firstIndex(where: { $0.id == message.id }),
+              let question = session.messages[..<index].last(where: { $0.role == .user }) else { return nil }
+        return message.createdAt.timeIntervalSince(question.createdAt)
+    }
     private var isUser: Bool { message.role == .user }
     private var reasoningText: String {
         isStreaming ? liveReasoning : (message.reasoning ?? "")
@@ -79,7 +85,7 @@ struct MessageBubble: View {
             if isStreaming { ThinkingDots(label: message.content.isEmpty && reasoningText.isEmpty ? "Working" : nil) }
 
             if !message.toolCalls.isEmpty {
-                StoredToolRunView(calls: message.toolCalls)
+                StoredToolRunView(calls: message.toolCalls, seconds: workedSeconds)
             }
 
             if !isStreaming { actionRow }

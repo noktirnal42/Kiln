@@ -79,6 +79,7 @@ struct ProviderSettingsView: View {
     @State private var model = ProviderSettingsModel()
     @AppStorage("computerUse.enabled") private var computerUseEnabled = false
     @AppStorage("provider.firstChunkTimeout") private var firstChunkTimeout = 90.0
+    @AppStorage(ToolSummaryStyle.defaultsKey) private var toolSummaryStyle = ToolSummaryStyle.sentence.rawValue
     /// Live: macOS can say "Kiln: on" for another copy of Kiln while this copy is not trusted, so show what this copy sees.
     @State private var accessibilityTrusted = AXIsProcessTrusted()
 
@@ -99,6 +100,14 @@ struct ProviderSettingsView: View {
                     }
                     .pickerStyle(.segmented).fixedSize()
                     Text("Kiln follows the system by default. Light, Dark and High Contrast apply to every window.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                    Picker("Finished steps in chat", selection: $toolSummaryStyle) {
+                        ForEach(ToolSummaryStyle.allCases) { Text($0.label).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented).fixedSize()
+                    Text("After a run, the steps fold into one line: what it did (\"Ran 2 commands and read 3 files\") or how long it worked (\"Worked for 42s\"). Click the line to see each step.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
