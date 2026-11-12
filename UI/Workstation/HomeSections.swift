@@ -10,7 +10,7 @@ enum HomeSections {
 
     private static let layout: [(title: String, ids: [String])] = [
         ("Work", ["agent", "swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news"]),
-        ("Communication", ["mail", "messages", "contacts", "calendar"]),
+        ("Communication", ["mail", "messages", "slack", "contacts", "calendar"]),
         ("Files and knowledge", ["notes", "drives", "research", "github"]),
     ]
 

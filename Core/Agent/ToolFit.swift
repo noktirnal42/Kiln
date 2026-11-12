@@ -18,7 +18,7 @@ public enum ToolFit {
     /// Tools every run needs: files, search, shell, git, web, MCP and Kiln's own task list, in the order they are kept.
     static let coreOrder = ["read", "list", "glob", "grep", "search", "edit", "write", "run", "git", "web", "stream", "background", "delete", "mcp", "kiln"]
     /// Module tool groups (the text before the first underscore), most generally useful first. Groups not listed come last.
-    static let groupOrder = ["ide", "browser", "computer", "mail", "messages", "calendar", "reminders", "contacts", "notes", "github",
+    static let groupOrder = ["ide", "browser", "computer", "mail", "messages", "slack", "calendar", "reminders", "contacts", "notes", "github",
                              "drive", "pdf", "library", "news", "media", "image", "maps", "device", "lab", "re"]
 
     /// The fraction of the window the tool definitions may use.
