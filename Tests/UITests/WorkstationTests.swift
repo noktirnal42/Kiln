@@ -150,6 +150,20 @@ struct WorkstationTests {
         #expect(sections.last?.activities.map(\.id) == ["brand-new"])
     }
 
+    @Test func aPointerRestingOnThePaletteNeverStealsTheHighlight() {
+        var gate = PaletteHoverGate()
+        let first = gate.pointerMoved(to: CGPoint(x: 300, y: 250))
+        let repeated = gate.pointerMoved(to: CGPoint(x: 300, y: 250))
+        let jitter = gate.pointerMoved(to: CGPoint(x: 300.2, y: 250.3))
+        let moved = gate.pointerMoved(to: CGPoint(x: 300, y: 262))
+        let restingAgain = gate.pointerMoved(to: CGPoint(x: 300, y: 262))
+        #expect(!first, "the first event only records where the pointer is")
+        #expect(!repeated, "the list reordering under a resting pointer repeats the position")
+        #expect(!jitter, "sub-point jitter is not movement")
+        #expect(moved, "a real move selects the row under the pointer")
+        #expect(!restingAgain)
+    }
+
     @Test func recentModelsThatAreNotOfferedNeverShow() {
         let recents = ["stub-m1", "ollama-qwen3:8b", "ollama-cloud-gemma4:31b", "nvidia-nim-glm"]
         #expect(ModelPickerRecents.visible(recents, selected: "nvidia-nim-glm", available: ["ollama-qwen3:8b", "nvidia-nim-glm"]) == ["ollama-qwen3:8b", "nvidia-nim-glm"])
