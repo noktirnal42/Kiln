@@ -136,3 +136,41 @@ struct MailThreadingAndComposeTests {
         }
     }
 }
+
+@Suite("Mail accounts")
+struct MailAccountTests {
+    @Test func presetsFillKnownProvidersAndKeepTheAddressAsUsername() throws {
+        let a = try #require(MailAccount.preset(for: "ada@gmail.com", displayName: "Ada"))
+        #expect(a.imapHost == "imap.gmail.com" && a.smtpPort == 465 && a.username == "ada@gmail.com")
+        #expect(a.sender == MailAddress(name: "Ada", email: "ada@gmail.com"))
+        #expect(MailAccount.preset(for: "ada@unknown.example") == nil)
+        #expect(MailAccount.preset(for: "not-an-address") == nil)
+    }
+
+    @Test func validationRequiresTLSForRemoteServers() {
+        var a = MailAccount(displayName: "", address: "a@b.c", imapHost: "imap.b.c", smtpHost: "smtp.b.c")
+        #expect(a.validationProblem == nil)
+        a.imapSecurity = .none
+        #expect(a.validationProblem == "Incoming mail must use TLS.")
+        a.imapHost = "localhost"
+        #expect(a.validationProblem == nil)
+        a.address = "nope"
+        #expect(a.validationProblem == "Enter a full email address.")
+    }
+
+    @Test func storeKeepsSettingsInPreferencesAndPasswordsOutOfThem() throws {
+        let defaults = try #require(TestDefaults.suite("kiln.test.mailaccounts"))
+        defaults.removePersistentDomain(forName: "kiln.test.mailaccounts")
+        let store = MailAccountStore(defaults: defaults)
+        let account = MailAccount(displayName: "Ada", address: "ada@example.com", imapHost: "imap.example.com", smtpHost: "smtp.example.com")
+        try store.save(account, password: "s3cret-test-value")
+        #expect(store.accounts() == [account])
+        #expect(store.password(for: account) == "s3cret-test-value")
+        let stored = String(decoding: defaults.data(forKey: MailAccountStore.defaultsKey) ?? Data(), as: UTF8.self)
+        #expect(!stored.contains("s3cret-test-value"))
+        try store.remove(account)
+        #expect(store.accounts().isEmpty && store.password(for: account) == nil)
+        var bad = account; bad.address = "x"
+        #expect(throws: MailTransportError.self) { try store.save(bad, password: nil) }
+    }
+}
