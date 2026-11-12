@@ -8,7 +8,7 @@ Two ways in: download the preview, or build from source.
 2. The build is Developer ID signed, notarized and stapled. Check the checksum with `shasum -a 256 -c` against the published `.sha256` file.
 3. Move Kiln to Applications and open it. There is no in-app updater; to update, download a newer build and replace the app. Your data lives in `~/Library/Application Support/Kiln`, so nothing is lost.
 
-The published preview predates some development-branch features (the Browser, Devices and Media activities and the activity registry). Build from source to try them. The iPhone and Apple Watch apps are not in the download; see [[Building and Signing]].
+The published preview (0.1.1) is far behind the current source: it predates Maps, News, Images, Mail through GitHub, on-demand tool loading and most of the interface work. Build from source to try them. The iPhone and Apple Watch apps are not in the download; see [[Building and Signing]].
 
 ## Option 2: build from source
 
@@ -35,8 +35,8 @@ Kiln needs no provider to start, but a chat needs a model. The Home activity sho
 
 ## Moving around
 
-In the `codex/kiln-qa-completion` development branch, the toolbar opens Chat, Code and common surfaces; the Work menu lists the other activities. Shortcuts follow registry order: ⌘1 Home, ⌘2 Agent, ⌘3 Swarm, ⌘4 Develop, ⌘5 Analyze, ⌘6 Lab, ⌘7 Audit, ⌘8 Browser, ⌘9 Devices, ⌘0 Media. ⌘K opens the command palette and ⌘, opens Settings. Packaged releases can have a different layout. See [[Activities]].
+The toolbar opens Chat, Code, Browser, Maps and Devices; the Work menu lists the other activities, and Home shows a card for each, grouped as Work, Communication, and Files and knowledge. Shortcuts follow registry order: ⌘1 Home, ⌘2 Agent, ⌘3 Swarm, ⌘4 Develop, ⌘5 Analyze, ⌘6 Lab, ⌘7 Audit, ⌘8 Browser, ⌘9 Devices, ⌘0 Media; the other eleven activities have no shortcut. ⌘K opens the command palette (type "Mail" and Go to Mail comes first) and ⌘, opens Settings. A packaged preview can have a different layout. See [[Activities]].
 
 ---
 
-**Verified status.** The build command and walkthrough follow `docs/GETTING-STARTED.md`, which was followed on a clean checkout (503 tests then) with no signing team. Shortcut order comes from the registry code and its test. **Not checked:** the preview download steps on a fresh Mac in this documentation pass, and Intel Macs.
+**Verified status.** The build command and walkthrough follow `docs/GETTING-STARTED.md`, which was followed on a clean checkout (503 tests then; the suite has more than 1,000 now) with no signing team. Shortcut order comes from the registry code and its test. **Not checked:** the preview download steps on a fresh Mac in this documentation pass, and Intel Macs.

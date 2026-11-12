@@ -1,4 +1,4 @@
-# Parity and beyond (2026-11-09)
+# Parity and beyond (2026-11-09; chat-platform rows updated 2026-11-12)
 
 The product goal: one workstation that is as good as the best standalone app in each area, and better than
 Claude Code Desktop and the Codex app because everything is wired together. Status words below are honest:
@@ -30,12 +30,12 @@ feature cannot ship as GUI-only.
 | MCP client and MCP server | have | Per-server permissions UI, OAuth for remote servers |
 | Computer use, browser, devices | have / new | Fold into one "Environment" permission surface |
 | Skills (`list_skills`, `read_skill`) | partial | Authoring UI, project and user scopes, install from a folder or URL |
-| Slash commands (custom, project-level) | missing | `.kiln/commands/*.md` with arguments; palette integration |
-| Hooks (pre/post tool, on stop, on prompt) | missing | `.kiln/hooks`; policy decisions in the audit chain |
-| Memory files (`AGENTS.md`, `CLAUDE.md`, `KILN.md`) | missing | Read at session start, shown in the context meter, editable pane |
-| Plan mode (read-only exploration, then approve a plan) | missing | Mode in the composer; plan card with approve / edit |
-| Checkpoints and rewind (files and conversation) | missing | Snapshot before each write round; rewind to any message |
-| Parallel sessions, worktree isolation, background tasks | partial (swarm, remote) | A sessions list with status, fork/resume, worktree per task, run in background |
+| Slash commands (custom, project-level) | have (built 2026-11-09; unit-tested, not seen in the running app) | Palette (⌘K) entries for custom commands |
+| Hooks (pre/post tool, on stop, on prompt) | have (built 2026-11-09; unit-tested, not seen in the running app) | Hook results shown in the thread |
+| Memory files (`AGENTS.md`, `CLAUDE.md`, `KILN.md`) | have (built 2026-11-09; unit-tested; the pane sits behind the brain button beside the context meter) | `@import` lines, nested per-directory files; the brain button is planned to become the reasoning control and Memory to move (see section 8 of doc 30) |
+| Plan mode (read-only exploration, then approve a plan) | have (built 2026-11-09; unit-tested, not seen in the running app) | Plan card polish |
+| Checkpoints and rewind (files and conversation) | have (built 2026-11-09; unit-tested; edit and resend was seen on screen 2026-11-12) | Commands are listed as not undone |
+| Parallel sessions, worktree isolation, background tasks | partial (swarm, remote, a sessions list with fork and resume) | Runs do not continue in the background while another conversation is open; worktree per task |
 | Subagents | partial (swarm) | Spawn from a chat turn, with their own context and a summary back |
 | Diff review (accept / reject hunks, inline comments to the agent) | partial (Git panel) | Review pane that feeds comments back as a task |
 | Git/PR workflow (branch, commit message, PR, CI watch, review comments) | partial | `gh`-backed PR pane and tools; CI status in the status strip |

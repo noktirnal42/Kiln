@@ -39,7 +39,7 @@
       <a class="btn btn-ghost" href="https://github.com/noktirnal42/Kiln">View the source</a>
     </div>
     <p class="badges"><span>Notarized by Apple</span><span>Source-available</span><span>Apple silicon recommended</span></p>
-    <p class="fine">Version 0.1.1 preview for macOS 15 or later. Early software: read <a href="#status">what works and what does not</a> before you rely on it.</p>
+    <p class="fine">Version 0.1.1 preview for macOS 15 or later; the source on GitHub is far ahead of it. Early software: read <a href="#status">what works and what does not</a> before you rely on it.</p>
   </div>
   <div class="stage">
     <div class="window main">
@@ -54,7 +54,7 @@
 
 <div class="strip">
   <ul aria-label="Facts about Kiln">
-    <li><strong>592</strong><span>automated tests pass on the Mac</span></li>
+    <li><strong>1,063</strong><span>automated tests pass on the Mac</span></li>
     <li><strong>3</strong><span>approval modes: Ask, Auto, Bypass</span></li>
     <li><strong>5</strong><span>model providers verified in live chat</span></li>
     <li><strong>Source-available</strong><span>source, notarized builds, public issues</span></li>
@@ -200,6 +200,11 @@
     <article class="card"><span class="chip ok">Working</span><h3>Browse</h3><p>A tabbed WebKit browser the agent can read and drive. Sign-in, autofill and passkeys are not verified.</p></article>
     <article class="card"><span class="chip ok">Working</span><h3>Run devices</h3><p>Boot iOS simulators and Android emulators, watch the screen, install and launch apps, read logs.</p></article>
     <article class="card"><span class="chip ok">Working</span><h3>Handle media</h3><p>View video, images and audio, speak text to a file and transcribe recordings. <a href="activities.html">Explore the activities</a> and <a href="agent.html">the agent&rsquo;s tools</a>.</p></article>
+  </div>
+  <div class="grid-3" style="margin-top:20px">
+    <article class="card"><span class="chip early">Development build</span><h3>Mail, messages and calendar</h3><p>Read and write email, texts and reminders from one window, with every send approved by you. Seen on screen only as far as empty states and permission screens (Calendar has read real events); not yet tried with a real mailbox or conversation.</p></article>
+    <article class="card"><span class="chip early">Development build</span><h3>Notes, drives and research</h3><p>Apple Notes, the cloud-drive folders on your Mac, PDFs and a citation library, with the agent able to search them. Not yet tried with real notes, folders or PDFs.</p></article>
+    <article class="card"><span class="chip ok">Working</span><h3>Context that lasts</h3><p>More than 200 tools are loaded only when the agent asks for them, so small and large context windows both leave room for the conversation, and the browser identifies as Safari so streaming sites accept it. Seen working with one hosted model; no cloud-gaming service has been tried yet.</p></article>
   </div>
 </section>
 

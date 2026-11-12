@@ -16,6 +16,10 @@ Before reporting, record the commit or build, macOS and Xcode versions, hardware
 
 ## Agent and approvals
 
+**"To save context, N of M tools are loaded".** The model's context window is too small for all 200-plus tool definitions, so a run starts with the basics and the agent loads the others by asking. If a model never asks, it will not use the module tools (mail, calendar, maps and so on); pick a model with a larger window. The context meter reads lower during a run than when idle because idle also counts the system prompt and loaded tools.
+
+**A message does not send in Messages.** The red text under the thread is the error. A permission refusal means Kiln needs Automation permission for Messages (System Settings, Privacy & Security, Automation); an "unknown" script error is usually a macOS change, so please report it with the text. Reading needs Full Disk Access.
+
 **A run stopped with "Paused after N steps".** The limit is 200 steps; say "continue".
 
 **The agent panel disappeared.** It hides below 1240 pt window width.
@@ -43,6 +47,8 @@ Before reporting, record the commit or build, macOS and Xcode versions, hardware
 **Tapping an iPhone simulator does nothing.** Not possible through `simctl`; use URL open and launch.
 
 **A website will not let me use a passkey or autofill.** Not verified in Kiln; see [[Browser]].
+
+**A streaming or cloud-gaming site says the browser is unsupported.** Kiln identifies as Safari, which most of them accept. Some check more than the browser name, and voice chat in a page needs a microphone prompt the browser does not have yet; tell us which service and the exact message.
 
 ## Still stuck
 
