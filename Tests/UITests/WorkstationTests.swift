@@ -150,6 +150,20 @@ struct WorkstationTests {
         #expect(sections.last?.activities.map(\.id) == ["brand-new"])
     }
 
+    @Test func aPointerRestingOnThePaletteNeverStealsTheHighlight() {
+        var gate = PaletteHoverGate()
+        let first = gate.pointerMoved(to: CGPoint(x: 300, y: 250))
+        let repeated = gate.pointerMoved(to: CGPoint(x: 300, y: 250))
+        let jitter = gate.pointerMoved(to: CGPoint(x: 300.2, y: 250.3))
+        let moved = gate.pointerMoved(to: CGPoint(x: 300, y: 262))
+        let restingAgain = gate.pointerMoved(to: CGPoint(x: 300, y: 262))
+        #expect(!first, "the first event only records where the pointer is")
+        #expect(!repeated, "the list reordering under a resting pointer repeats the position")
+        #expect(!jitter, "sub-point jitter is not movement")
+        #expect(moved, "a real move selects the row under the pointer")
+        #expect(!restingAgain)
+    }
+
     // MARK: Status
 
     @Test func approvalsOutrankStreamingWhenDecidingTheAgentState() {
