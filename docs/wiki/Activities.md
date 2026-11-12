@@ -56,7 +56,19 @@ Not an activity, but part of the Agent: dictation, spoken replies and a hands-fr
 
 ---
 
-**Verified status.** Activity names, order and shortcuts match the registry; behavior and limits come from `docs/11-CURRENT-STATE.md`, `docs/KNOWN-ISSUES.md` and `docs/13-AGENT-CAPABILITY-MATRIX.md`. The registry's own 12 tests passed on 2026-11-09 and the integration branch reported 772 passing tests. **Not checked:** a visual pass of all ten activities in one signed build; the registry is not proof of end-to-end operation.
+**Verified status.** Activity names, order and shortcuts match the registry; behavior and limits come from `docs/11-CURRENT-STATE.md`, `docs/KNOWN-ISSUES.md` and `docs/13-AGENT-CAPABILITY-MATRIX.md`. The registry's own 12 tests passed on 2026-11-09 and the integration branch reported 772 passing tests. **Not checked:** a visual pass of all ten activities in one signed build; Mail, Contacts, Messages, Calendar and GitHub against real accounts and data; the registry is not proof of end-to-end operation.
+
+## Mail, Contacts, Messages, Calendar and GitHub (in development)
+
+Five more activities exist in the development branch. None is in a published release, and none has been tried against a real account yet.
+
+- **Mail:** add an account with your name, address and password. Kiln finds the servers (built-in settings, the Thunderbird configuration database, the domain's own autoconfig file, then common names) and proves the sign-in before saving. Then read, reply and compose. Gmail, iCloud and Yahoo need an app-specific password. **Limits:** no browser sign-in, so Outlook.com and Microsoft 365 are not supported; no STARTTLS-only providers; no offline cache, search or folder actions.
+- **Contacts:** a read-only lookup that also completes addresses in Mail and numbers for texts. **Limits:** tested with a fake contact list; needs your macOS permission.
+- **Messages:** your conversations, threads that refresh every few seconds, and sending through the Messages app. **Limits:** needs Full Disk Access to read and Automation permission to send; Apple documents neither, so updates can break it; delivery cannot be confirmed; one recipient per new text; attachments are not sent.
+- **Calendar:** the next 7 days of events and open reminders; agents can add an event or reminder after approval. **Limits:** EventKit has not been exercised against real data; no edit or delete.
+- **GitHub:** pull requests, CI runs and issues for the open project, read-only, through the `gh` sign-in on your Mac. **Limits:** no comments, reviews or merges.
+
+All five have agent and MCP tools; see [[MCP Server and Tools]] and the permissions in [[Security and Privacy]]. Shortcuts can open any activity or put a question in the message box ("Ask Kiln").
 
 ## Maps and News
 

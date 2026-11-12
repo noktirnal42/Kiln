@@ -26,6 +26,11 @@ Develop → MCP lists servers imported from Claude Code, Codex and OpenCode conf
 | Media | `media_open`, `media_list`, `media_generate_image`, `media_speak`, `media_transcribe` | Writes need approval |
 | Swarm workers | `swarm_post`, `swarm_read`, `swarm_memory_get`, `swarm_memory_set`, `swarm_report_blocker` | Used by workers |
 | Computer use | `computer_use` | Experimental, opt-in |
+| Mail (in development) | `mail_accounts`, `mail_folders`, `mail_recent`, `mail_read`, `mail_send` | Reading reaches the network and is gated; `mail_send` needs approval of the recipients, subject and text; message text is untrusted |
+| Contacts (in development) | `contacts_status`, `contacts_search` | Read-only; needs the macOS Contacts permission |
+| Messages (in development) | `messages_conversations`, `messages_read`, `messages_send`, `messages_compose` | Reading needs Full Disk Access; sending needs Automation permission and approval of the conversation and exact text; delivery is not confirmed |
+| Calendar and Reminders (in development) | `calendar_events`, `calendar_create_event`, `reminders_list`, `reminders_create` | Reads gated by macOS permission; creating needs approval; no edit or delete |
+| GitHub (in development) | `github_prs`, `github_pr`, `github_issues`, `github_runs` | Read-only, through the `gh` sign-in on the Mac; text from GitHub users is untrusted |
 
 ## What is not exposed
 

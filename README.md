@@ -11,7 +11,7 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 
 ## Contents
 
-[What Kiln is](#what-kiln-is) · [Screenshots](#screenshots) · [The ten activities](#the-ten-activities) · [Agent and MCP integration](#agent-and-mcp-integration) · [Providers](#providers) · [Safety model](#safety-model) · [Install](#install) · [Build from source](#build-from-source) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
+[What Kiln is](#what-kiln-is) · [Screenshots](#screenshots) · [Activities](#activities) · [Agent and MCP integration](#agent-and-mcp-integration) · [Providers](#providers) · [Safety model](#safety-model) · [Install](#install) · [Build from source](#build-from-source) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
 
 ## What Kiln is
 
@@ -33,7 +33,7 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 <p align="center"><img src="site/assets/shots/iphone-approval.png" width="260" alt="Kiln Remote on iPhone showing a pending tool approval with Allow once and Deny buttons"></p>
 <p align="center"><sub>Companion: an approval answered from the iPhone app (iOS Simulator capture).</sub></p>
 
-## The ten activities
+## Activities
 
 Activities have registry-defined shortcuts (⌘1 to ⌘9, then ⌘0), and the registry in [`Core/Registry/`](Core/Registry/) is the single place an activity is declared.
 
@@ -52,6 +52,11 @@ Activities have registry-defined shortcuts (⌘1 to ⌘9, then ⌘0), and the re
 | — | **Images** | Local SD-Turbo generation, history and model catalog; optional external engines | SDXL and external-engine generation remain unverified; see [Image Studio](docs/18-IMAGE-STUDIO.md) |
 | — | **Maps** | MapKit, USGS Topo, historical catalog, pins and driving directions | Development build; location and routes need live QA |
 | — | **News** | ModernReader directory, subscriptions, combined stories and RSS/Atom/JSON feeds | Development build; subscriptions are local and entries are session-only |
+| — | **Mail** | Add an account with name, address and password (servers are found automatically and the sign-in is checked before saving), then read, reply and compose; agent tools to list and read | Development build, tested only against scripted local servers, not a real provider. No offline cache, search or folder actions. Outlook.com, Microsoft 365 and STARTTLS-only providers need a browser sign-in or STARTTLS, which is not supported yet |
+| — | **Contacts** | Read-only lookup in your Contacts; completes addresses in Mail | Development build; tested with a fake contact list only. Needs your macOS permission |
+| — | **Messages** | Conversations from your Messages history, threads that refresh, and sending through the Messages app | Development build. Reading needs Full Disk Access and sending needs Automation permission; Apple documents neither interface, so macOS updates can break it. Delivery cannot be confirmed. Tested against a fixture database, not a real one |
+| — | **Calendar** | Next 7 days of events and open reminders; agents can add an event or reminder after approval | Development build; EventKit not yet exercised against real data. No edit or delete |
+| — | **GitHub** | Pull requests, CI runs and issues of the open project, read-only, through the `gh` sign-in already on your Mac | Development build; no comments, reviews or merges |
 
 Details for each are in the [wiki](https://github.com/noktirnal42/Kiln/wiki) (source in [`docs/wiki/`](docs/wiki/Activities.md)) and on the [website](https://noktirnal42.github.io/Kiln/activities.html).
 
@@ -66,7 +71,8 @@ Application services are registered as ordinary tools with a declared permission
 - **Agent profiles:** Research Assistant (read-only), Coding Agent, and Workstation Agent (adds `re_*`, `lab_*`, `browser_*`, `device_*`, `media_*` and others).
 - **Kiln as an MCP server:** Develop → MCP → Start. Loopback only, bearer-token protected, with reads free and everything else waiting for approval in Kiln. External calls are audited as "External: <client>".
 - **Kiln as an MCP client:** it reads, never copies, MCP servers and skills already configured for Claude Code, Codex and OpenCode. Each imported server still needs "Approve & Connect".
-- **Tool families:** `re_*` (reverse engineering), `lab_*` (Model Lab), `browser_*`, `device_*`, `media_*`, `swarm_*`, Git, search, shell and file tools, `list_skills` / `read_skill`, and opt-in `computer_use`.
+- **Tool families:** `re_*` (reverse engineering), `lab_*` (Model Lab), `browser_*`, `device_*`, `media_*`, `swarm_*`, Git, search, shell and file tools, `list_skills` / `read_skill`, and opt-in `computer_use`. In development: `mail_*`, `contacts_*`, `messages_*`, `calendar_*` / `reminders_*` and `github_*`. Reading mail, messages and calendar is gated; sending a mail or text and creating a calendar event need your approval of the exact recipients and text, and message text from other people is labelled untrusted.
+- **Shortcuts:** Kiln offers App Shortcuts to open any activity, open a website, or put a question in the message box ("Ask Kiln").
 
 The [agent capability matrix](docs/13-AGENT-CAPABILITY-MATRIX.md) lists what is covered and, as importantly, the registry gaps that have no agent tool yet.
 
@@ -150,6 +156,7 @@ The following is **planned or in parallel development and is not in the current 
 - **Agent platform:** slash commands, hooks, memory files, plan mode, checkpoints and rewind, a sessions list, a usage and cost view, and editable permission rules.
 - **Develop and Analyze upgrades:** toward an Xcode and Ghidra bar (symbol outline, refactoring, debugger variables and threads, graph view, structure editor, patching, binary diffing).
 - **Beyond parity:** evidence ledger and signed run bundles, a Pinboard context tray, saved workflows, closed-loop app analysis, a verifier agent, privacy tiers and local-first routing, and policy as code.
+- **Next, in the order the owner set:** Spotlight indexing of conversations and artifacts; PDF annotation and a research library with citations; cloud drives; Notes; Slack and chat connectors; Notification Center and Focus awareness; a menu-bar quick-ask and Share extension; Writing Tools and Services-menu actions; weather and a radar layer on the Maps view; and a document, spreadsheet and presentation studio. The details and acceptance notes are in the [feature roadmap](docs/21-EVERYTHING-APP-ROADMAP.md).
 - **Platform work with outside dependencies:** passkeys in the Browser need an Apple entitlement that has been requested and not granted; iCloud sync, push and Private Cloud Compute are not implemented or verified; no dates are promised.
 
 ## Contributing
