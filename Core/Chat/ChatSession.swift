@@ -995,6 +995,8 @@ public final class ChatSession {
                         self.agentNotice = "Retrying (\(attempt)) in \(Int(delay))s: \(reason)"
                     case .policyDenied(let tool, _, let reason): self.agentNotice = "\(tool) was blocked: \(reason)"
                     case .contextMeasured(let used, let window): self.contextUsage = ContextUsage(used: used, window: window)
+                    case .toolsFitted(let offered, let total):
+                        self.agentNotice = "To save context, \(offered) of \(total) tools are loaded now; the agent loads the others when it needs them."
                     case .contextCompacted(let compaction):
                         self.recordCompaction(compaction, conversationID: conversationID, promptIndex: promptIndex)
                     case .pausedContext(let context):

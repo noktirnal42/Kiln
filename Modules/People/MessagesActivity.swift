@@ -25,6 +25,7 @@ final class MessagesState {
     private(set) var error: String?
     private(set) var sending = false
     var notice: String?
+    private(set) var noticeIsError = false
     @ObservationIgnored private let service = MessagesService()
     @ObservationIgnored private var lastRow: Int64 = 0
 
@@ -53,11 +54,12 @@ final class MessagesState {
         sending = true; defer { sending = false }
         do {
             try await service.send(body: text, toChat: chat, approval: .init(destination: chat.guid, body: text))
+            noticeIsError = false
             notice = "Handed to Messages. Delivery is not confirmed here."
             try? await Task.sleep(for: .seconds(1.2))
             await refresh(full: true)
             return true
-        } catch { notice = error.localizedDescription; return false }
+        } catch { noticeIsError = true; notice = error.localizedDescription; return false }
     }
 }
 
@@ -126,7 +128,7 @@ struct MessagesView: View {
                     .onChange(of: state.thread.last?.id) { _, id in if let id { proxy.scrollTo(id, anchor: .bottom) } }
                 }
                 Divider()
-                if let notice = state.notice { Text(notice).font(SSTypography.caption()).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, SSSpacing.m).padding(.top, 4) }
+                if let notice = state.notice { Text(notice).font(SSTypography.caption()).foregroundStyle(state.noticeIsError ? SSColor.danger : .secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, SSSpacing.m).padding(.top, 4) }
                 HStack(alignment: .bottom) {
                     TextField("Message", text: $draft, axis: .vertical).lineLimit(1...5).textFieldStyle(.roundedBorder).onSubmit { send() }
                     Button { send() } label: { Image(systemName: "arrow.up.circle.fill").font(.system(size: 22)) }.buttonStyle(.plain)

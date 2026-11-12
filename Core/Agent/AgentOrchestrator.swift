@@ -21,6 +21,8 @@ public enum AgentEvent: Sendable {
     case contextCompacted(ContextCompaction)
     /// Estimated tokens in the request about to be sent, against the model's window. Not audited.
     case contextMeasured(used: Int, window: Int)
+    /// The model's window cannot carry every tool definition, so only `offered` of `total` tools were offered.
+    case toolsFitted(offered: Int, total: Int)
     /// In-memory model context at a step-limit pause. Never write this event to the audit log.
     case pausedContext([ChatMessage])
     case finished(AgentRunSummary)
@@ -460,7 +462,21 @@ public final class AgentOrchestrator: Sendable {
             permissions: profile.toolPermissions,
             workspaceRoot: workspaceRoot
         )
-        let providerTools = offered.map(\.providerTool)
+        // When every definition would use more than a tenth of the window, start with the basics and let the model load
+        // the rest by asking (`kiln_tool_search`). Whatever still does not fit a small window is trimmed.
+        let loader = contextWindow.flatMap { ToolLoader(offered: offered, window: $0) }
+        let totalOffered = offered.count
+        func currentTools() -> [ToolSpec] {
+            guard let contextWindow else { return offered }
+            guard let loader else { return ToolFit.fit(offered, window: contextWindow).tools }
+            // The search tool is never trimmed; the rest is fitted to the window.
+            let current = loader.offered().filter { $0.name != ToolLoader.searchToolName }
+            return ToolFit.fit(current, window: contextWindow).tools + [loader.searchSpec]
+        }
+        var providerTools = currentTools().map(\.providerTool)
+        if let contextWindow, loader != nil || ToolFit.fit(offered, window: contextWindow).trimmed {
+            yield(.toolsFitted(offered: providerTools.count, total: totalOffered))
+        }
 
         // prompt_submit hooks: a denial ends the run before any model call; a note is shown to the model as context.
         var hookNotes: [String] = []
@@ -523,6 +539,7 @@ public final class AgentOrchestrator: Sendable {
                 throw AgentRunError.budgetExhausted(reason)
             }
 
+            providerTools = currentTools().map(\.providerTool)
             if let contextWindow {
                 let budget = ContextCompactor.budget(window: contextWindow, maxTokens: profile.maxTokens ?? 4096, tools: providerTools)
                 let outcome = await ContextCompactor.compact(history, budget: budget) { text in
@@ -558,7 +575,7 @@ public final class AgentOrchestrator: Sendable {
             // Small local models often write a tool call as JSON text instead of a structured call.
             // Accept that only when the whole reply is calls to tools this run actually offered (one, or several in a row).
             if turn.toolCalls.isEmpty {
-                let calls = TextToolCall.parseAll(turn.text, offered: Set(offered.map(\.name)))
+                let calls = TextToolCall.parseAll(turn.text, offered: Set(providerTools.map(\.name)))
                 if !calls.isEmpty {
                     turn.toolCalls = calls
                     turn.text = ""
@@ -602,6 +619,7 @@ public final class AgentOrchestrator: Sendable {
                     findings: findings,
                     hooks: hooks,
                     checkpoint: checkpoint,
+                    loader: loader,
                     yield: yield
                 )
                 switch record.status {
@@ -710,7 +728,13 @@ public final class AgentOrchestrator: Sendable {
         var policy = ExecutionPolicy(mode: profile.mode)
         policy.toolsAllowed = policy.toolsAllowed.filter { profile.toolPermissions.isEnabled($0) }
         if profile.toolPermissions.enabledTools.isEmpty { policy.toolsAllowed = [] }
-        let tools = policy.offeredTools(from: toolRegistry, permissions: profile.toolPermissions, workspaceRoot: workspaceRoot)
+        let all = policy.offeredTools(from: toolRegistry, permissions: profile.toolPermissions, workspaceRoot: workspaceRoot)
+        let tools: [ToolSpec]
+        if let loader = ToolLoader(offered: all, window: contextWindow) {
+            tools = ToolFit.fit(loader.initial().filter { $0.name != ToolLoader.searchToolName }, window: contextWindow).tools + [loader.searchSpec]
+        } else {
+            tools = ToolFit.fit(all, window: contextWindow).tools
+        }
         return ContextCompactor.budget(window: contextWindow, maxTokens: profile.maxTokens ?? 4096, tools: tools.map(\.providerTool))
     }
 
@@ -823,6 +847,7 @@ public final class AgentOrchestrator: Sendable {
         findings: RubricFindings?,
         hooks: HookRunner? = nil,
         checkpoint: CheckpointRecorder? = nil,
+        loader: ToolLoader? = nil,
         yield: @escaping @Sendable (AgentEvent) -> Void
     ) async throws -> ToolCallRecord {
         var record = ToolCallRecord(
@@ -842,6 +867,17 @@ public final class AgentOrchestrator: Sendable {
             return record
         }
 
+        if let loader {
+            // Loading more tools is the loader's own tool; it is not in the registry and runs nothing.
+            if call.name == ToolLoader.searchToolName {
+                let query = (ToolArgs.object(from: call.arguments) ?? [:])["query"] as? String ?? ""
+                return finish(.succeeded, result: loader.search(query))
+            }
+            // A tool that exists but was not loaded: load it and show its definition instead of running it.
+            if loader.isDeferredAndNotLoaded(call.name), let message = loader.loadNamed(call.name) {
+                return finish(.failed, error: message)
+            }
+        }
         guard let tool = toolRegistry.tool(named: call.name) else {
             return finish(.failed, error: "Unknown tool '\(call.name)'. Available tools are the ones you were given.")
         }

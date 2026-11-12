@@ -116,7 +116,43 @@ struct MessagesIntegrationTests {
         #expect(fake.sent.isEmpty)
         try await service.send(body: "hi", toChat: direct, approval: .init(destination: direct.guid, body: "hi"))
         try await service.send(body: "yo", toChat: group, approval: .init(destination: group.guid, body: "yo"))
-        #expect(fake.sent[0] == ("+15550100199", "hi", false) && fake.sent[1] == ("iMessage;+;chat777", "yo", true))
+        #expect(fake.sent[0] == (direct.guid, "hi", true) && fake.sent[1] == ("iMessage;+;chat777", "yo", true), "every existing chat is sent to by its own id")
+    }
+
+    private final class ChatRouteFails: MessagesSending, @unchecked Sendable {
+        var sent: [(dest: String, isChat: Bool)] = []
+        let error: MessagesSendError
+        init(_ error: MessagesSendError) { self.error = error }
+        func send(body: String, toHandle handle: String) async throws { sent.append((handle, false)) }
+        func send(body: String, toChatGUID guid: String) async throws { throw error }
+    }
+
+    private func chat(_ guid: String, group: Bool = false) -> MessageChat {
+        MessageChat(id: 9, guid: guid, title: "x", isGroup: group, lastDate: nil, lastText: "")
+    }
+
+    @Test func aOneToOneIMessageChatFallsBackToTheHandleButSMSAndGroupsDoNot() async throws {
+        let path = try makeFixtureDB()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        func service(_ sender: ChatRouteFails) -> MessagesService { MessagesService(database: MessagesDatabase(path: path), sender: sender) }
+        let iMessage = chat("iMessage;-;+15550100199")
+        let failing = ChatRouteFails(.failed("no chat"))
+        try await service(failing).send(body: "hi", toChat: iMessage, approval: .init(destination: iMessage.guid, body: "hi"))
+        #expect(failing.sent.count == 1 && failing.sent[0] == ("+15550100199", false))
+
+        let sms = chat("SMS;-;+15550100199")
+        let smsSender = ChatRouteFails(.failed("no chat"))
+        await #expect(throws: MessagesSendError.failed("no chat")) { try await service(smsSender).send(body: "hi", toChat: sms, approval: .init(destination: sms.guid, body: "hi")) }
+        #expect(smsSender.sent.isEmpty, "an SMS chat is never sent through the iMessage service")
+
+        let group = chat("iMessage;+;chat777", group: true)
+        let groupSender = ChatRouteFails(.failed("no chat"))
+        await #expect(throws: MessagesSendError.failed("no chat")) { try await service(groupSender).send(body: "hi", toChat: group, approval: .init(destination: group.guid, body: "hi")) }
+        #expect(groupSender.sent.isEmpty)
+
+        let denied = ChatRouteFails(.automationDenied)
+        await #expect(throws: MessagesSendError.automationDenied) { try await service(denied).send(body: "hi", toChat: iMessage, approval: .init(destination: iMessage.guid, body: "hi")) }
+        #expect(denied.sent.isEmpty, "a permission refusal is reported, not retried another way")
     }
 
     @Test func toolsLabelUntrustedTextAndGateSending() async throws {
