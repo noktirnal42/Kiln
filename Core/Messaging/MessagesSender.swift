@@ -118,8 +118,15 @@ public struct MessagesService: Sendable {
     public func send(body: String, toChat chat: MessageChat, approval: SendApproval) async throws {
         let text = try Self.checked(body)
         guard approval.destination == chat.guid, approval.body == body else { throw ServiceError.notApproved }
-        if chat.isGroup || !chat.guid.contains(";-;") { try await sender.send(body: text, toChatGUID: chat.guid) }
-        else { try await sender.send(body: text, toHandle: String(chat.guid.split(separator: ";").last ?? "")) }
+        // The conversation's own id reaches every kind of chat: iMessage, SMS and groups. Going through the iMessage
+        // service by handle cannot send to an SMS conversation at all.
+        do { try await sender.send(body: text, toChatGUID: chat.guid) }
+        catch let error as MessagesSendError {
+            // A one-to-one iMessage chat can also be reached by handle; for SMS and groups the first error stands.
+            guard case .failed = error, !chat.isGroup, chat.guid.hasPrefix("iMessage;-;"),
+                  let handle = chat.guid.split(separator: ";").last.map(String.init) else { throw error }
+            try await sender.send(body: text, toHandle: handle)
+        }
     }
 
     static func checked(_ body: String) throws -> String {

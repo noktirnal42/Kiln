@@ -21,6 +21,8 @@ public enum AgentEvent: Sendable {
     case contextCompacted(ContextCompaction)
     /// Estimated tokens in the request about to be sent, against the model's window. Not audited.
     case contextMeasured(used: Int, window: Int)
+    /// The model's window cannot carry every tool definition, so only `offered` of `total` tools were offered.
+    case toolsFitted(offered: Int, total: Int)
     /// In-memory model context at a step-limit pause. Never write this event to the audit log.
     case pausedContext([ChatMessage])
     case finished(AgentRunSummary)
@@ -455,11 +457,19 @@ public final class AgentOrchestrator: Sendable {
         }
 
         // Gate A: the tool list the model may even see.
-        let offered = policy.offeredTools(
+        var offered = policy.offeredTools(
             from: toolRegistry,
             permissions: profile.toolPermissions,
             workspaceRoot: workspaceRoot
         )
+        // A small window cannot carry every tool definition; offer the ones that fit rather than overflow it.
+        if let contextWindow {
+            let fitted = ToolFit.fit(offered, window: contextWindow)
+            if fitted.trimmed {
+                offered = fitted.tools
+                yield(.toolsFitted(offered: fitted.tools.count, total: fitted.totalCount))
+            }
+        }
         let providerTools = offered.map(\.providerTool)
 
         // prompt_submit hooks: a denial ends the run before any model call; a note is shown to the model as context.
@@ -710,7 +720,8 @@ public final class AgentOrchestrator: Sendable {
         var policy = ExecutionPolicy(mode: profile.mode)
         policy.toolsAllowed = policy.toolsAllowed.filter { profile.toolPermissions.isEnabled($0) }
         if profile.toolPermissions.enabledTools.isEmpty { policy.toolsAllowed = [] }
-        let tools = policy.offeredTools(from: toolRegistry, permissions: profile.toolPermissions, workspaceRoot: workspaceRoot)
+        let tools = ToolFit.fit(policy.offeredTools(from: toolRegistry, permissions: profile.toolPermissions, workspaceRoot: workspaceRoot),
+                                window: contextWindow).tools
         return ContextCompactor.budget(window: contextWindow, maxTokens: profile.maxTokens ?? 4096, tools: tools.map(\.providerTool))
     }
 
