@@ -14,5 +14,8 @@
 	<!-- Contacts are read (never written) for address lookup in Mail and by approved agents; still subject to macOS authorization. -->
 	<key>com.apple.security.personal-information.addressbook</key>
 	<true/>
+	<!-- Calendar and Reminders are read, and events and reminders are added only after approval; never edited or deleted. Still subject to macOS authorization. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
 </dict>
 </plist>
