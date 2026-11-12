@@ -50,24 +50,25 @@ struct MessageBubble: View {
     private var userBody: some View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack {
-                Spacer(minLength: 60)
+                Spacer(minLength: editing ? 0 : 60)
                 let parts = ContextExpander.split(message.content)
                 VStack(alignment: .trailing, spacing: 6) {
                     if editing {
                         VStack(alignment: .trailing, spacing: 6) {
                             TextEditor(text: $editText)
-                                .font(.system(size: 14)).frame(minWidth: 280, minHeight: 60, maxHeight: 180)
+                                .font(.system(size: 14)).frame(maxWidth: .infinity, minHeight: 60, maxHeight: 180)
                                 .scrollContentBackground(.hidden)
                                 .padding(4).background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 6))
                                 .accessibilityLabel("Edit message")
-                            HStack {
+                            HStack(spacing: 6) {
+                                Spacer(minLength: 0)
                                 Button("Cancel") { editing = false }.keyboardShortcut(.cancelAction)
                                 Button("Resend") { editing = false; Task { await session.resubmit(message.id, text: editText) } }
                                     .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
                                     .disabled(editText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }.controlSize(.small)
                             Text("Resending removes the replies after this message. Files the agent changed stay as they are.")
-                                .font(SSTypography.caption()).foregroundStyle(.secondary)
+                                .font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true)
                         }
                     } else {
                         Text(parts.visible)

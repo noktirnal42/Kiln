@@ -378,7 +378,7 @@ public final class ChatSession {
     /// Rewinds the conversation to just before `messageID` (which must be a user message): later messages are removed and the
     /// text goes back in the message box. With `restoreFiles`, files the agent changed since then are put back too.
     @discardableResult
-    public func rewind(to messageID: UUID, restoreFiles: Bool = true) async -> RewindReport? {
+    public func rewind(to messageID: UUID, restoreFiles: Bool = true, refillMessageBox: Bool = true) async -> RewindReport? {
         guard !isStreaming, let conversationID, let index = messages.firstIndex(where: { $0.id == messageID }) else { return nil }
         var report = RewindReport()
         if restoreFiles, let checkpointStore, let workspaceRoot {
@@ -396,7 +396,7 @@ public final class ChatSession {
             saveCompactions()
             contextNotes = state.notes
         }
-        if removed.first?.role == .user { draft = removed[0].content }
+        if refillMessageBox, removed.first?.role == .user { draft = removed[0].content }
         agentNotice = restoreFiles ? "Rewound to before this message. " + report.summary : "Rewound the conversation; files were not changed."
         await platformAudit.record("checkpoint.rewound", [
             "messages_removed": .int(removed.count), "files_restored": .int(report.restored.count),
@@ -768,8 +768,7 @@ public final class ChatSession {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !isStreaming, !trimmed.isEmpty,
               messages.first(where: { $0.id == messageID })?.role == .user else { return }
-        await rewind(to: messageID, restoreFiles: false)
-        draft = ""
+        await rewind(to: messageID, restoreFiles: false, refillMessageBox: false)
         await send(trimmed, includeAttachments: false)
     }
 
