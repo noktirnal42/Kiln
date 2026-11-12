@@ -66,32 +66,38 @@ struct HomeView: View {
     }
 
     private var actions: some View {
-        VStack(alignment: .leading, spacing: SSSpacing.s) {
-            SSSectionLabel("Work")
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: SSSpacing.m)], alignment: .leading, spacing: SSSpacing.m) {
-                ForEach(Activity.allCases.filter { $0 != .home }) { activity in
-                    Button { workstation.select(activity, app: app) } label: {
-                        VStack(alignment: .leading, spacing: SSSpacing.s) {
-                            HStack {
-                                Image(systemName: activity.symbol)
-                                    .font(.system(size: 20)).foregroundStyle(SSColor.accent)
-                                Spacer()
-                                if let key = activity.shortcutKey { SSKeyCap("⌘\(key)") }
-                            }
-                            Text(activity.title).font(SSTypography.headline())
-                            Text(activity.summary)
-                                .font(SSTypography.caption()).foregroundStyle(.secondary)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 0)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
-                        .ssPanel(padding: SSSpacing.m)
+        VStack(alignment: .leading, spacing: SSSpacing.l) {
+            ForEach(HomeSections.grouped(Activity.allCases.filter { $0 != .home }), id: \.title) { section in
+                VStack(alignment: .leading, spacing: SSSpacing.s) {
+                    SSSectionLabel(section.title)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: SSSpacing.m)], alignment: .leading, spacing: SSSpacing.m) {
+                        ForEach(section.activities) { activity in activityCard(activity) }
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+
+    private func activityCard(_ activity: Activity) -> some View {
+        Button { workstation.select(activity, app: app) } label: {
+            VStack(alignment: .leading, spacing: SSSpacing.s) {
+                HStack {
+                    Image(systemName: activity.symbol)
+                        .font(.system(size: 20)).foregroundStyle(SSColor.accent)
+                    Spacer()
+                    if let key = activity.shortcutKey { SSKeyCap("⌘\(key)") }
+                }
+                Text(activity.title).font(SSTypography.headline())
+                Text(activity.summary)
+                    .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+            .ssPanel(padding: SSSpacing.m)
+        }
+        .buttonStyle(.plain)
     }
 
     private var conversationsPanel: some View {

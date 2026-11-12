@@ -28,6 +28,9 @@ jobs:
       - name: Build
         run: xcodebuild -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS' -jobs 2 CODE_SIGNING_ALLOWED=NO -skipPackagePluginValidation -skipMacroValidation build
       - name: Test (live provider tests are opt-in and stay off)
+        # xcodebuild only passes variables with this prefix to the test process; tests that need real audio read CI.
+        env:
+          TEST_RUNNER_CI: 'true'
         run: xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS' -jobs 2 CODE_SIGNING_ALLOWED=NO -skipPackagePluginValidation -skipMacroValidation
       - name: Site checks
         run: python3 Scripts/check_site.py

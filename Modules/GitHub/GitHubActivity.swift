@@ -57,7 +57,7 @@ struct GitHubView: View {
                 VStack(spacing: SSSpacing.s) {
                     Image(systemName: "arrow.triangle.pull").font(.system(size: 28)).foregroundStyle(.secondary)
                     Text(error).font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 420)
-                    Text("Kiln uses the GitHub sign-in already on this Mac (gh). It never sees your token and only reads.").font(SSTypography.caption()).foregroundStyle(.tertiary).frame(maxWidth: 420)
+                    Text("Kiln uses the GitHub sign-in already on this Mac (gh). It never sees your token and only reads.").font(SSTypography.caption()).foregroundStyle(.secondary).frame(maxWidth: 420)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {

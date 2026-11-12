@@ -65,8 +65,10 @@ struct NotesView: View {
             SSActivityHeader(title: "Notes", subtitle: "Apple Notes on this Mac", symbol: "note.text", trailing: {
                 HStack(spacing: 8) {
                     if state.busy { ProgressView().controlSize(.small) }
-                    Button { composing = true } label: { Label("New note", systemImage: "square.and.pencil") }.disabled(!state.enabled)
-                    Button { Task { await state.reload() } } label: { Image(systemName: "arrow.clockwise") }.disabled(!state.enabled).help("Reload").accessibilityLabel("Reload")
+                    if state.enabled {
+                        Button { composing = true } label: { Label("New note", systemImage: "square.and.pencil") }
+                        Button { Task { await state.reload() } } label: { Image(systemName: "arrow.clockwise") }.help("Reload").accessibilityLabel("Reload")
+                    }
                 }
             })
             if !state.enabled {
@@ -75,7 +77,7 @@ struct NotesView: View {
                     Text("Kiln reads and adds to Apple Notes by asking the Notes app, which needs your permission.").font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 380)
                     Button("Allow access to Notes") { Task { await state.enable() } }.buttonStyle(.borderedProminent)
                     Text("macOS will ask once. Kiln only creates notes (never edits or deletes), cannot read password-locked notes, and nothing is uploaded by Kiln. Notes may take a few seconds with a large library.")
-                        .font(SSTypography.caption()).foregroundStyle(.tertiary).multilineTextAlignment(.center).frame(maxWidth: 380)
+                        .font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 380)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 if let m = state.message { Text(m).font(SSTypography.caption()).foregroundStyle(SSColor.danger).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, SSSpacing.m).padding(.vertical, 4) }

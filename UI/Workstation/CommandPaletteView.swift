@@ -7,6 +7,9 @@ struct CommandPaletteView: View {
 
     @State private var query = ""
     @State private var selection = 0
+    /// Where the pointer last was. A row takes the highlight only when the pointer really moved, so a list
+    /// that reorders or scrolls under a resting pointer cannot steal it from the top result.
+    @State private var lastPointer: CGPoint?
     @FocusState private var searchFocused: Bool
 
     private var results: [WorkstationCommand] { CommandRanking.rank(commands, query: query) }
@@ -45,12 +48,15 @@ struct CommandPaletteView: View {
                                 Button { run(command) } label: { row(command, selected: index == selection) }
                                     .buttonStyle(.plain)
                                     .id(command.id)
-                                    .onHover { if $0 { selection = index } }
+                                    .onContinuousHover(coordinateSpace: .named("paletteList")) { phase in
+                                        if case .active(let point) = phase, point != lastPointer { lastPointer = point; selection = index }
+                                    }
                                     .accessibilityLabel("\(command.title). \(command.subtitle)")
                             }
                         }
                         .padding(SSSpacing.xs)
                     }
+                    .coordinateSpace(name: "paletteList")
                     .frame(maxHeight: 340)
                     .onChange(of: selection) { _, new in
                         if results.indices.contains(new) { proxy.scrollTo(results[new].id) }
