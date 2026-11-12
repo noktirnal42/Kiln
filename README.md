@@ -40,7 +40,7 @@ Activities have registry-defined shortcuts (⌘1 to ⌘9, then ⌘0), and the re
 | Shortcut | Activity | What it is for | Honest limits |
 |---|---|---|---|
 | ⌘1 | **Home** | Overview, a get-started checklist, and a card for each activity grouped as Work, Communication, and Files and knowledge | Overview only |
-| ⌘2 | **Agent** | Chat with a model, with tools; compaction, a context meter, tools loaded on demand, edit and resend, file-name chips, voice | Small local models often fail tool use; on-demand tool loading was seen working with one hosted model |
+| ⌘2 | **Agent** | Chat with a model, with tools; compaction, a context meter, a per-model reasoning control, tools loaded on demand, edit and resend, file-name chips, voice | Small local models often fail tool use; on-demand tool loading was seen working with one hosted model |
 | ⌘3 | **Swarm** | Give a goal to a team of agents (planner, parallel workers, blockers, shared bus) | No top-level tool yet to create or cancel a run from the agent |
 | ⌘4 | **Develop** | Editor, terminal, Git, search, build/test/run, LLDB launch debugger, MCP servers and the Kiln MCP server | A capable editor, not Xcode: no previews, debugger attach or non-Swift/C language servers |
 | ⌘5 | **Analyze** | Reverse engineering: import, strings, Mach-O inspection, Ghidra and radare2 engines, decompiler, xrefs, crypto scan, package downloader | Ghidra is separate software you install; the cipher classifier is a placeholder |

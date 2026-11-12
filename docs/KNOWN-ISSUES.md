@@ -12,6 +12,10 @@ Mail, Contacts, Messages, Calendar, Notes, Cloud Drives, Research, GitHub, Slack
 
 **Observed (fixed 2026-11-12):** all 200-plus tool definitions, about 21,000 tokens, went to the model on every request, so any window smaller than that overflowed and the context meter sat at 100%. Tools are now loaded on demand (`kiln_tool_search`) and trimmed to fit small windows; see `docs/11-CURRENT-STATE.md`. **Limits:** it was seen working with one hosted model; a small local model that ignores the search tool will simply lack the module tools; swarm workers still receive their tools up front; and the meter counts only the conversation while a run is going but also the system prompt and loaded tools when idle, so the two readings differ (about 3% against 11% on an empty chat with a large window).
 
+## Reasoning options are unverified against live APIs
+
+The chat's reasoning control (the brain button) offers only levels that Kiln has a documented or tested request for: Ollama `think` (a switch for most thinking models, low, medium and high for gpt-oss), OpenRouter `reasoning.effort`, and NVIDIA GLM 5.3 `reasoning_effort` (low, high, max). Most other models (other NVIDIA models, custom endpoints, Apple and MLX models) show the control greyed out because Kiln does not know what they accept. The request bodies are unit-tested; no live call was made with a chosen level, and some models cannot be switched off even where Ollama accepts `think: false`.
+
 ## Browser and cloud gaming
 
 The browser now identifies as Safari and enables fullscreen and click-free playback, which streaming sites check for. No cloud-gaming service has been confirmed to start, because that needs a sign-in; some services check more than the browser name. Voice chat in a page needs a microphone permission prompt that the browser does not have yet.

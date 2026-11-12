@@ -93,7 +93,8 @@ public enum OpenAICompatibleTransport {
             payload["tools"] = toolsJSON(request.tools)
         }
         if let reasoning, reasoning.enabled {
-            payload["reasoning"] = ProviderJSON(reasoning.openAIRReasoningFields)
+            // A level the person chose for a model that offers levels goes as `reasoning.effort`; otherwise the budget as before.
+            payload["reasoning"] = ProviderJSON(reasoning.level.map { ["effort": ProviderJSON($0)] } ?? reasoning.openAIRReasoningFields)
         }
         for (key, value) in extraFields {
             payload[key] = value

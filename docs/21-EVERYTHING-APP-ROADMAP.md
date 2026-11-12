@@ -53,7 +53,9 @@ Mail, Contacts, Messages and Calendar now exist as development builds (their sta
 15. **Weather and radar** (owner request 2026-11-11; see "Weather and radar" below). Placed after the core data sources; it is small once Maps exists, so it can move up if wanted.
 16. **Document, spreadsheet and presentation studio** (largest; after the data sources above exist).
 
-**Chat composer todo (owner, 2026-11-12):** reasoning options that follow what each model offers (greyed out when it offers none), using the brain button, with Memory moved elsewhere; and a streamlined bottom bar at the next UI polish. Details and acceptance: [section 8 of the chat and layout plan](30-CHAT-MAPS-LAYOUT-PLAN.md).
+**Chat composer todo (owner, 2026-11-12):** reasoning options that follow what each model offers (greyed out when it offers none), using the brain button, with Memory moved elsewhere. **Built 2026-11-12** (see section 8 of the [chat and layout plan](30-CHAT-MAPS-LAYOUT-PLAN.md) for what was and was not verified). Still open: a streamlined bottom bar at the next UI polish.
+
+**Model library todo (owner, 2026-11-12):** a full-featured library and picker for local MLX and Ollama models, with download and removal; Ollama models from the Ollama library or Hugging Face, MLX models from Hugging Face. Section 9 of the chat and layout plan and `HANDOFF-MODEL-LIBRARY-2026-11-12.md` have the brief.
 
 ## Weather and radar (requested 2026-11-11)
 

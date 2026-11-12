@@ -382,15 +382,7 @@ struct AgentModeBar: View {
                 }
             }
             Spacer()
-            Button { showMemory = true } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "brain").font(.system(size: 10))
-                    if session.memory.totalTokens > 0 { Text(session.memory.totalTokens.formatted()).font(SSTypography.caption()).monospacedDigit() }
-                }
-            }
-            .buttonStyle(.borderless)
-            .help(session.memory.injected.isEmpty ? "Memory: no KILN.md, AGENTS.md or CLAUDE.md found. Click to create one." : "Memory files in use: \(session.memory.injected.map(\.name).joined(separator: ", ")) (\(session.memory.totalTokens.formatted()) tokens). Click to edit.")
-            .accessibilityLabel("Memory files")
+            ReasoningMenu(session: session)
             ContextMeterView(session: session)
         }
         .padding(.horizontal, SSSpacing.m)
@@ -469,5 +461,52 @@ struct LiveStatusLine: View {
 
     static func elapsed(_ seconds: TimeInterval) -> String {
         ToolSummaryStyle.duration(seconds)
+    }
+}
+
+/// The brain button: the reasoning levels the selected model actually offers. A model that offers none shows it greyed out, with the reason.
+struct ReasoningMenu: View {
+    let session: ChatSession
+
+    private func title(_ selection: ReasoningSelection?, _ control: ReasoningControl) -> String? {
+        switch (control, selection) {
+        case (.toggle, .some(.off)): "Off"
+        case (.toggle, _): "On"
+        case (.levels(let levels), .some(.level(let id))): levels.first { $0.id == id }?.title
+        default: nil
+        }
+    }
+
+    var body: some View {
+        let control = session.reasoningControl
+        let selection = session.reasoningSelection
+        Menu {
+            switch control {
+            case .unavailable(let why):
+                Text(why)
+            case .toggle:
+                choice("Thinking on", selected: selection == .on) { session.setReasoning(.on) }
+                choice("Thinking off", selected: selection == .off) { session.setReasoning(.off) }
+            case .levels(let levels):
+                ForEach(levels) { level in
+                    choice(level.title, selected: selection == .level(level.id)) { session.setReasoning(.level(level.id)) }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "brain").font(.system(size: 10))
+                if let text = title(selection, control) { Text(text).font(SSTypography.caption()) }
+            }
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .disabled(!control.isAvailable)
+        .help(control.isAvailable ? "Reasoning: \(control.explanation)" : "Reasoning: \(control.explanation)")
+        .accessibilityLabel("Reasoning")
+        .accessibilityValue(title(selection, control) ?? "Not available for this model")
+    }
+
+    @ViewBuilder
+    private func choice(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) { if selected { Label(text, systemImage: "checkmark") } else { Text(text) } }
     }
 }

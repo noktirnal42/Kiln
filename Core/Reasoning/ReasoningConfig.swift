@@ -9,6 +9,10 @@ public struct ReasoningConfig: Codable, Equatable, Sendable {
     public var maxTokens: Int
     public var stopSequences: [String]
     public var systemPrompt: String?
+    /// A named level chosen for the current model ("low", "max"), when the model offers levels. Nil means none was chosen.
+    public var level: String?
+    /// The person turned thinking off on a model that offers a switch. Providers then send an explicit off instead of nothing.
+    public var chosenOff: Bool
 
     public init(
         enabled: Bool = true,
@@ -18,7 +22,9 @@ public struct ReasoningConfig: Codable, Equatable, Sendable {
         topP: Double = 0.95,
         maxTokens: Int = 4096,
         stopSequences: [String] = [],
-        systemPrompt: String? = nil
+        systemPrompt: String? = nil,
+        level: String? = nil,
+        chosenOff: Bool = false
     ) {
         self.enabled = enabled
         self.budget = budget
@@ -28,6 +34,27 @@ public struct ReasoningConfig: Codable, Equatable, Sendable {
         self.maxTokens = maxTokens
         self.stopSequences = stopSequences
         self.systemPrompt = systemPrompt
+        self.level = level
+        self.chosenOff = chosenOff
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case enabled, budget, depth, temperature, topP, maxTokens, stopSequences, systemPrompt, level, chosenOff
+    }
+
+    /// Configs saved before `level` and `chosenOff` existed still decode.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decode(Bool.self, forKey: .enabled)
+        budget = try c.decode(ReasoningBudget.self, forKey: .budget)
+        depth = try c.decode(ReasoningDepth.self, forKey: .depth)
+        temperature = try c.decode(Double.self, forKey: .temperature)
+        topP = try c.decode(Double.self, forKey: .topP)
+        maxTokens = try c.decode(Int.self, forKey: .maxTokens)
+        stopSequences = try c.decode([String].self, forKey: .stopSequences)
+        systemPrompt = try c.decodeIfPresent(String.self, forKey: .systemPrompt)
+        level = try c.decodeIfPresent(String.self, forKey: .level)
+        chosenOff = try c.decodeIfPresent(Bool.self, forKey: .chosenOff) ?? false
     }
 
     public static let `default` = ReasoningConfig()

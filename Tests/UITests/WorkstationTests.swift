@@ -150,6 +150,13 @@ struct WorkstationTests {
         #expect(sections.last?.activities.map(\.id) == ["brand-new"])
     }
 
+    @Test func recentModelsThatAreNotOfferedNeverShow() {
+        let recents = ["stub-m1", "ollama-qwen3:8b", "ollama-cloud-gemma4:31b", "nvidia-nim-glm"]
+        #expect(ModelPickerRecents.visible(recents, selected: "nvidia-nim-glm", available: ["ollama-qwen3:8b", "nvidia-nim-glm"]) == ["ollama-qwen3:8b", "nvidia-nim-glm"])
+        #expect(ModelPickerRecents.visible(recents, selected: "stub-m1", available: []) == ["stub-m1"], "while loading, only the model in use shows")
+        #expect(ModelPickerRecents.visible([], selected: "x", available: ["x"]).isEmpty)
+    }
+
     // MARK: Status
 
     @Test func approvalsOutrankStreamingWhenDecidingTheAgentState() {
