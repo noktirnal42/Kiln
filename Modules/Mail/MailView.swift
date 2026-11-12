@@ -4,6 +4,7 @@ struct MailView: View {
     @State private var state = MailState()
     @State private var addingAccount = false
     @State private var composing: MailDraft?
+    @State private var texting = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -15,6 +16,7 @@ struct MailView: View {
                             ForEach(state.accounts) { Text($0.address).tag($0.id) }
                         }.labelsHidden().fixedSize()
                     }
+                    Button { texting = true } label: { Image(systemName: "message") }.help("New text message in Messages").accessibilityLabel("New text message")
                     Button { composing = newDraft() } label: { Label("New message", systemImage: "square.and.pencil") }.disabled(state.account == nil)
                     Button { Task { await state.refresh() } } label: { Image(systemName: "arrow.clockwise") }.disabled(state.account == nil || state.busy).help("Check for new mail").accessibilityLabel("Check for new mail")
                     Button { addingAccount = true } label: { Image(systemName: "plus") }.help("Add an account").accessibilityLabel("Add an account")
@@ -43,6 +45,7 @@ struct MailView: View {
         }
         .background(SSColor.canvas)
         .task { state.load(); if state.account != nil { await state.refresh() } }
+        .sheet(isPresented: $texting) { TextMessageSheet(isPresented: $texting) }
         .sheet(isPresented: $addingAccount) { AddMailAccountSheet(state: state, isPresented: $addingAccount) }
         .sheet(item: Binding(get: { composing.map(DraftBox.init) }, set: { composing = $0?.draft })) { box in
             ComposeSheet(state: state, draft: box.draft, close: { composing = nil })
@@ -252,5 +255,77 @@ struct ComposeSheet: View {
     private var recipientsSummary: String {
         let all = MIMEParser.addresses(to) + MIMEParser.addresses(cc)
         return all.isEmpty ? "Add a recipient." : "Will be sent to \(all.map(\.email).joined(separator: ", "))."
+    }
+}
+
+
+/// Opens a prefilled text in the Messages app. The person reviews and sends it there; Kiln cannot send, read replies or confirm delivery.
+struct TextMessageSheet: View {
+    @Binding var isPresented: Bool
+    @State private var to = ""
+    @State private var text = ""
+    @State private var suggestions: [(name: String, value: String)] = []
+    @State private var note: String?
+    @State private var contactsAccess = ContactsService().access
+    private let contacts = ContactsService()
+
+    private var parsed: (valid: [MessageRecipient], invalid: [String]) { MessageRecipient.parseList(to) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SSSpacing.s) {
+            Text("New text message").font(SSTypography.title())
+            TextField("To: phone numbers or Apple ID emails, comma separated", text: $to).textFieldStyle(.roundedBorder)
+                .task(id: to) { await suggest() }
+            if contactsAccess == .notDetermined {
+                Button("Allow Contacts to find numbers") { Task { contactsAccess = await contacts.ensureAccess() } }.controlSize(.small).buttonStyle(.link)
+            }
+            if !suggestions.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(suggestions, id: \.value) { s in
+                            Button { accept(s.value) } label: {
+                                Text("\(s.name) · \(s.value)").font(.system(size: 11.5)).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(SSColor.surfaceRaised, in: Capsule())
+                            }.buttonStyle(.plain).accessibilityLabel("Add \(s.name), \(s.value)")
+                        }
+                    }
+                }
+            }
+            TextEditor(text: $text).font(.system(size: 13)).frame(minHeight: 110)
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SSColor.hairline))
+            if !parsed.invalid.isEmpty { Text("Not a phone number or email: \(parsed.invalid.joined(separator: ", "))").font(SSTypography.caption()).foregroundStyle(SSColor.danger) }
+            if let note { Text(note).font(SSTypography.caption()).foregroundStyle(.secondary) }
+            Text("Kiln opens this in Messages for you to review and send. It cannot send for you, read replies or confirm delivery.")
+                .font(SSTypography.caption()).foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("Close") { isPresented = false }.keyboardShortcut(.cancelAction)
+                Button("Open in Messages") {
+                    let r = parsed
+                    Task {
+                        let ok = await SystemMessageComposer().open(recipients: r.valid, body: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: [])
+                        if ok { isPresented = false } else { note = "Messages could not open a compose window. Open the Messages app once and sign in." }
+                    }
+                }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                    .disabled(parsed.valid.isEmpty || !parsed.invalid.isEmpty || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(SSSpacing.l).frame(width: 500)
+    }
+
+    private func suggest() async {
+        let token = to.split(separator: ",", omittingEmptySubsequences: false).last.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        guard token.count >= 2, contacts.access.isAuthorized else { suggestions = []; return }
+        try? await Task.sleep(for: .milliseconds(200))
+        guard !Task.isCancelled else { return }
+        let found = (try? await contacts.search(token, limit: 5)) ?? []
+        suggestions = found.flatMap { c in (c.phones + c.emails).map { (name: c.name.isEmpty ? "Unnamed" : c.name, value: $0) } }.prefix(8).map { $0 }
+    }
+
+    private func accept(_ value: String) {
+        var parts = to.split(separator: ",", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        if parts.isEmpty { parts = [value] } else { parts[parts.count - 1] = value }
+        to = parts.joined(separator: ", ") + ", "
+        suggestions = []
     }
 }
