@@ -9,11 +9,13 @@ struct ActivityRegistryTests {
 
     @Test func theActivitiesKeepTheirOrderSidebarAndShortcuts() {
         #expect(registry.descriptors.map(\.id) ==
-                ["home", "agent", "swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news"])
+                ["home", "agent", "swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news",
+                 "mail", "calendar", "contacts", "messages", "github"])
         #expect(Activity.allCases.compactMap { $0.shortcutKey.map(String.init) } == ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
         // Home has the logo and Agent has New chat; the rest are the sidebar's Workstation list, in order.
         #expect(Activity.allCases.filter(\.descriptor.showsInSidebar).map(\.id) ==
-                ["swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news"])
+                ["swarm", "develop", "analyze", "lab", "audit", "browser", "devices", "media", "images", "maps", "news",
+                 "mail", "calendar", "contacts", "messages", "github"])
     }
 
     @Test func idsAreUniqueAndEveryActivityIsComplete() {
