@@ -25,8 +25,11 @@ struct MailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, SSSpacing.m).padding(.vertical, 4)
             }
             if state.account == nil {
-                SSEmptyState(symbol: "envelope", title: "No mail account yet", message: "Add an account to read and write email. Passwords are kept in your Keychain; Kiln never shows them again.")
-                    .overlay(alignment: .bottom) { Button("Add an account") { addingAccount = true }.buttonStyle(.borderedProminent).padding(.bottom, 80) }
+                VStack(spacing: SSSpacing.m) {
+                    SSEmptyState(symbol: "envelope", title: "No mail account yet", message: "Add an account to read and write email. Passwords are kept in your Keychain; Kiln never shows them again.")
+                    Button("Add an account") { addingAccount = true }.buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HSplitView {
                     list.frame(minWidth: 260, idealWidth: 320)
