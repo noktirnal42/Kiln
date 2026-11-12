@@ -4,7 +4,7 @@ Kiln's activities are declared once in the activity registry (`Core/Registry/`),
 
 An unsent message follows the conversation between the center and the compact dock. Draft text and attachments are kept separately for each conversation while Kiln is open; they are not persisted across relaunches.
 
-There are 21 activities. Ten have shortcuts:
+There are 22 activities. Ten have shortcuts:
 
 | Shortcut | Activity | One line |
 |---|---|---|
@@ -19,7 +19,7 @@ There are 21 activities. Ten have shortcuts:
 | ⌘9 | [Devices](#devices) | iOS simulators and Android emulators |
 | ⌘0 | [Media](#media) | Video, images and audio |
 
-The other eleven have no shortcut and are in the Work menu and the palette: [Images](#images), [Maps](#maps-and-news), [News](#maps-and-news), [Mail](#mail), [Messages](#messages), [Contacts](#contacts), [Calendar](#calendar), [Notes](#notes), [Cloud Drives](#cloud-drives), [Research](#research) and [GitHub](#github).
+The other twelve have no shortcut and are in the Work menu and the palette: [Images](#images), [Maps](#maps-and-news), [News](#maps-and-news), [Mail](#mail), [Messages](#messages), [Slack](#slack), [Contacts](#contacts), [Calendar](#calendar), [Notes](#notes), [Cloud Drives](#cloud-drives), [Research](#research) and [GitHub](#github).
 
 ## Home
 An overview with a *Get started* checklist and a card for each activity, grouped as **Work**, **Communication** and **Files and knowledge**.
@@ -71,6 +71,10 @@ Add an account with your name, address and password. Kiln finds the servers (bui
 Your conversations, threads that refresh every few seconds, and sending through the Messages app. A message goes to the conversation by its own id (iMessage, SMS and groups); a failed send is shown in red.
 **Limits:** needs Full Disk Access to read and Automation permission to send; Apple documents neither, so updates can break it; delivery cannot be confirmed; one recipient per new text; attachments are not sent. Tested against a fixture database and fake senders; no real text has been sent from it.
 
+## Slack
+Channels, direct messages and history of your Slack workspace, and posting with your approval. You create a small Slack app, add the read and `chat:write` scopes, install it to your workspace and paste its token (a bot `xoxb-` or user `xoxp-` token) into Kiln. Kiln checks it with Slack before saving it to the Keychain, never shows it again and never gives it to a model. Messages you post show their exact text for approval and Kiln refuses `@channel`, `@here`, `@everyone` and user-group mentions.
+**Limits:** a bot only sees channels it has been invited to; Kiln polls every 15 seconds (no real-time events), and has no search, files or reactions; one workspace; Discord and Teams are not built. Tested against a stub of the Slack API; not seen on screen and not tried against a real workspace.
+
 ## Contacts
 A read-only lookup that also completes addresses in Mail and numbers for texts.
 **Limits:** tested with a fake contact list; needs your macOS permission.
@@ -105,4 +109,4 @@ All the communication and knowledge activities have agent and MCP tools; see [[M
 
 ---
 
-**Verified status.** Activity names, order and shortcuts match the registry (21 activities). Behavior and limits come from `docs/11-CURRENT-STATE.md`, `docs/KNOWN-ISSUES.md` and `docs/13-AGENT-CAPABILITY-MATRIX.md`. On 2026-11-12 the installed build was checked on screen: Home and its grouping, the palette, the empty states and permission screens of Mail, Messages, Contacts, Notes, Cloud Drives, Research and GitHub, Calendar reading real events, the Browser, and an Agent run. **Not checked:** Mail, Messages, Contacts, Notes, Cloud Drives and Research with real accounts and data, Spotlight search, Maps, News, Media, Images, Devices, Audit, Swarm and Analyze in this pass, narrow windows and light mode. The registry is not proof of end-to-end operation.
+**Verified status.** Activity names, order and shortcuts match the registry (22 activities). Behavior and limits come from `docs/11-CURRENT-STATE.md`, `docs/KNOWN-ISSUES.md` and `docs/13-AGENT-CAPABILITY-MATRIX.md`. On 2026-11-12 the installed build was checked on screen: Home and its grouping, the palette, the empty states and permission screens of Mail, Messages, Contacts, Notes, Cloud Drives, Research and GitHub, Calendar reading real events, the Browser, and an Agent run. **Not checked:** Mail, Messages, Contacts, Notes, Cloud Drives, Research and Slack with real accounts and data (the Slack screen itself has not been seen), Spotlight search, Maps, News, Media, Images, Devices, Audit, Swarm and Analyze in this pass, narrow windows and light mode. The registry is not proof of end-to-end operation.

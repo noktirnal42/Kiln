@@ -4,7 +4,7 @@
 
 **One native Mac workspace. Many ways to make.**
 
-Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI agent and a set of professional tools share one foundation: a source editor, a reverse-engineering workbench, a model lab, a browser, device simulators, a media viewer, maps and news, and mail, messages, calendar, notes, drives, research and GitHub. Every consequential agent action passes through approvals and a tamper-evident audit record.
+Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI agent and a set of professional tools share one foundation: a source editor, a reverse-engineering workbench, a model lab, a browser, device simulators, a media viewer, maps and news, and mail, messages, Slack, calendar, notes, drives, research and GitHub. Every consequential agent action passes through approvals and a tamper-evident audit record.
 
 Kiln is a **preview**. These pages describe what is built and verified, and say plainly what is not. Planned work is only on the [[Roadmap]].
 
