@@ -64,11 +64,16 @@ public final class ChatSession {
     nonisolated static let workspaceKey = "agent.workspaceRoot"
 
     public private(set) var conversationID: UUID?
+    /// Keeps Spotlight in step with conversations when the person has turned that on (Settings). Nil in tests.
+    public var spotlight: SpotlightSync?
     public private(set) var conversationTitle: String
     public private(set) var messages: [MessageSnapshot]
     public private(set) var isStreaming = false {
         didSet {
             // A finished run sends the next queued message, unless the person stopped it (then the queue waits for them).
+            if oldValue, !isStreaming, let id = conversationID, let spotlight {
+                Task { await spotlight.update(id) }
+            }
             if oldValue, !isStreaming, !queuePaused, errorText == nil, !queuedMessages.isEmpty {
                 Task { [weak self] in await self?.sendNextQueued() }
             }
@@ -674,6 +679,7 @@ public final class ChatSession {
 
     public func deleteConversation(_ id: UUID) async {
         try? await conversations.deleteConversation(id)
+        await spotlight?.remove(id)
         conversationListGeneration += 1
         compactions[id] = nil
         composerDrafts[id] = nil
