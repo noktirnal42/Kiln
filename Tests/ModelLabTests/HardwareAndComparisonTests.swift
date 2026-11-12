@@ -4,6 +4,23 @@ import ModelLabCore
 @testable import Kiln
 
 @Suite struct HardwareProfileTests {
+    @Test func untestedNetworkAndMLXDoNotClaimAvailability() {
+        #expect(CapabilityDetector.detectNetwork().status == .notChecked)
+        if CapabilityDetector.detectHardware().status.isAvailable {
+            #expect(CapabilityDetector.detectMLX().status == .notChecked)
+        }
+    }
+    @Test func catalogProbeChecksResponseAndRejectsErrors() async {
+        MockURLProtocol.reset()
+        defer { MockURLProtocol.reset() }
+        let session = ProviderSessions.stubbed()
+        MockURLProtocol.route("huggingface.co/api/models", json: "[]")
+        #expect(await CapabilityDetector.checkNetwork(session: session).status == .available)
+        MockURLProtocol.route("huggingface.co/api/models", status: 503, json: "{}")
+        #expect(!(await CapabilityDetector.checkNetwork(session: session).status.isAvailable))
+        MockURLProtocol.route("huggingface.co/api/models", json: "{}")
+        #expect(!(await CapabilityDetector.checkNetwork(session: session).status.isAvailable))
+    }
     @Test func liveProbeReturnsRealValues() {
         let profile = HardwareProfile.current()
         #expect(profile.memoryGB > 0)

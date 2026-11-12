@@ -73,11 +73,11 @@ struct ModelLabOverviewView: View {
                     }
                 }
             }
-            Section("Capabilities (checked live)") {
+            Section("Capabilities") {
                 ForEach(module.capabilityReports) { report in
                     HStack {
-                        Image(systemName: report.status.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .foregroundStyle(report.status.isAvailable ? .green : .red)
+                        Image(systemName: report.status == .notChecked ? "questionmark.circle" : (report.status.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill"))
+                            .foregroundStyle(report.status == .notChecked ? Color.secondary : (report.status.isAvailable ? Color.green : Color.red))
                         VStack(alignment: .leading) {
                             Text(report.name)
                             if let reason = report.status.reason {
@@ -89,10 +89,13 @@ struct ModelLabOverviewView: View {
                     }
                 }
                 Button("Re-check now") { module.refreshCapabilities() }
+                Button(module.checkingMLX ? "Testing MLX…" : "Test MLX with an installed model") {
+                    Task { await module.testMLX() }
+                }.disabled(module.checkingMLX)
             }
             Section("MLX status is environment-sensitive") {
                 Label(
-                    "MLX availability indicates the runtime is linked. A successful model download and run are needed to verify generation or training on this Mac.",
+                    "The MLX test uses the smallest installed language model estimated to fit. It loads the model and checks for generated text; vision, tools and training need separate tests.",
                     systemImage: "info.circle"
                 )
                 .font(.caption)
