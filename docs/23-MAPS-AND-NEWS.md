@@ -1,6 +1,6 @@
 # Maps and News — development status
 
-This describes the development branch, not a published release. Verification is scoped below.
+This describes the current source on `main`, not a published release; the published preview predates Maps and News. Verification is scoped below.
 
 ## Maps
 

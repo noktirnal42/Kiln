@@ -1,14 +1,22 @@
-# Kiln — current state (2026-11-03)
+# Kiln — current state (updated 2026-11-12)
 
-> **Next session: read [HANDOFF-2026-11-10.md](HANDOFF-2026-11-10.md) first** (state, unverified items, open work, pitfalls, commands).
+> **Next session: read [HANDOFF-CODEX-2026-11-10.md](HANDOFF-CODEX-2026-11-10.md) first** (how to build, test and check the UI, and the pitfalls), then [21-EVERYTHING-APP-ROADMAP.md](21-EVERYTHING-APP-ROADMAP.md), which has the owner's priority order with per-item status.
 
 Read this first. It says what exists, how it was checked, how to build and ship it, and what is still open.
-Older docs describe the plan; this describes the app.
+Older docs describe the plan; this describes the app. Sections dated before 2026-11-12 are kept as the record of when a thing was verified; where they disagree with the section below, the section below wins.
 
-On the integration-registry worktree, activity descriptors provide sidebar and palette metadata,
-agent-tool registration and capability declarations. The registry's 12 focused tests passed on
-2026-11-09. This worktree is not merged or visually verified; consult the capability matrix for
-declared gaps and do not treat its descriptors as proof of end-to-end operation.
+## State on 2026-11-12
+
+- **Branches.** Everything described here is merged to `main` (pull requests through #38; GitHub still lists #38 as closed because its merge call returned a 502, but its merge commit `4b647e8` is on `main`). The published preview, `v0.1.1` (2026-11-03), is far behind `main`.
+- **Activities.** 21 are registered in `Core/Registry/ActivityCatalog.swift`: Home, Agent, Swarm, Develop, Analyze, Lab, Audit, Browser, Devices and Media (⌘1 to ⌘9, then ⌘0), then Images, Maps, News, Mail, Messages, Contacts, Calendar, Notes, Cloud Drives, Research and GitHub (no shortcut). Home groups its cards as Work, Communication, and Files and knowledge; an activity not listed in `UI/Workstation/HomeSections.swift` still appears, under More.
+- **Tests.** The full Mac suite passed on `main` at `4b647e8` on 2026-11-12, run locally: 1,063 tests in 216 suites (about 95 seconds). CI runs the same suite on a hosted macOS runner (about 15 minutes); on 2026-11-12 three attempts on one pull request never got a runner ("The job was not acquired by Runner of type hosted"), so that change was merged on the local result. A speech-synthesis test is skipped on CI (the workflow forwards `CI=true` to the test process as `TEST_RUNNER_CI`; before that the skip never applied).
+- **Installed builds checked on screen, 2026-11-12** (Developer ID signed and notarized, built from `main` at `39fd052` and `4b647e8`): Home and its grouping, the command palette, the empty states and permission screens of Mail, Messages, Contacts, Notes, Cloud Drives, Research and GitHub, Calendar reading real events and reminders, the Browser (below), and an Agent run with a hosted model (below). **Not seen with real data:** a Mail account, the Messages database, Contacts, Notes, a cloud-drive folder, the PDF reader's highlight and save buttons, Spotlight search, creating a calendar event or reminder. No real text or email has been sent from Kiln.
+- **Tools on demand.** About 21,000 tokens of tool definitions (more than 200 tools) used to go to the model on every request, which overflowed any window below that and pinned the context meter at 100%. Now, when the definitions would use more than a tenth of the window, a run starts with the file, search, shell, Git and web tools plus `kiln_tool_search` (`Core/Agent/OnDemandTools.swift`); the agent searches by need and the matching tools are added for the rest of the run, and calling an unloaded tool loads it and returns its arguments instead of running it. `Core/Agent/ToolFit.swift` trims what still does not fit a small window (core tools first, then whole groups, to 30% of the window). The meter and `/compact` count only what is loaded; the thread says "N of M tools are loaded". Checked on screen with `nemotron-3.5-super` on NVIDIA NIM: 22 of 199 tools loaded, the agent searched for "reminders" and named the four tools it loaded, the meter read 3% to 4% (11% idle, because the idle figure also counts the system prompt and loaded tools; during a run the meter counts only the conversation). Swarm workers do not pass a window, so they still get their tools up front. Tests: `ToolLoaderTests`, `ToolFitTests`.
+- **Browser.** It now identifies as Safari of the Mac's own version (`Modules/Browser/BrowserIdentity.swift`: `Version/27.0 Safari/605.1.15` on this Mac, confirmed by a real server echoing it), turns on element fullscreen and click-free playback, because a bare `WKWebView` sends no Safari token and streaming and cloud-gaming sites refuse it. **Not verified:** that any cloud-gaming service then starts (needs a sign-in); there is no microphone permission prompt for voice chat inside a page.
+- **Messages.** Sending goes to each conversation by its own chat id (iMessage, SMS and groups), with a handle fallback for one-to-one iMessage chats; a permission refusal is never retried; a failed send is shown in red. Tested with fake senders; no real text sent.
+- **Spotlight.** Conversations can be added to Spotlight (Settings: Off by default, Titles only, or Titles and text). Unit-tested; a real Spotlight search has not been tried.
+- **Polish from the 2026-11-12 screen pass.** The palette ranks "Go to <activity>" above that activity's tool rows and a list that reorders under a resting pointer no longer steals the highlight; Calendar no longer says "Nothing" while loading; Research and Notes have proper empty states; permission and privacy footnotes are readable.
+- **Open.** Slack and chat connectors and the rest of the roadmap ([21](21-EVERYTHING-APP-ROADMAP.md)); the unverified items above; Return in the command palette could not be confirmed with the available automation (the handler is `onSubmit`).
 
 ## Build, test, sign, notarize
 
@@ -19,7 +27,7 @@ declared gaps and do not treat its descriptors as proof of end-to-end operation.
 - Signing: automatic, team `LH8KLB9N4F`, Apple Development identity; Release archives are re-signed with
   Developer ID at export. `xcodeVersion: 2710` plus the recommended build settings keep Xcode's
   "Update to recommended settings" prompt away. Bump it when moving to a newer Xcode.
-- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (592 tests as of 2026-11-03, including the opt-in live Ghidra test; no
+- Tests: `xcodebuild test -project Kiln.xcodeproj -scheme Kiln -destination 'platform=macOS'` (see the test count above; it was 592 on 2026-11-03; no
   warnings except four from mlx-swift's Metal kernels, which cannot be silenced from this project; mlx-swift 0.32
   is worse, 76 warnings).
 - **Notarize from Xcode:** Product → Archive, Organizer → Distribute App → Direct Distribution → Export
@@ -38,9 +46,9 @@ declared gaps and do not treat its descriptors as proof of end-to-end operation.
 
 One window, one sidebar, one conversation.
 
-- **Sidebar** (`UI/Workstation/WorkstationSidebar.swift`): New chat, project switcher, chat history grouped by day
-  (auto-titled from the first message), then the tools: Swarm, Develop, Analyze, Lab, Audit, Browser, Devices. The Kiln logo opens
-  Overview (the old Home). ⌘1–⌘9 and ⌘K still work.
+- **Sidebar and toolbar** (`UI/Workstation/WorkstationSidebar.swift`, `UI/MainWindow.swift`): the sidebar holds New chat, Scheduled tasks, the project switcher and the conversation history
+  (auto-titled from the first message), with approvals and Settings at the bottom. Navigation is in the toolbar: Chat, Code, Browser, Maps and Devices buttons and a Work menu that lists the other activities. The Kiln logo opens
+  Home. ⌘1–⌘9, ⌘0 and ⌘K (command palette) work.
 - **Shared activity chrome** (`UI/DesignSystem/ActivityChrome.swift`, added in the 2026-11-09 UI pass): every activity (Develop, Analyze, Lab,
   Swarm, Audit) opens with `SSActivityHeader` (40 pt: name, optional `SSTabStrip`, trailing actions) and uses `SSPaneHeader` (28 pt) over its panes,
   `SSCodeBlock` for listings and `SSEmptyState` for empty panes. Activities never use the window toolbar or `.navigationTitle`, so the title bar
@@ -95,7 +103,7 @@ One window, one sidebar, one conversation.
   `[result cleared: <tool>, N chars]` stubs (newest 4 kept), (b) if still over, the older part is summarised by the
   model into one message (system messages and the recent tail stay verbatim, a tool call never separated from its
   results), (c) if the summary call fails the oldest part is dropped with an honest note. `run(contextWindow:)` nil = off.
-  `AgentEvent.contextCompacted` / `.contextMeasured`. `ChatSession` keeps per conversation the summary + covered-message
+  `AgentEvent.contextCompacted` / `.contextMeasured`. Since 2026-11-12 tool definitions are loaded on demand and trimmed to fit (see the section above), so the "tool-schema size" in that budget is only what is loaded. `ChatSession` keeps per conversation the summary + covered-message
   count (UserDefaults key `chat.compaction.v1`; off under tests) and rebuilds history as [summary] + later messages.
   The run limit is 200 steps and **pauses** ("Paused after N steps; say continue…") instead of erroring.
   UI: context meter + compact button in the composer bar (tooltip has detail), `/compact`, "Context compacted (A → B
@@ -111,7 +119,7 @@ One window, one sidebar, one conversation.
 - **Swarm:** planner (JSON plan or fixed research → implement → review fallback), parallel workers over the
   coordination bus, blockers reported not retried, every worker call through the same gates.
 - **Kiln as an MCP server:** Develop → MCP → Start. Loopback only, bearer token in
-  `Application Support/Kiln/mcp-server.json` (0600). 34 tools incl. `re_*`, `lab_*`. External calls run as
+  `Application Support/Kiln/mcp-server.json` (0600). the full tool registry (34 tools when this was written, more than 200 now), including `re_*` and `lab_*`. External calls run as
   "External: <client>" and are audited; reads are free, anything else waits for approval in Kiln.
 - **Shared tool configuration (no duplicates).** Kiln reads, never copies, what Claude Code, Codex and OpenCode already
   have: MCP servers from `~/.claude.json`, `~/.codex/config.toml` and `~/.config/opencode/opencode.json`
@@ -158,13 +166,13 @@ One window, one sidebar, one conversation.
   `re_download_package` is a write, so it needs approval like `edit_file`. Files land in
   `Application Support/Kiln/ReverseEngineering/Downloads` and are analyzed, never run.
 - **Devices (Apple simulators + Android emulators):** list/boot/shutdown/screenshot/install/launch/open URL/record/logs via `xcrun simctl` and `adb`/`emulator`, `device_*` agent and MCP tools, live screenshot view with Android touch forwarding. Apple input is not possible through simctl. See `docs/16-DEVICES.md` (also Windows/Linux design and sandbox notes).
-- **Media (⌘8, `Modules/Media`, `Core/Media`):** viewer (AVKit video with scrub and 0.5–2× speed, zoomable images, audio with waveform) that opens workspace files,
+- **Media (⌘0, `Modules/Media`, `Core/Media`):** viewer (AVKit video with scrub and 0.5–2× speed, zoomable images, audio with waveform) that opens workspace files,
   drops and agent results; a gallery of generated items in `Application Support/Kiln/Media`; image generation behind `ImageGenerationProvider`
   (Apple Image Playground when this Mac has it, else a custom OpenAI-compatible `/images/generations` endpoint — unverified against a live endpoint; with neither
   configured the call fails and says why, nothing is faked); text to speech to a file (AVSpeechSynthesizer.write) and speech to text from a file
   (`AudioTranscriber.transcribe(fileAt:)`; the composer's existing mic button is the dictation hook, untouched). Tools: `media_open`, `media_list` (read),
   `media_generate_image`, `media_speak`, `media_transcribe` (write, need approval). Verified here: a real MP4 plays in the viewer; TTS then STT round trip returned the spoken sentence.
-- **Image studio (⌘- , `Modules/ImageStudio`, `Core/ImageStudio`; research and measurements in `docs/18-IMAGE-STUDIO.md`):** activity "Images" with Create (prompt, negative prompt, style chips, engine and model pickers, task, size presets, steps, guidance, seed, batch, sampler and LoRA stack when the engine has them, queue with cancel, canvas with history strip), Models (engine status with setup steps, catalogue from four sources, downloads with progress) and History. Engines behind `ImageEngine`: **MLX** in-process (SD 2.x-architecture and SDXL-architecture diffusers folders: SD-Turbo, SDXL-Turbo, SDXL base and fine-tunes; text-to-image and image-to-image only; a vendored fork of mlx-swift-examples' StableDiffusion in `Packages/KilnDiffusion`), **Draw Things** (A1111-style HTTP API, default port 7860), **ComfyUI** (workflow API, 8188) and **AUTOMATIC1111/Forge** (7861); an engine that is not running shows a setup state and never fakes output; inpaint, outpaint and LoRA are offered only where an engine has them, with the reason shown otherwise. Catalogue: curated list (SD-Turbo, SDXL-Turbo, SDXL base/refiner, fine-tunes, SD 1.5, SD 3.5, FLUX.1 schnell/dev, Playground, LCM and Lightning LoRAs, ControlNets, VAEs, upscalers; sizes and licences checked 2026-11-09), Draw Things' live list (`models.drawthings.ai`), Hugging Face search and Civitai search (public API, no key). Downloader: resumable (Range), SHA-256 / git-SHA-1 verified, disk-space check, queue, into the universal model store in the Hugging Face cache layout (or the folder of another tool for single files); gated models need the user's own token (Settings → Providers, Keychain) and terms accepted on the model page, Kiln never accepts for the user; downloads over 8 GB need confirmation. Every PNG embeds its request as `kiln-generation` JSON plus an A1111-style `parameters` chunk, so "Re-run" and "Load settings" work from the file. Upscale is Lanczos resampling (labelled as such); AI upscalers, ControlNet, face fix and a LoRA in the MLX engine are **not** implemented. Tools: `image_list_models`, `image_history` (read), `image_download_model`, `image_generate`, `image_edit`, `image_upscale` (write; approval). Verified here: see docs/18 for what was actually generated.
+- **Image studio (no shortcut, `Modules/ImageStudio`, `Core/ImageStudio`; research and measurements in `docs/18-IMAGE-STUDIO.md`):** activity "Images" with Create (prompt, negative prompt, style chips, engine and model pickers, task, size presets, steps, guidance, seed, batch, sampler and LoRA stack when the engine has them, queue with cancel, canvas with history strip), Models (engine status with setup steps, catalogue from four sources, downloads with progress) and History. Engines behind `ImageEngine`: **MLX** in-process (SD 2.x-architecture and SDXL-architecture diffusers folders: SD-Turbo, SDXL-Turbo, SDXL base and fine-tunes; text-to-image and image-to-image only; a vendored fork of mlx-swift-examples' StableDiffusion in `Packages/KilnDiffusion`), **Draw Things** (A1111-style HTTP API, default port 7860), **ComfyUI** (workflow API, 8188) and **AUTOMATIC1111/Forge** (7861); an engine that is not running shows a setup state and never fakes output; inpaint, outpaint and LoRA are offered only where an engine has them, with the reason shown otherwise. Catalogue: curated list (SD-Turbo, SDXL-Turbo, SDXL base/refiner, fine-tunes, SD 1.5, SD 3.5, FLUX.1 schnell/dev, Playground, LCM and Lightning LoRAs, ControlNets, VAEs, upscalers; sizes and licences checked 2026-11-09), Draw Things' live list (`models.drawthings.ai`), Hugging Face search and Civitai search (public API, no key). Downloader: resumable (Range), SHA-256 / git-SHA-1 verified, disk-space check, queue, into the universal model store in the Hugging Face cache layout (or the folder of another tool for single files); gated models need the user's own token (Settings → Providers, Keychain) and terms accepted on the model page, Kiln never accepts for the user; downloads over 8 GB need confirmation. Every PNG embeds its request as `kiln-generation` JSON plus an A1111-style `parameters` chunk, so "Re-run" and "Load settings" work from the file. Upscale is Lanczos resampling (labelled as such); AI upscalers, ControlNet, face fix and a LoRA in the MLX engine are **not** implemented. Tools: `image_list_models`, `image_history` (read), `image_download_model`, `image_generate`, `image_edit`, `image_upscale` (write; approval). Verified here: see docs/18 for what was actually generated.
 - **Model Lab:** `lab_hardware`, `lab_list_experiments`, `lab_list_datasets`, Hugging Face search tools.
 
 ## Providers (all verified with real calls, 2026-11-01)
@@ -192,7 +200,7 @@ Only language models (`architectures` ending in `CausalLM`) are listed; speech, 
 same cache are skipped (9 of 32 in this user's store). Lab → Models also lists them; Playground reads them from
 disk instead of downloading.
 
-## Verification status
+## Verification status (2026-11-03; see the 2026-11-12 section above for later checks)
 
 Verified with the real app or real models: provider matrix above; agent fixing a failing test (listed folder, read
 files, ran tests, edited, re-ran); swarm writing and reviewing a README whose examples were then run and matched;

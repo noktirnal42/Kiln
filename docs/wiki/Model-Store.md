@@ -16,7 +16,7 @@ Where the store lives (internal or external drive) is up to you; models can be l
 - Agents can register a Hub repository (`lab_register_model`, downloads nothing) and remove a library entry (`lab_delete_model`, which never touches the cache). LoRA and distillation tools use only cached base models unless `allow_download` is passed.
 - LM Studio's own model folder and Ollama's model directory are not scanned. Ollama uses only what its running server knows.
 - Kiln never deletes the shared cache.
-- In the `codex/kiln-qa-completion` development branch, Lab's installed-model list can be filtered by name and estimated memory fit, and sorted by name or size. The estimate uses the model's stored size and the current Mac's hardware; it does not establish that an architecture or a particular context length will run.
+- Lab's installed-model list can be filtered by name and estimated memory fit, and sorted by name or size. The estimate uses the model's stored size and the current Mac's hardware; it does not establish that an architecture or a particular context length will run.
 
 ## Image models
 
