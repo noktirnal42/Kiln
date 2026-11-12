@@ -248,6 +248,11 @@ public final class AppModel {
             initialModelID: UserDefaults.standard.stringArray(forKey: "chat.recentModels")?.first ?? ""
         )
         chatSession = session
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            let sync = SpotlightSync(store: conversations)
+            session.spotlight = sync
+            Task { await sync.rebuild() }   // keeps the index matching the chosen mode after a relaunch (Off clears it)
+        }
         remoteServer = RemoteServer(
             bridge: RemoteBridge(backend: ChatRemoteBackend(session: session)),
             store: RemotePairingStore(directory: AgentPaths.makeDefault()),
