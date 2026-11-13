@@ -32,6 +32,8 @@ public final class ThemeManager {
     }
 
     public private(set) var appearance: Appearance = .system
+    /// Colour and font themes (built-in and the person's own).
+    public let themes = ThemeStore()
     private var settings: SettingsService?
     private let settingsKey = "ui.theme"
 

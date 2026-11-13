@@ -350,29 +350,36 @@ struct AgentModeBar: View {
                 Toggle(isOn: $session.planMode) { Label("Plan", systemImage: "list.bullet.clipboard") }
                     .toggleStyle(.button).controlSize(.small)
                     .help("Plan mode: the agent explores read-only, then proposes a plan you approve before anything changes (/plan)")
-                Picker("", selection: $session.agentProfileIndex) {
-                    ForEach(Array(session.agentProfiles.enumerated()), id: \.offset) { index, profile in
-                        Text(profile.name).tag(index)
-                    }
-                }
-                .labelsHidden().controlSize(.small).frame(maxWidth: 150)
-                if let profile = session.agentProfile {
-                    Menu {
-                        ForEach(AgentRoundLimits.presets, id: \.self) { limit in
-                            Button {
-                                session.setRoundLimit(limit, for: profile)
-                            } label: {
-                                if session.roundLimit(for: profile) == limit { Label("\(limit) steps", systemImage: "checkmark") }
-                                else { Text("\(limit) steps") }
+                Menu {
+                    Section("Agent profile") {
+                        ForEach(Array(session.agentProfiles.enumerated()), id: \.offset) { index, profile in
+                            Button { session.agentProfileIndex = index } label: {
+                                if session.agentProfileIndex == index { Label(profile.name, systemImage: "checkmark") } else { Text(profile.name) }
                             }
                         }
-                    } label: {
-                        Text("\(session.roundLimit(for: profile)) steps").font(SSTypography.caption())
                     }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    .help("Maximum model rounds for \(profile.name); changes apply to the next run")
-                    .accessibilityLabel("Step limit: \(session.roundLimit(for: profile))")
+                    if let profile = session.agentProfile {
+                        Menu("Step limit: \(session.roundLimit(for: profile))") {
+                            ForEach(AgentRoundLimits.presets, id: \.self) { limit in
+                                Button { session.setRoundLimit(limit, for: profile) } label: {
+                                    if session.roundLimit(for: profile) == limit { Label("\(limit) steps", systemImage: "checkmark") } else { Text("\(limit) steps") }
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.crop.rectangle").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text(session.agentProfile?.name ?? "Profile").font(.system(size: 11)).lineLimit(1).truncationMode(.tail).frame(maxWidth: 110)
+                        Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(SSColor.surfaceRaised, in: Capsule())
                 }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .help(session.agentProfile.map { "Agent profile: \($0.name). Up to \(session.roundLimit(for: $0)) model rounds per run; changes apply to the next run." } ?? "Agent profile")
+                .accessibilityLabel("Agent profile and step limit")
                 PermissionModeMenu(center: ApprovalCenter.shared)
                 if session.workspaceRoot == nil {
                     Label("No project", systemImage: "folder.badge.questionmark")
