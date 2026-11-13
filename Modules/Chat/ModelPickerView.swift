@@ -9,12 +9,14 @@ struct ModelPickerView: View {
     @State private var availability: [String: ProviderAvailability] = [:]
     @State private var loadError: String?
     @State private var loading = true
+    @State private var showLibrary = false
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Text("Models").font(SSTypography.title())
                 Spacer()
+                Button("Add or remove local models…") { showLibrary = true }.help("Download or remove Ollama models")
                 Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
             }
             .padding(SSSpacing.m)
@@ -76,6 +78,7 @@ struct ModelPickerView: View {
         .task {
             await loadModels()
         }
+        .sheet(isPresented: $showLibrary, onDismiss: { Task { await loadModels() } }) { ModelLibrarySheet(session: session) }
     }
 
     /// Recents whose provider does not offer the model (a removed key, an unplugged server, a test stub) are hidden, also
