@@ -117,14 +117,21 @@ enum ShellRunner {
         process.standardError = out
 
         let collector = OutputCollector(pipe: out)
-        do {
-            try process.run()
-        } catch {
-            throw AgentRunError.permissionDenied("Could not start the command: \(error.localizedDescription)")
+        // Wait for exit with the termination handler rather than a blocking `waitUntilExit()` on a pool thread: when many
+        // commands run at once (parallel tests on a loaded runner) blocked threads starved the pool and a trivial command
+        // was reported as timed out.
+        let startError = StartErrorBox()
+        let finished: Bool = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let state = TimeoutRaceState(continuation)
+            process.terminationHandler = { _ in state.finish(true) }
+            do { try process.run() } catch { startError.error = error; state.finish(true); return }
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                state.finish(false)
+            }
         }
-
-        let finished = await withTimeoutRace(seconds: timeout) {
-            process.waitUntilExit()
+        if let error = startError.error {
+            throw AgentRunError.permissionDenied("Could not start the command: \(error.localizedDescription)")
         }
         let timedOut = !finished
         if timedOut && process.isRunning {
@@ -158,6 +165,9 @@ enum ShellRunner {
         return BackgroundJob(command: command, process: process, outputURL: outputURL)
     }
 }
+
+/// Carries a launch failure out of the continuation closure.
+final class StartErrorBox: @unchecked Sendable { var error: Error? }
 
 /// Collects pipe output off the reading thread without blocking the caller.
 /// `Pipe` buffers internally, so draining lazily on collect is enough for
