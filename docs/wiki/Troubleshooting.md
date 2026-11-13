@@ -50,7 +50,7 @@ Before reporting, record the commit or build, macOS and Xcode versions, hardware
 
 **A website will not let me use a passkey or autofill.** Not verified in Kiln; see [[Browser]].
 
-**A streaming or cloud-gaming site says the browser is unsupported.** Kiln identifies as Safari, which most of them accept. Some check more than the browser name, and voice chat in a page needs a microphone prompt the browser does not have yet; tell us which service and the exact message.
+**A streaming or cloud-gaming site says the browser is unsupported.** Kiln identifies as Safari, which most of them accept. Some check more than the browser name, and voice chat in a page asks you to allow the microphone (a prompt that has not yet been seen on screen), and macOS may ask Kiln for access too; tell us which service and the exact message.
 
 ## Still stuck
 

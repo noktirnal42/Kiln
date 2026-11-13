@@ -25,7 +25,7 @@ Mail (scripted IMAP and SMTP servers), Messages (fixture database and fake sende
 | A real cloud-drive folder; the PDF reader's highlight and save buttons | A synced folder; a PDF |
 | A real Spotlight search of an indexed conversation | Settings option turned on by the owner |
 | Slack: the connected view, reading, and posting | A Slack app and token created and pasted by the owner |
-| A cloud-gaming service starting in the browser | The owner's sign-in; some services check more than the browser name; voice chat has no microphone prompt |
+| A cloud-gaming service starting in the browser | The owner's sign-in; some services check more than the browser name; voice chat now asks for the microphone, but that prompt has not been seen on screen |
 | The reasoning menu opened on screen; a live request with a chosen level for each provider | Real keystrokes or full-screen control; provider keys (never read them) |
 | Creating a calendar event or reminder | The owner's approval flow on screen |
 | Return in the command palette | Real key events (background automation cannot deliver them) |

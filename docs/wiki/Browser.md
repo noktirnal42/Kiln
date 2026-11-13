@@ -17,7 +17,7 @@ The **Browser** activity (⌘8) is a tabbed WebKit browser inside Kiln that the 
 
 ## Not done
 
-Voice chat inside a page (the browser has no microphone permission prompt), popups with `window.opener` (they open as new tabs), JavaScript dialogs, HTTP authentication prompts, per-tab incognito, history and bookmarks. The agent has no tools for history or closing tabs.
+Camera and screen sharing in a page (a page's microphone request shows a Kiln prompt each time; the prompt has not been seen on screen), popups with `window.opener` (they open as new tabs), JavaScript dialogs, HTTP authentication prompts, per-tab incognito, history and bookmarks. The agent has no tools for history or closing tabs.
 
 ## Sign-in, autofill and passkeys
 

@@ -153,6 +153,27 @@ extension BrowserTab: WKUIDelegate {
         guard let owner else { return nil }
         return owner.newTab(url: nil, select: true, configuration: configuration).webView
     }
+
+    /// A page asked for the microphone (voice chat, dictation sites). Without this method the request had no Kiln-owned prompt.
+    /// The microphone is asked for each time; the camera is refused because Kiln does not declare it.
+    @available(macOS 12.0, *)
+    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
+                 type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
+        switch MediaCapturePolicy.decide(type: type, host: origin.host) {
+        case .deny: decisionHandler(.deny)
+        case .ask(let question):
+            let alert = NSAlert()
+            alert.messageText = "Microphone access"
+            alert.informativeText = question
+            alert.addButton(withTitle: "Allow")
+            alert.addButton(withTitle: "Don't Allow")
+            if let window = webView.window {
+                alert.beginSheetModal(for: window) { response in decisionHandler(response == .alertFirstButtonReturn ? .grant : .deny) }
+            } else {
+                decisionHandler(alert.runModal() == .alertFirstButtonReturn ? .grant : .deny)
+            }
+        }
+    }
 }
 
 extension BrowserTab: WKDownloadDelegate {
