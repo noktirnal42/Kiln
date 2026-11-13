@@ -18,6 +18,8 @@ struct KilnApp: App {
     var body: some Scene {
         WindowGroup {
             MainWindow()
+                .id(appModel.themeManager.themes.revision)   // redraws with the new colours when the theme changes
+                .tint(SSColor.accent)
                 .environment(appModel)
                 .onOpenURL { appModel.open($0) }
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in

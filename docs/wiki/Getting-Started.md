@@ -35,7 +35,7 @@ Kiln needs no provider to start, but a chat needs a model. The Home activity sho
 
 ## Moving around
 
-The toolbar opens Chat, Code, Browser, Maps and Devices; the Work menu lists the other activities, and Home shows a card for each, grouped as Work, Communication, and Files and knowledge. Shortcuts follow registry order: ⌘1 Home, ⌘2 Agent, ⌘3 Swarm, ⌘4 Develop, ⌘5 Analyze, ⌘6 Lab, ⌘7 Audit, ⌘8 Browser, ⌘9 Devices, ⌘0 Media; the other eleven activities have no shortcut. ⌘K opens the command palette (type "Mail" and Go to Mail comes first) and ⌘, opens Settings. A packaged preview can have a different layout. See [[Activities]].
+Settings → Theme switches the whole app between seven built-in themes (Ember, Midnight, Forest, Violet, Rose, Graphite, Paper), or lets you duplicate one and save your own colours, font and text size. The toolbar opens Chat, Code, Browser, Maps and Devices; the Work menu lists the other activities, and Home shows a card for each, grouped as Work, Communication, and Files and knowledge. Shortcuts follow registry order: ⌘1 Home, ⌘2 Agent, ⌘3 Swarm, ⌘4 Develop, ⌘5 Analyze, ⌘6 Lab, ⌘7 Audit, ⌘8 Browser, ⌘9 Devices, ⌘0 Media; the other eleven activities have no shortcut. ⌘K opens the command palette (type "Mail" and Go to Mail comes first) and ⌘, opens Settings. A packaged preview can have a different layout. See [[Activities]].
 
 ---
 

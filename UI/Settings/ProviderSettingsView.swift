@@ -165,6 +165,7 @@ struct ProviderSettingsView: View {
                         Button("Relaunch Kiln") { Self.relaunch() }
                     }
                 }
+                ThemeSettingsCard()
                 NotificationSettingsCard()
                 QuickAskSettingsCard()
                 ModelStoreCard()
