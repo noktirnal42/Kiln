@@ -54,7 +54,7 @@ struct QuickAskSettingsCard: View {
         VStack(alignment: .leading, spacing: SSSpacing.s) {
             Text("Menu bar and links").font(SSTypography.headline())
             Toggle("Show Kiln in the menu bar", isOn: $showInMenuBar)
-            Text("A field you can type a question into from anywhere. Ask sends it to the chat and brings Kiln forward; Put in message box leaves it for you to edit. Tool approvals still appear in Kiln.")
+            Text("A field you can type a question into from anywhere. Ask sends it to the chat and brings Kiln forward; Put in message box leaves it for you to edit. Tool approvals still appear in Kiln. If the icon does not show, your menu bar may be full: macOS hides items that do not fit (the most on Macs with a notch), so remove some items in System Settings → Menu Bar.")
                 .font(SSTypography.caption()).foregroundStyle(.secondary)
             Text("Links: kiln://ask?text=… and kiln://share?title=…&url=…&text=… put text in the message box after whatever you are typing. A link can come from any web page, so it never sends by itself.")
                 .font(SSTypography.caption()).foregroundStyle(.secondary)
