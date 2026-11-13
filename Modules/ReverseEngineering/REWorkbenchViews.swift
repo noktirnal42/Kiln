@@ -419,7 +419,7 @@ struct REFindingsPane: View {
                     List(findings) { f in
                         VStack(alignment: .leading, spacing: 2) {
                             HStack { SSBadge(text: f.severity.rawValue, tint: f.severity == .critical || f.severity == .high ? SSColor.danger : f.severity == .medium ? SSColor.warning : .secondary)
-                                Text(f.title).font(.system(size: 12.5, weight: .semibold)); if f.source != "analyst" { SSBadge(text: f.source) }; Spacer()
+                                Text(f.title).font(ThemeRuntime.font(12.5, .semibold)); if f.source != "analyst" { SSBadge(text: f.source) }; Spacer()
                                 Button { try? module.removeFinding(projectID: projectID, id: f.id); reload() } label: { Image(systemName: "trash") }.buttonStyle(.borderless) }
                             Text(f.summary).font(SSTypography.caption()).foregroundStyle(.secondary)
                             if let a = f.address ?? f.function { Text(a).font(SSTypography.mono(10.5)).foregroundStyle(SSColor.accent) }

@@ -56,7 +56,7 @@ struct MessageBubble: View {
                     if editing {
                         VStack(alignment: .trailing, spacing: 6) {
                             TextEditor(text: $editText)
-                                .font(.system(size: 14)).frame(maxWidth: .infinity, minHeight: 60, maxHeight: 180)
+                                .font(ThemeRuntime.font(14)).frame(maxWidth: .infinity, minHeight: 60, maxHeight: 180)
                                 .scrollContentBackground(.hidden)
                                 .padding(4).background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 6))
                                 .accessibilityLabel("Edit message")
@@ -72,7 +72,7 @@ struct MessageBubble: View {
                         }
                     } else {
                         Text(parts.visible)
-                            .font(.system(size: 14))
+                            .font(ThemeRuntime.font(14))
                             .textSelection(.enabled)
                     }
                     if !parts.attached.isEmpty {
@@ -145,7 +145,7 @@ struct MessageBubble: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: open ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
-                    Text(isStreaming ? "Thinking…" : "Thought process").font(.system(size: 12))
+                    Text(isStreaming ? "Thinking…" : "Thought process").font(ThemeRuntime.font(12))
                 }
                 .foregroundStyle(.secondary)
             }
@@ -153,7 +153,7 @@ struct MessageBubble: View {
             if open {
                 ScrollView {
                     Text(reasoningText)
-                        .font(.system(size: 12))
+                        .font(ThemeRuntime.font(12))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -196,7 +196,7 @@ struct MessageBubble: View {
                 actionButton("trash", "Delete message") { Task { await session.deleteMessage(message.id) } }
                 if message.role == .assistant {
                     Text(meta)
-                        .font(.system(size: 11))
+                        .font(ThemeRuntime.font(11))
                         .foregroundStyle(.tertiary)
                         .padding(.leading, 6)
                         .lineLimit(1)
@@ -264,7 +264,7 @@ struct ThinkingDots: View {
             if let label {
                 Text(waited > 60 ? "No answer after \(Int(waited)) s. The provider may be busy: Stop, then pick another model from the model menu."
                      : waited > 15 ? "Still waiting for the model to start responding" : label)
-                    .font(.system(size: 12)).foregroundStyle(waited > 60 ? SSColor.warning : .secondary)
+                    .font(ThemeRuntime.font(12)).foregroundStyle(waited > 60 ? SSColor.warning : .secondary)
             }
         }
     }
@@ -303,7 +303,7 @@ struct ToolCallTextNotice: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle").font(.system(size: 11)).foregroundStyle(SSColor.warning)
-                Text("This model wrote a tool call as text instead of making it, so nothing ran.").font(.system(size: 13))
+                Text("This model wrote a tool call as text instead of making it, so nothing ran.").font(ThemeRuntime.font(13))
                 Button(showing ? "Hide" : "Show text") { showing.toggle() }.buttonStyle(.borderless).font(SSTypography.caption())
                 Button("Try again", action: retry).buttonStyle(.borderless).font(SSTypography.caption())
             }

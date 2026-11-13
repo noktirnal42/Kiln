@@ -69,7 +69,7 @@ struct ApprovalQueueView: View {
     private var emptyState: some View {
         VStack(spacing: SSSpacing.s) {
             Image(systemName: "checkmark.seal")
-                .font(.system(size: 28))
+                .font(ThemeRuntime.font(28))
                 .foregroundStyle(SSColor.success)
             Text("No approvals waiting")
                 .font(SSTypography.body())

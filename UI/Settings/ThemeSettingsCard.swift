@@ -77,7 +77,7 @@ struct ThemeSettingsCard: View {
                 Slider(value: binding(theme, \.fontScale), in: 0.85...1.4).frame(width: 180)
                 Text("\(Int((theme.fontScale * 100).rounded()))%").monospacedDigit().foregroundStyle(.secondary)
             }
-            Text("Text size and font apply to text that uses Kiln's standard styles; a few views keep their own sizes. Changes are saved as you make them, and the window redraws.")
+            Text("Font and text size apply to most text; icons and a few views keep their own sizes. Changes are saved as you make them, and the window redraws.")
                 .font(SSTypography.caption()).foregroundStyle(.secondary)
         }
     }

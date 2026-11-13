@@ -237,7 +237,7 @@ struct BrowserRootView: View {
         HStack(spacing: SSSpacing.s) {
             Image(systemName: item.isPackage ? "shippingbox" : "arrow.down.circle").foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                Text(item.name).font(ThemeRuntime.font(12, .medium)).lineLimit(1)
                 switch item.state {
                 case .inProgress: Text("Downloading…").font(.caption).foregroundStyle(.secondary)
                 case .failed(let reason): Text(reason).font(.caption).foregroundStyle(SSColor.danger).lineLimit(1)
