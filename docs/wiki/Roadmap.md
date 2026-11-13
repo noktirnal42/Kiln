@@ -15,7 +15,7 @@ Mail, Contacts, Messages, Slack, Calendar and Reminders, notifications that foll
 
 ## Planned, in the owner's priority order
 
-a menu-bar quick-ask and Share extension; Writing Tools and Services-menu actions; weather and a radar layer on the Maps view (sources and terms still to be verified); a document, spreadsheet and presentation studio. Details are in the [feature roadmap](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
+weather and a radar layer on the Maps view (sources and terms still to be verified); a document, spreadsheet and presentation studio. Details are in the [feature roadmap](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
 
 ## Next
 

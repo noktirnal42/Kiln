@@ -4,6 +4,19 @@
 <dict>
     <key>NSLocationUsageDescription</key>
     <string>Kiln uses your location when you choose My Location in Maps. Approved agents can read the last location you requested.</string>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict><key>default</key><string>Ask Kiln</string></dict>
+            <key>NSMessage</key>
+            <string>askKiln</string>
+            <key>NSPortName</key>
+            <string>Kiln</string>
+            <key>NSSendTypes</key>
+            <array><string>NSStringPboardType</string><string>public.utf8-plain-text</string></array>
+        </dict>
+    </array>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
@@ -13,6 +26,14 @@
             <string>Viewer</string>
             <key>CFBundleURLSchemes</key>
             <array><string>http</string><string>https</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>Kiln link</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleURLSchemes</key>
+            <array><string>kiln</string></array>
         </dict>
     </array>
 </dict>

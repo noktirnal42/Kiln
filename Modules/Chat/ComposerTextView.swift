@@ -37,6 +37,9 @@ struct ComposerTextView: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticSpellingCorrectionEnabled = false
+        // Apple's Writing Tools (proofread, rewrite, summarize) where the Mac has them. The message is plain text, so results come back as plain text.
+        textView.writingToolsBehavior = .complete
+        textView.allowedWritingToolsResultOptions = [.plainText]
         textView.setAccessibilityLabel("Message")
         textView.delegate = context.coordinator
         textView.onCommandReturn = { [weak coordinator = context.coordinator, weak textView] in

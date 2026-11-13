@@ -166,6 +166,7 @@ struct ProviderSettingsView: View {
                     }
                 }
                 NotificationSettingsCard()
+                QuickAskSettingsCard()
                 ModelStoreCard()
                 Divider()
                 AboutKilnView()

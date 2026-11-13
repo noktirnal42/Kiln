@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftData
 import Observation
@@ -42,6 +43,8 @@ public final class AppModel {
     public var activeModuleID: String?
     var requestedActivity: Activity?
     private var pendingWebURLs: [URL] = []
+    /// A question that arrived before the chat existed (a `kiln://` link that launched Kiln).
+    private var pendingQuickAsk: (request: QuickAskRequest, sendNow: Bool)?
     public private(set) var bootstrapError: String?
     /// Bumped whenever providers are registered or reloaded, so screens that show them can refresh. Home loads
     /// before bootstrap has registered anything; without this it kept an empty list forever.
@@ -167,7 +170,12 @@ public final class AppModel {
         }
     }
 
+    private var didBootstrap = false
+
+    /// Runs once. Every new window asks for it, and a second run would replace the chat session (and whatever was in its message box).
     public func bootstrap() async {
+        guard !didBootstrap else { return }
+        didBootstrap = true
         await themeManager.attach(settings: settings)
         catchAllToken = await eventBus.subscribeAny { [weak self] entry in
             guard let self else { return }
@@ -190,9 +198,40 @@ public final class AppModel {
         ))
         await syncUIModules()
         flushPendingWebURLs()
+        await flushPendingQuickAsk()
         if activeModuleID == nil, let firstUI = uiModules.keys.sorted().first {
             await activateModule(firstUI)
         }
+    }
+
+    /// Routes `kiln://` links to the message box; everything else is a web address for the browser.
+    func open(_ url: URL) {
+        if url.scheme?.lowercased() == QuickAskLink.scheme {
+            if let request = QuickAskLink.parse(url) { Task { await quickAsk(request) } }
+        } else {
+            openWebURL(url)
+        }
+    }
+
+    /// Brings a question into the chat. It is sent only when the person typed it in the menu bar and asked to send; otherwise it is added
+    /// to the message box after whatever they are already typing, so a link or a share can never send a prompt by itself.
+    func quickAsk(_ request: QuickAskRequest, sendNow: Bool = false) async {
+        guard let session = chatSession else { pendingQuickAsk = (request, sendNow); return }
+        requestedActivity = .agent
+        NSApp.activate(ignoringOtherApps: true)
+        if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) { NSWorkspace.shared.open(Bundle.main.bundleURL) }
+        guard !request.text.isEmpty else { return }   // "Open Kiln" with nothing typed just brings it forward
+        if sendNow && request.maySendAtOnce {
+            await session.send(request.text)
+        } else {
+            session.composerText = QuickAskLink.merge(existing: session.composerText, adding: request.text)
+        }
+    }
+
+    private func flushPendingQuickAsk() async {
+        guard let pending = pendingQuickAsk, chatSession != nil else { return }
+        pendingQuickAsk = nil
+        await quickAsk(pending.request, sendNow: pending.sendNow)
     }
 
     /// macOS can deliver links before module discovery finishes. Preserve their order until the browser exists.
