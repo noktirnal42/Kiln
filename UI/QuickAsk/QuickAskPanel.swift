@@ -82,7 +82,14 @@ final class MenuBarController: NSObject {
 
     private var wanted: Bool { UserDefaults.standard.bool(forKey: QuickAskSettings.menuBarKey) }
 
+    /// Creating a status item makes AppKit write its position to UserDefaults, which posts `didChangeNotification`
+    /// while `item` is still nil. Without this guard that re-entered `apply()` until the stack overflowed.
+    private var isApplying = false
+
     private func apply() {
+        guard !isApplying else { return }
+        isApplying = true
+        defer { isApplying = false }
         if wanted, item == nil {
             let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
             statusItem.button?.image = NSImage(systemSymbolName: "flame", accessibilityDescription: "Ask Kiln")
