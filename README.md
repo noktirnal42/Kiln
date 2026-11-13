@@ -11,7 +11,7 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 
 ## Contents
 
-[What Kiln is](#what-kiln-is) · [Screenshots](#screenshots) · [Activities](#activities) · [Agent and MCP integration](#agent-and-mcp-integration) · [Providers](#providers) · [Safety model](#safety-model) · [Install](#install) · [Build from source](#build-from-source) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
+[What Kiln is](#what-kiln-is) · [What's new](#whats-new) · [Screenshots](#screenshots) · [Activities](#activities) · [Agent and MCP integration](#agent-and-mcp-integration) · [Providers](#providers) · [Safety model](#safety-model) · [Install](#install) · [Build from source](#build-from-source) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
 
 ## What Kiln is
 
@@ -21,6 +21,26 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 - **Supervised by design.** Ask, Auto and Bypass approval modes, a behavior monitor, tripwires and a hash-chained audit log you can verify from the app.
 - **Take it with you.** Talk to the agent, hear replies, and approve tool calls from an iPhone or Apple Watch companion (built from source) over an encrypted link.
 - **Open.** Specifications, implementation and tests are in this repository.
+
+## What's new
+
+Built on `main` since the 0.2.0 preview; each item says what was seen on screen.
+
+<table>
+<tr>
+<td width="50%"><img src="site/assets/shots/maps-radar.jpg" alt="Kiln's Maps activity over Syracuse, New York with NOAA radar on: light echoes drawn over the map, a play button and time scrubber, an opacity slider, a colour legend and the source line" width="100%"></td>
+<td width="50%"><img src="site/assets/shots/theme-violet.jpg" alt="Kiln's chat window in the Violet theme with a serif font: purple accents and tinted panels" width="100%"></td>
+</tr>
+<tr>
+<td><sub><strong>Weather and radar.</strong> A Radar button on Maps shows NOAA's radar for the contiguous US with a two-hour loop, opacity and a legend, and a Weather sheet gives a US forecast and alerts. Seen: both on screen (debug build, light echoes only).</sub></td>
+<td><sub><strong>Themes.</strong> Seven built-in themes and your own saved ones: colours for dark and light, font design and text size, in Settings → Theme. Seen: switching, the editor, and a saved theme returning after a restart. Light mode not checked.</sub></td>
+</tr>
+</table>
+
+- **Models you manage.** An "Add or remove local models" sheet in the model picker downloads, tracks and removes Ollama models, with `models_*` agent tools that need approval. Seen: the sheet listing real models; a real download has not been tried. MLX and Hugging Face downloads are still to come.
+- **Reach Kiln from anywhere.** An optional menu-bar quick-ask, `kiln://` links, a Services entry and a Share extension that only add text to the message box and never send it; run-finished notifications with Focus awareness. Partly seen: links and the Settings card; the menu-bar icon and Share extension are not yet.
+- **Slack, and calmer chat.** A Slack activity (a token you create and paste yourself), reasoning options that follow each model, tools that load on demand to save context, and a decluttered chat bar. Seen: the bar and reasoning button; Slack has never been connected.
+- **Fixes you would notice.** The menu-bar toggle no longer crashes, Maps asks macOS for location permission and has its button back, the browser asks before a page uses the microphone, and the context meter agrees during and between runs.
 
 ## Screenshots
 
