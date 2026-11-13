@@ -20,6 +20,8 @@ struct MapsView: View {
               }
               HStack(spacing: 8) {
                 Button("Directions…") { showDirections = true }
+                Button { location.request() } label: { Image(systemName: "location") }
+                    .help("Go to my location (macOS asks for permission the first time)").accessibilityLabel("My Location")
                 Button("Weather") { showWeather = true }.help("Forecast and alerts for the map center (US only, National Weather Service)")
                 Picker("Map layer", selection: $state.layer) {
                     Text("Map").tag("standard"); Text("Satellite").tag("satellite"); Text("Hybrid").tag("hybrid"); Text("Terrain").tag("terrain"); Text("USGS Topo").tag("usgs_topo")
