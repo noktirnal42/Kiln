@@ -1011,7 +1011,7 @@ private struct FileTreeRow: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
                 Image(systemName: node.isDirectory ? (expanded ? "chevron.down" : "chevron.right") : "doc")
-                    .font(.system(size: 9)).frame(width: 10)
+                    .font(ThemeRuntime.font(9)).frame(width: 10)
                     .foregroundStyle(.secondary)
                 Text(node.name).font(SSTypography.caption()).lineLimit(1)
                 Spacer(minLength: 0)

@@ -184,11 +184,11 @@ struct ChatHero: View {
         VStack(spacing: SSSpacing.s) {
             Image("KilnMark").resizable().scaledToFit().frame(width: 44, height: 44).opacity(0.9)
             if let root = session.workspaceRoot {
-                Text("What should we work on in ").font(.system(size: 24, weight: .light))
-                    + Text(URL(fileURLWithPath: root).lastPathComponent).font(.system(size: 24, weight: .medium)).foregroundColor(SSColor.accent)
-                    + Text("?").font(.system(size: 24, weight: .light))
+                Text("What should we work on in ").font(ThemeRuntime.font(24, .light))
+                    + Text(URL(fileURLWithPath: root).lastPathComponent).font(ThemeRuntime.font(24, .medium)).foregroundColor(SSColor.accent)
+                    + Text("?").font(ThemeRuntime.font(24, .light))
             } else {
-                Text("What should we work on?").font(.system(size: 24, weight: .light))
+                Text("What should we work on?").font(ThemeRuntime.font(24, .light))
             }
             Text(session.selectedModelID.isEmpty
                  ? "Pick a model below to begin."
@@ -324,7 +324,7 @@ struct ComposerView: View {
                         .padding(.horizontal, 8).padding(.top, 8).allowsHitTesting(false)
                 } else if input.isEmpty {
                     Text(placeholder)
-                        .foregroundStyle(.tertiary).font(.system(size: 13))
+                        .foregroundStyle(.tertiary).font(ThemeRuntime.font(13))
                         .padding(.horizontal, 8).padding(.top, 7).allowsHitTesting(false)
                 }
             }

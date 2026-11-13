@@ -117,7 +117,7 @@ struct StoredToolRunView: View {
                     ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
                         let title = ToolPhrase.title(name: call.name, argumentsJSON: call.arguments)
                         HStack(spacing: SSSpacing.xs) {
-                            Text(title.verb).font(.system(size: 12)).foregroundStyle(.secondary)
+                            Text(title.verb).font(ThemeRuntime.font(12)).foregroundStyle(.secondary)
                             Text(title.object).font(.system(size: 11.5, design: .monospaced)).foregroundStyle(.primary.opacity(0.85))
                                 .lineLimit(1).truncationMode(.middle)
                         }
@@ -370,7 +370,7 @@ struct AgentModeBar: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "person.crop.rectangle").font(.system(size: 10)).foregroundStyle(.secondary)
-                        Text(session.agentProfile?.name ?? "Profile").font(.system(size: 11)).lineLimit(1).truncationMode(.tail).frame(maxWidth: 110)
+                        Text(session.agentProfile?.name ?? "Profile").font(ThemeRuntime.font(11)).lineLimit(1).truncationMode(.tail).frame(maxWidth: 110)
                         Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
                     }
                     .foregroundStyle(.secondary)
@@ -427,7 +427,7 @@ struct PlanCardView: View {
         VStack(alignment: .leading, spacing: SSSpacing.s) {
             Label("Plan — nothing has been changed yet", systemImage: "list.bullet.clipboard").font(SSTypography.headline())
             if editing {
-                TextEditor(text: $draft).font(.system(size: 12)).frame(minHeight: 160, maxHeight: 320)
+                TextEditor(text: $draft).font(ThemeRuntime.font(12)).frame(minHeight: 160, maxHeight: 320)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.25)))
             } else if session.messages.last?.content != plan.text {
                 // The plan is normally the reply right above this card; it is repeated only when it is not.
@@ -458,8 +458,8 @@ struct LiveStatusLine: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             HStack(spacing: SSSpacing.xs) {
                 ProgressView().controlSize(.mini)
-                Text(status).font(.system(size: 12.5)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                if let since { Text(Self.elapsed(context.date.timeIntervalSince(since))).font(.system(size: 11)).monospacedDigit().foregroundStyle(.tertiary) }
+                Text(status).font(ThemeRuntime.font(12.5)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                if let since { Text(Self.elapsed(context.date.timeIntervalSince(since))).font(ThemeRuntime.font(11)).monospacedDigit().foregroundStyle(.tertiary) }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Working: \(status)")

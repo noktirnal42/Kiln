@@ -11,7 +11,7 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 
 ## Contents
 
-[What Kiln is](#what-kiln-is) · [Screenshots](#screenshots) · [Activities](#activities) · [Agent and MCP integration](#agent-and-mcp-integration) · [Providers](#providers) · [Safety model](#safety-model) · [Install](#install) · [Build from source](#build-from-source) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
+[What Kiln is](#what-kiln-is) · [What's new](#whats-new) · [Screenshots](#screenshots) · [Activities](#activities) · [Agent and MCP integration](#agent-and-mcp-integration) · [Providers](#providers) · [Safety model](#safety-model) · [Install](#install) · [Build from source](#build-from-source) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
 
 ## What Kiln is
 
@@ -21,6 +21,26 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 - **Supervised by design.** Ask, Auto and Bypass approval modes, a behavior monitor, tripwires and a hash-chained audit log you can verify from the app.
 - **Take it with you.** Talk to the agent, hear replies, and approve tool calls from an iPhone or Apple Watch companion (built from source) over an encrypted link.
 - **Open.** Specifications, implementation and tests are in this repository.
+
+## What's new
+
+Built on `main` since the 0.2.0 preview; each item says what was seen on screen.
+
+<table>
+<tr>
+<td width="50%"><img src="site/assets/shots/maps-radar.jpg" alt="Kiln's Maps activity over Syracuse, New York with NOAA radar on: light echoes drawn over the map, a play button and time scrubber, an opacity slider, a colour legend and the source line" width="100%"></td>
+<td width="50%"><img src="site/assets/shots/theme-violet.jpg" alt="Kiln's chat window in the Violet theme with a serif font: purple accents and tinted panels" width="100%"></td>
+</tr>
+<tr>
+<td><sub><strong>Weather and radar.</strong> A Radar button on Maps shows NOAA's radar for the contiguous US with a two-hour loop, opacity and a legend, and a Weather sheet gives a US forecast and alerts. Seen: both on screen (debug build, light echoes only).</sub></td>
+<td><sub><strong>Themes.</strong> Seven built-in themes and your own saved ones: colours for dark and light, font design and text size, in Settings → Theme. Seen: switching, the editor, and a saved theme returning after a restart. Light mode not checked.</sub></td>
+</tr>
+</table>
+
+- **Models you manage.** An "Add or remove local models" sheet in the model picker downloads, tracks and removes Ollama models, with `models_*` agent tools that need approval. Seen: the sheet listing real models; a real download has not been tried. MLX and Hugging Face downloads are still to come.
+- **Reach Kiln from anywhere.** An optional menu-bar quick-ask, `kiln://` links, a Services entry and a Share extension that only add text to the message box and never send it; run-finished notifications with Focus awareness. Partly seen: links and the Settings card; the menu-bar icon and Share extension are not yet.
+- **Slack, and calmer chat.** A Slack activity (a token you create and paste yourself), reasoning options that follow each model, tools that load on demand to save context, and a decluttered chat bar. Seen: the bar and reasoning button; Slack has never been connected.
+- **Fixes you would notice.** The menu-bar toggle no longer crashes, Maps asks macOS for location permission and has its button back, the browser asks before a page uses the microphone, and the context meter agrees during and between runs.
 
 ## Screenshots
 
@@ -78,7 +98,7 @@ Application services are registered as ordinary tools with a declared permission
 - **Kiln as an MCP client:** it reads, never copies, MCP servers and skills already configured for Claude Code, Codex and OpenCode. Each imported server still needs "Approve & Connect".
 - **Tool families:** `re_*` (reverse engineering), `lab_*` (Model Lab), `ide_*` (Develop), `browser_*`, `device_*`, `media_*`, `image_*`, `maps_*`, `news_*`, `swarm_*`, `kiln_*` (memory, commands, schedules, checkpoints, usage, round limit), Git, search, shell and file tools, `list_skills` / `read_skill`, and opt-in `computer_use`. Development builds add `mail_*`, `contacts_*`, `messages_*`, `calendar_*` / `reminders_*`, `notes_*`, `drive_*`, `pdf_*` / `library_*` and `github_*` and `slack_*`. Reading mail, messages, notes, Slack and calendar is gated by macOS permissions; sending a mail or text and creating a calendar event or note need your approval of the exact recipients and text, and text from other people is labelled untrusted.
 - **Notifications and Focus (Settings → Notifications):** Kiln tells you outside its window when an agent needs an approval, when a long run finishes, fails or pauses, and when a scheduled task finishes; you choose which, and a minimum run length. It holds the notices that can wait while a Focus is on and while Kiln is in front, and never reads other apps' notifications (macOS gives an app no view of them). Reading Focus status is optional, asks macOS first, and is experimental: developers report `isFocused` may read "off" without the Communication Notifications capability, which Kiln does not have. The agent has `notify_user` (a write, so it asks; labelled "Kiln agent:", plain text, at most 5 in 10 minutes) and `notifications_status`. Unit-tested with fakes, and the Settings card was seen on screen (2026-11-12); no real notification has been posted from a build yet and Focus has not been read.
-- **Themes:** seven built-in looks (Ember, Midnight, Forest, Violet, Rose, Graphite, Paper) and your own saved themes: Settings → Theme, duplicate any theme and change its accent, background, panel and raised colours for dark and light, its font design (System, Rounded, Serif, Monospaced) and text size. Text with fixed sizes keeps them. Seen working on screen for switching, the editor and the serif font; light mode is not checked.
+- **Themes:** seven built-in looks (Ember, Midnight, Forest, Violet, Rose, Graphite, Paper) and your own saved themes: Settings → Theme, duplicate any theme and change its accent, background, panel and raised colours for dark and light, its font design (System, Rounded, Serif, Monospaced) and text size. Most text follows the font and size (icons and a few views keep their own). Seen working on screen for switching, the editor, the serif font and a saved theme coming back after a restart; light mode is not checked.
 - **Quick ask, links, Services and Sharing:** an optional Kiln item in the menu bar (Settings → Menu bar and links; off by default) with a field that sends a question to the chat or just puts it in the message box; `kiln://ask?text=…` and `kiln://share?title=…&url=…&text=…` links; an "Ask Kiln" entry in the Services menu for selected text; an "Ask Kiln" Share extension for text and web addresses; and Apple's Writing Tools in the message box where the Mac has them. Only the menu-bar field can send at once: a link, a service or a share is added to the message box after what you are typing and never sends by itself. Unit-tested; the link path was seen working on screen; the menu-bar item, the Services entry, the Share extension and Writing Tools have not been seen.
 - **Spotlight:** conversations can be added to Spotlight (Settings: Off, which is the default, Titles only, or Titles and text). Secrets are redacted, choosing Off removes everything Kiln added, and a result opens that conversation. Unit-tested; a real Spotlight search has not been tried.
 - **Shortcuts:** Kiln offers App Shortcuts to open any activity, open a website, or put a question in the message box ("Ask Kiln").

@@ -23,7 +23,7 @@ struct SymbolBadge: View {
     var body: some View {
         Image(systemName: kind.symbolName)
             .symbolRenderingMode(.hierarchical)
-            .font(.system(size: 12, weight: .semibold))
+            .font(ThemeRuntime.font(12, .semibold))
             .foregroundStyle(kind.tint)
             .frame(width: 16, height: 16)
             .accessibilityHidden(true)
@@ -227,7 +227,7 @@ struct DevelopIssuesList: View {
                                     HStack(alignment: .top, spacing: 5) {
                                         Image(systemName: item.severity == .error ? "xmark.octagon.fill" : item.severity == .warning ? "exclamationmark.triangle.fill" : "info.circle.fill")
                                             .foregroundStyle(item.severity == .error ? SSColor.danger : item.severity == .warning ? SSColor.warning : .secondary)
-                                            .font(.system(size: 11))
+                                            .font(ThemeRuntime.font(11))
                                         Text(item.message).font(SSTypography.caption()).lineLimit(3).multilineTextAlignment(.leading)
                                         Spacer(minLength: 0)
                                         Text("\(item.line)").font(SSTypography.mono(10)).foregroundStyle(.tertiary)

@@ -93,7 +93,7 @@ struct WorkstationSidebar: View {
             app.chatSession?.requestedPane = .schedules
         } label: {
             Label("Scheduled tasks", systemImage: "calendar.badge.clock")
-                .font(.system(size: 12.5))
+                .font(ThemeRuntime.font(12.5))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, SSSpacing.s).padding(.vertical, 5)
                 .contentShape(Rectangle())
@@ -126,7 +126,7 @@ struct WorkstationSidebar: View {
             if !chatVisible { workstation.select(.agent, app: app) }
         } label: {
             Text(item.title)
-                .font(.system(size: 12.5))
+                .font(ThemeRuntime.font(12.5))
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, SSSpacing.s).padding(.vertical, 6)
@@ -150,7 +150,7 @@ struct WorkstationSidebar: View {
                     .frame(width: 28, height: 26)
                     .overlay(alignment: .topTrailing) {
                         if pending > 0 {
-                            Text("\(pending)").font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+                            Text("\(pending)").font(ThemeRuntime.font(9, .bold)).foregroundStyle(.white)
                                 .padding(.horizontal, 4).background(SSColor.accent, in: Capsule()).offset(x: 2, y: -2)
                         }
                     }
@@ -196,9 +196,9 @@ struct ProjectSwitcher: View {
                     .foregroundStyle(current == nil ? Color.secondary : SSColor.accent)
                 VStack(alignment: .leading, spacing: 0) {
                     Text(current.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Choose a project")
-                        .font(.system(size: 12.5, weight: .medium)).lineLimit(1)
+                        .font(ThemeRuntime.font(12.5, .medium)).lineLimit(1)
                     Text(current == nil ? "The agent can't read files yet" : "Agent works in this folder")
-                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                        .font(ThemeRuntime.font(10)).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down").font(.system(size: 9)).foregroundStyle(.tertiary)

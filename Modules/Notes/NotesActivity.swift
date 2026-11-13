@@ -107,7 +107,7 @@ struct NotesView: View {
             VStack(alignment: .leading, spacing: SSSpacing.s) {
                 Text("New note").font(SSTypography.title())
                 TextField("Title", text: $newTitle).textFieldStyle(.roundedBorder)
-                TextEditor(text: $newBody).font(.system(size: 13)).frame(minHeight: 160).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SSColor.hairline))
+                TextEditor(text: $newBody).font(ThemeRuntime.font(13)).frame(minHeight: 160).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SSColor.hairline))
                 Text("Adds a new note in Apple Notes (it syncs through your iCloud account). Kiln never edits or deletes existing notes.").font(SSTypography.caption()).foregroundStyle(.secondary)
                 HStack { Spacer(); Button("Cancel") { composing = false }.keyboardShortcut(.cancelAction)
                     Button("Add note") { let t = newTitle, b = newBody; Task { if await state.create(title: t, body: b) { newTitle = ""; newBody = ""; composing = false } } }

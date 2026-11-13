@@ -55,7 +55,7 @@ struct HomeView: View {
                 Image(systemName: "sparkles").foregroundStyle(SSColor.accent)
                 TextField("Ask the agent…", text: $prompt)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15))
+                    .font(ThemeRuntime.font(15))
                     .onSubmit(ask)
                 SSKeyCap("⏎")
             }
@@ -83,7 +83,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: SSSpacing.s) {
                 HStack {
                     Image(systemName: activity.symbol)
-                        .font(.system(size: 20)).foregroundStyle(SSColor.accent)
+                        .font(ThemeRuntime.font(20)).foregroundStyle(SSColor.accent)
                     Spacer()
                     if let key = activity.shortcutKey { SSKeyCap("⌘\(key)") }
                 }

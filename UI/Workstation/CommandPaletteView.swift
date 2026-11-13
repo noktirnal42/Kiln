@@ -20,7 +20,7 @@ struct CommandPaletteView: View {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Type a command or where to go…", text: $query)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15))
+                    .font(ThemeRuntime.font(15))
                     .focused($searchFocused)
                     .onSubmit { runSelected() }
                     .onKeyPress(.downArrow) { move(1); return .handled }

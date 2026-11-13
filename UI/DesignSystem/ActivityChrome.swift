@@ -118,7 +118,7 @@ struct SSPaneHeader<Trailing: View>: View {
     var body: some View {
         HStack(spacing: SSSpacing.s) {
             SSSectionLabel(title)
-            if let count { Text("\(count)").font(.system(size: 10, weight: .medium)).foregroundStyle(.tertiary) }
+            if let count { Text("\(count)").font(ThemeRuntime.font(10, .medium)).foregroundStyle(.tertiary) }
             Spacer(minLength: 0)
             trailing().labelStyle(.iconOnly).buttonStyle(.borderless).controlSize(.small)
         }

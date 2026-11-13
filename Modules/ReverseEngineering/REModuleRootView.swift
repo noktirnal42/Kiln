@@ -115,7 +115,7 @@ struct REProjectBrowser: View {
                 HStack(spacing: SSSpacing.s) {
                     Image(systemName: "cube").foregroundStyle(selected ? SSColor.accent : .secondary).frame(width: 18)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(project.binaryURL.lastPathComponent).font(.system(size: 12.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                        Text(project.binaryURL.lastPathComponent).font(ThemeRuntime.font(12.5, .medium)).lineLimit(1).truncationMode(.middle)
                         Text(functionSummary(for: project)).font(SSTypography.caption()).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)

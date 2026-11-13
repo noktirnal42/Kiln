@@ -50,7 +50,7 @@ struct StatusBar: View {
             Label("Tripwires on", systemImage: "shield.lefthalf.filled").foregroundStyle(.secondary)
             SSKeyCap("⌘K")
         }
-        .font(.system(size: 11))
+        .font(ThemeRuntime.font(11))
         .foregroundStyle(.secondary)
         .padding(.horizontal, SSSpacing.m)
     }

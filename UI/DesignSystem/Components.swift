@@ -24,7 +24,7 @@ struct SSSectionLabel: View {
     init(_ text: String) { self.text = text }
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 10, weight: .semibold))
+            .font(ThemeRuntime.font(10, .semibold))
             .tracking(0.8)
             .foregroundStyle(.secondary)
     }
@@ -35,7 +35,7 @@ struct SSBadge: View {
     var tint: Color = SSColor.accent
     var body: some View {
         Text(text)
-            .font(.system(size: 10, weight: .semibold))
+            .font(ThemeRuntime.font(10, .semibold))
             .foregroundStyle(tint)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

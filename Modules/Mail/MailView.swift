@@ -74,7 +74,7 @@ struct MailView: View {
                             Spacer()
                             if let date = row.message.date { Text(date, style: .date).font(SSTypography.caption()).foregroundStyle(.secondary) }
                         }
-                        Text(row.message.subject.isEmpty ? "(no subject)" : row.message.subject).font(.system(size: 12)).lineLimit(1)
+                        Text(row.message.subject.isEmpty ? "(no subject)" : row.message.subject).font(ThemeRuntime.font(12)).lineLimit(1)
                         Text((row.message.plainText ?? "").prefix(120).replacingOccurrences(of: "\n", with: " ")).font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
                     }.tag(row.uid).padding(.vertical, 2)
                 }
@@ -209,7 +209,7 @@ struct ComposeSheet: View {
                     HStack(spacing: 6) {
                         ForEach(suggestions.flatMap { c in c.emails.map { (c, $0) } }.prefix(8), id: \.1) { c, email in
                             Button { accept(email) } label: {
-                                Text(c.name.isEmpty ? email : "\(c.name) · \(email)").font(.system(size: 11.5)).lineLimit(1)
+                                Text(c.name.isEmpty ? email : "\(c.name) · \(email)").font(ThemeRuntime.font(11.5)).lineLimit(1)
                                     .padding(.horizontal, 8).padding(.vertical, 3).background(SSColor.surfaceRaised, in: Capsule())
                             }.buttonStyle(.plain).accessibilityLabel("Add \(email)")
                         }
@@ -218,7 +218,7 @@ struct ComposeSheet: View {
             }
             TextField("Cc", text: $cc)
             TextField("Subject", text: $draft.subject)
-            TextEditor(text: $draft.body).font(.system(size: 13)).frame(minHeight: 180)
+            TextEditor(text: $draft.body).font(ThemeRuntime.font(13)).frame(minHeight: 180)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SSColor.hairline))
             if let message = state.message { Text(message).font(SSTypography.caption()).foregroundStyle(SSColor.danger) }
             HStack {
@@ -294,14 +294,14 @@ struct TextMessageForm: View {
                     HStack(spacing: 6) {
                         ForEach(suggestions, id: \.value) { s in
                             Button { accept(s.value) } label: {
-                                Text("\(s.name) · \(s.value)").font(.system(size: 11.5)).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 3)
+                                Text("\(s.name) · \(s.value)").font(ThemeRuntime.font(11.5)).lineLimit(1).padding(.horizontal, 8).padding(.vertical, 3)
                                     .background(SSColor.surfaceRaised, in: Capsule())
                             }.buttonStyle(.plain).accessibilityLabel("Add \(s.name), \(s.value)")
                         }
                     }
                 }
             }
-            TextEditor(text: $text).font(.system(size: 13)).frame(minHeight: 110)
+            TextEditor(text: $text).font(ThemeRuntime.font(13)).frame(minHeight: 110)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(SSColor.hairline))
             if !parsed.invalid.isEmpty { Text("Not a phone number or email: \(parsed.invalid.joined(separator: ", "))").font(SSTypography.caption()).foregroundStyle(SSColor.danger) }
             if let note { Text(note).font(SSTypography.caption()).foregroundStyle(.secondary) }
