@@ -87,7 +87,7 @@ struct ModelLibrarySheet: View {
     private func summary(_ model: OllamaInstalledModel) -> String {
         // Ollama Cloud entries are a few hundred bytes of metadata; the model itself runs on Ollama's servers.
         if model.sizeBytes < 1_000_000, model.name.contains("cloud") { return "Hosted by Ollama (nothing stored on this Mac)" }
-        [ByteCountFormatter.string(fromByteCount: model.sizeBytes, countStyle: .file), model.parameterSize, model.quantization].compactMap { $0 }.joined(separator: " · ")
+        return [ByteCountFormatter.string(fromByteCount: model.sizeBytes, countStyle: .file), model.parameterSize, model.quantization].compactMap { $0 }.joined(separator: " · ")
     }
 
     private func detail(_ pull: ModelLibraryState.Pull) -> String {
