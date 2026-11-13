@@ -22,6 +22,8 @@ struct MapsView: View {
                 Button("Directions…") { showDirections = true }
                 Button { location.request() } label: { Image(systemName: "location") }
                     .help("Go to my location (macOS asks for permission the first time)").accessibilityLabel("My Location")
+                Button(state.radarOn ? "Radar on" : "Radar") { Task { await state.setRadar(!state.radarOn) } }
+                    .help("NOAA weather radar over the map (contiguous US)")
                 Button("Weather") { showWeather = true }.help("Forecast and alerts for the map center (US only, National Weather Service)")
                 Picker("Map layer", selection: $state.layer) {
                     Text("Map").tag("standard"); Text("Satellite").tag("satellite"); Text("Hybrid").tag("hybrid"); Text("Terrain").tag("terrain"); Text("USGS Topo").tag("usgs_topo")
@@ -72,6 +74,7 @@ struct MapsView: View {
                     }.padding(10).frame(width: 300)
                 }
             }
+            if state.radarOn || state.radarMessage != nil { Divider(); RadarBar(state: state) }
             HStack {
                 Text(String(format: "%.5f, %.5f", state.latitude, state.longitude)).monospacedDigit()
                 Text(state.layer == "usgs_topo" ? "USGS The National Map · USGS Topo" : "Map data © Apple")
@@ -145,7 +148,7 @@ struct MapCanvas: NSViewRepresentable {
         }
         if coordinator.layer != state.layer {
             coordinator.layer = state.layer
-            view.removeOverlays(view.overlays.filter { $0 is MKTileOverlay })
+            view.removeOverlays(view.overlays.filter { $0 is MKTileOverlay && !($0 is RadarTileOverlay) })
             switch state.layer {
             case "satellite": view.preferredConfiguration = MKImageryMapConfiguration(elevationStyle: .flat)
             case "hybrid": view.preferredConfiguration = MKHybridMapConfiguration(elevationStyle: .flat)
@@ -157,6 +160,19 @@ struct MapCanvas: NSViewRepresentable {
                 overlay.canReplaceMapContent = true; view.addOverlay(overlay, level: .aboveLabels)
             }
         }
+        if coordinator.radarRevision != state.radarRevision {
+            coordinator.radarRevision = state.radarRevision
+            let old = view.overlays.compactMap { $0 as? RadarTileOverlay }
+            if state.radarOn {
+                // Add the new frame first and drop the old one a moment later so the loop does not flash.
+                view.addOverlay(RadarTileOverlay(frame: state.radarFrame), level: .aboveLabels)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak view] in view?.removeOverlays(old) }
+            } else { view.removeOverlays(old) }
+        }
+        if coordinator.radarOpacity != state.radarOpacity {
+            coordinator.radarOpacity = state.radarOpacity
+            for overlay in view.overlays where overlay is RadarTileOverlay { (view.renderer(for: overlay) as? MKTileOverlayRenderer)?.alpha = state.radarOpacity }
+        }
     }
     final class Coordinator: NSObject, MKMapViewDelegate {
         let state: MapsState
@@ -164,6 +180,8 @@ struct MapCanvas: NSViewRepresentable {
         var routeRevision = 0
         var routeOverlay: MKPolyline?
         var layer = ""
+        var radarRevision = 0
+        var radarOpacity = 0.7
         init(state: MapsState) { self.state = state }
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             let region = mapView.region
@@ -172,7 +190,7 @@ struct MapCanvas: NSViewRepresentable {
         }
         func mapView(_ mapView: MKMapView, rendererFor overlay: any MKOverlay) -> MKOverlayRenderer {
             if let line = overlay as? MKPolyline { let renderer = MKPolylineRenderer(polyline: line); renderer.strokeColor = .systemBlue; renderer.lineWidth = 5; return renderer }
-            if let tiles = overlay as? MKTileOverlay { return MKTileOverlayRenderer(tileOverlay: tiles) }
+            if let tiles = overlay as? MKTileOverlay { let renderer = MKTileOverlayRenderer(tileOverlay: tiles); if tiles is RadarTileOverlay { renderer.alpha = state.radarOpacity }; return renderer }
             return MKOverlayRenderer(overlay: overlay)
         }
     }

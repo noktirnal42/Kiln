@@ -22,7 +22,7 @@ The notification policy, the coordinator and the tools are tested with fakes; no
 
 ## Weather covers the United States only
 
-Weather forecasts and alerts come from the National Weather Service, which has no data outside the United States and its territories (the tools say so). There is no radar layer and no WeatherKit yet. The Weather sheet in Maps was seen on screen on 2026-11-12 (Phoenix, live NWS forecast with source and issue time); the tools have not been run end to end from the agent, and a forecast is only as fresh as the service's last run (older than four hours is marked stale). Official warnings, not Kiln's summary, decide safety.
+Weather forecasts and alerts come from the National Weather Service, which has no data outside the United States and its territories (the tools say so). The Maps radar layer (NOAA MRMS, contiguous US only, about the last two hours, no published rate limit or service promise) has been seen on screen with light echoes and the loop, but not with heavy echoes; there is no WeatherKit yet. Radar shows rain already falling, not a forecast, and is as fresh as the service's last frame (marked stale after 20 minutes). The Weather sheet in Maps was seen on screen on 2026-11-12 (Phoenix, live NWS forecast with source and issue time); the tools have not been run end to end from the agent, and a forecast is only as fresh as the service's last run (older than four hours is marked stale). Official warnings, not Kiln's summary, decide safety.
 
 ## Reasoning options are unverified against live APIs
 

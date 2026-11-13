@@ -8,6 +8,7 @@ struct MapsTool: ToolExecuting {
         // Parity additions for Apple Maps feature completeness
         case transit_routing, flyover, offline_download, category_search
         case save_state, bookmark, import_gpx, export_gpx
+        case radar
     }
     let kind: Kind
     @MainActor static func register(into registry: ToolRegistry) { for kind in Kind.allCases { registry.register(MapsTool(kind: kind)) } }
@@ -25,6 +26,7 @@ struct MapsTool: ToolExecuting {
         case .set_layer: ToolSpec(name: "maps_set_layer", summary: "Change the Maps activity's base layer. Requires approval.", parameters: [ToolParam(name: "layer", type: "string", description: "standard, satellite, hybrid, terrain, or usgs_topo")], permission: .write)
         case .search_places: ToolSpec(name: "maps_search_places", summary: "Search Apple MapKit for named places; sends the query to Apple. Requires approval.", parameters: [ToolParam(name: "query", type: "string", description: "Place name or address")], permission: .execute)
         case .search_historical: ToolSpec(name: "maps_search_historical", summary: "Search USGS historical map records for the current viewport. Sends coordinates to USGS; requires approval. Returns up to 50 records, not downloaded maps.", permission: .execute)
+        case .radar: ToolSpec(name: "maps_radar", summary: "Show or hide the NOAA weather radar layer on the map, or read its state. Sends map tile requests to opengeo.ncep.noaa.gov when shown. Contiguous US only. Reports the newest frame time and its age; radar shows precipitation already falling, not a forecast, and official warnings decide safety.", parameters: [ToolParam(name: "show", type: "boolean", description: "true to show, false to hide; omit to just read the state"), ToolParam(name: "minutes_ago", type: "number", description: "Optional: pick the frame closest to this many minutes before the newest")], permission: .execute)
         // Parity additions
         case .transit_routing: ToolSpec(name: "maps_transit_routing", summary: "Calculate transit/walking/cycling directions from map center to destination. Requires approval and sends coordinates to Apple.", parameters: [ToolParam(name: "latitude", type: "number", description: "Destination latitude"), ToolParam(name: "longitude", type: "number", description: "Destination longitude"), ToolParam(name: "route_mode", type: "string", description: "walking, cycling, or transit")], permission: .execute)
         case .flyover: ToolSpec(name: "maps_flyover", summary: "Activate 3D flyover view centered on current map location. Execute-only; no parameters.", permission: .execute)
@@ -64,6 +66,15 @@ struct MapsTool: ToolExecuting {
         case .set_layer:
             guard let layer = args["layer"] as? String else { throw MapsError.invalid("layer is required.") }
             try state.setLayer(layer); return "Map layer: \(layer)."
+        case .radar:
+            if let show = args["show"] as? Bool { await state.setRadar(show) }
+            if state.radarOn, let back = (args["minutes_ago"] as? Double), let newest = state.radarFrames.last {
+                let target = newest.addingTimeInterval(-back * 60)
+                if let index = state.radarFrames.indices.min(by: { abs(state.radarFrames[$0].timeIntervalSince(target)) < abs(state.radarFrames[$1].timeIntervalSince(target)) }) { state.selectRadarFrame(index) }
+            }
+            guard state.radarOn, let frame = state.radarFrame else { return "Radar is off." + (state.radarMessage.map { " " + $0 } ?? "") }
+            let age = Int(Date().timeIntervalSince(frame) / 60)
+            return "Radar is on (source: \(RadarWMS.source)). Showing the frame from \(frame.ISO8601Format()), \(age) minutes old; \(state.radarFrames.count) frames available. " + (state.radarMessage ?? "") + " Radar shows precipitation already falling, not a forecast; official warnings decide safety."
         case .search_places: return try await state.places(args["query"] as? String ?? "").map { "\($0.name) | \($0.latitude), \($0.longitude)" }.joined(separator: "\n")
         case .search_historical: let maps = try await state.searchHistorical(); return maps.isEmpty ? "No historical map records found for this viewport." : maps.map { "\($0.title) | \($0.publicationDate ?? "date unknown") | \($0.format ?? "format unknown") | \($0.downloadURL?.absoluteString ?? "no download URL")" }.joined(separator: "\n")
         // Parity additions

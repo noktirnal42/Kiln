@@ -314,3 +314,5 @@ Parity work against Claude Code Desktop and Codex (doc 17 §2). Each feature is 
 ## Maps and News development activities
 
 See [Maps and News status](23-MAPS-AND-NEWS.md) for capabilities, agent/MCP permissions, verification and remaining gaps. These activities have not been included in a public release.
+
+Changes on 2026-11-12: Maps gained US weather (forecast sheet and `weather_*` tools, National Weather Service) and a NOAA radar layer with a time loop and `maps_radar`; the My Location button is back in the toolbar and Kiln now asks macOS for location permission (before, it never requested it; not yet answered on this Mac). Turning on the menu-bar item crashed the 0.2.0 build (stack overflow); fixed and merged, in the build installed that day. Seen on screen: the Weather sheet and the radar bar, loop and light echoes. Not seen: the My Location button's permission prompt, the menu-bar icon and popover.

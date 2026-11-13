@@ -38,6 +38,41 @@ struct MapPlace: Identifiable, Sendable {
     var query = ""
     var busy = false
     var revision = 0
+    // Radar layer (NOAA MRMS, contiguous US). Frames are the service's own timestamps, oldest first.
+    var radarOn = false
+    var radarOpacity = 0.7
+    var radarFrames: [Date] = []
+    var radarIndex = 0
+    var radarFetched: Date?
+    var radarPlaying = false
+    var radarMessage: String?
+    var radarRevision = 0
+
+    var radarFrame: Date? { radarFrames.indices.contains(radarIndex) ? radarFrames[radarIndex] : nil }
+
+    /// Shows or hides radar. Showing fetches the frame list and starts on the newest frame; a failure leaves the layer off and says why.
+    func setRadar(_ on: Bool, service: RadarService = RadarService()) async {
+        guard on else { radarOn = false; radarPlaying = false; radarMessage = nil; radarRevision += 1; return }
+        radarMessage = "Loading radar…"
+        do {
+            let loaded = try await service.frames()
+            radarFrames = loaded.frames; radarIndex = loaded.frames.count - 1; radarFetched = loaded.fetched
+            radarOn = true
+            if RadarWMS.covers(latitude: latitude, longitude: longitude) {
+                radarMessage = loaded.isStale() ? "Radar is more than 20 minutes old; the service may be behind." : nil
+            } else {
+                radarMessage = "Radar covers the contiguous United States only; nothing is drawn for this area."
+            }
+        } catch {
+            radarOn = false; radarPlaying = false
+            radarMessage = error.localizedDescription
+        }
+        radarRevision += 1
+    }
+    func selectRadarFrame(_ index: Int) {
+        guard radarFrames.indices.contains(index), index != radarIndex else { return }
+        radarIndex = index; radarRevision += 1
+    }
 
     enum MapType: String, Sendable { case standard, satellite, hybrid, terrain, imagery, usgs_topo, transit, flyover }
     enum RouteMode: String, Sendable { case automobile, walking, cycling, transit }
