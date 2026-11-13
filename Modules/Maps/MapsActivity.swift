@@ -18,6 +18,7 @@ enum MapsActivity {
             .tool("maps_viewport", "Inspect map viewport", .read),
             .tool("maps_navigate", "Navigate map", .write),
             .tool("maps_set_layer", "Change map layer", .write),
+            .tool("maps_radar", "Show or hide NOAA weather radar", .execute),
             .tool("maps_search_places", "Search for a place", .execute),
             .tool("maps_search_historical", "Find historical USGS maps", .execute),
             .tool("maps_bookmark", "Create a named region bookmark", .write),
