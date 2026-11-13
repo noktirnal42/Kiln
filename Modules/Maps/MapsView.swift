@@ -8,6 +8,7 @@ struct MapsView: View {
     @State private var destination = ""
     @State private var directionText = ""
     @State private var routing = false
+    @State private var showWeather = false
     var body: some View {
         VStack(spacing: 0) {
             SSActivityHeader(title: "Maps", subtitle: "Explore places and USGS maps", symbol: "map", trailing: { EmptyView() })
@@ -19,6 +20,7 @@ struct MapsView: View {
               }
               HStack(spacing: 8) {
                 Button("Directions…") { showDirections = true }
+                Button("Weather") { showWeather = true }.help("Forecast and alerts for the map center (US only, National Weather Service)")
                 Picker("Map layer", selection: $state.layer) {
                     Text("Map").tag("standard"); Text("Satellite").tag("satellite"); Text("Hybrid").tag("hybrid"); Text("Terrain").tag("terrain"); Text("USGS Topo").tag("usgs_topo")
                 }.labelsHidden().frame(width: 120).accessibilityLabel("Map layer")
@@ -77,6 +79,7 @@ struct MapsView: View {
                 else if location.message != "Location has not been requested." { Text(location.message).lineLimit(1) }
             }.font(.caption).foregroundStyle(.secondary).padding(8)
         }
+        .sheet(isPresented: $showWeather) { WeatherSheet(latitude: state.latitude, longitude: state.longitude) { showWeather = false } }
         .sheet(isPresented: $showDirections) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack { Text("Driving directions").font(.headline); Spacer(); Button("Done") { showDirections = false }.keyboardShortcut(.cancelAction) }

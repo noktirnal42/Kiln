@@ -19,7 +19,7 @@ public enum ToolFit {
     static let coreOrder = ["read", "list", "glob", "grep", "search", "edit", "write", "run", "git", "web", "stream", "background", "delete", "mcp", "kiln"]
     /// Module tool groups (the text before the first underscore), most generally useful first. Groups not listed come last.
     static let groupOrder = ["ide", "browser", "computer", "mail", "messages", "slack", "notify", "notifications", "calendar", "reminders", "contacts", "notes", "github",
-                             "drive", "pdf", "library", "news", "media", "image", "maps", "device", "lab", "re"]
+                             "drive", "pdf", "library", "news", "media", "image", "maps", "weather", "device", "lab", "re"]
 
     /// The fraction of the window the tool definitions may use.
     public static let defaultShare = 0.3

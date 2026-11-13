@@ -7,7 +7,7 @@ enum MapsActivity {
         id: "maps", title: "Maps", symbol: "map", summary: "Explore places, USGS topography and historical maps",
         moduleIdentifier: nil, content: .custom { _ in AnyView(MapsView()) },
         starterPrompts: { _ in [StarterPrompt(title: "Explore a place", symbol: "map", text: "Find a place on the map and look for historical USGS maps covering it.")] },
-        toolPrefixes: ["maps_"], agentPromptSentence: "Use maps_* tools to inspect or navigate Maps and search USGS historical map records.",
+        toolPrefixes: ["maps_", "weather_"], agentPromptSentence: "Use maps_* tools to inspect or navigate Maps and search USGS historical map records. Use weather_forecast and weather_alerts for US weather (source, issue time and alert office are in the reply; official warnings decide safety).",
         capabilities: [
             .tool("maps_pins", "List map pins", .read),
             .tool("maps_remove_pin", "Remove a map pin", .write),
@@ -28,5 +28,7 @@ enum MapsActivity {
             .tool("maps_offline_download", "Download offline map region", .execute),
             .tool("maps_save_state", "Save current map state as artifact", .write),
             .tool("maps_transit_routing", "Calculate transit/walking/cycling directions", .execute),
-        ], registerTools: { context in MapsTool.register(into: context.registry) })
+            .tool("weather_forecast", "Forecast and alerts for a US place (National Weather Service)", .execute),
+            .tool("weather_alerts", "Active weather alerts for a US place", .execute),
+        ], registerTools: { context in MapsTool.register(into: context.registry); WeatherTool.register(into: context.registry) })
 }

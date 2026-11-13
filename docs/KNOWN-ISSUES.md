@@ -20,6 +20,10 @@ The link path was seen working (an `ask` link put its text in the message box wi
 
 The notification policy, the coordinator and the tools are tested with fakes; no real notification has been posted from a build (the Settings card was seen on screen, with its permission buttons left alone). Focus status is optional and a hint at best: Apple requires authorization, and developers report `isFocused` may read "off" while a Focus is on unless the app has the Communication Notifications capability, which Kiln does not have (adding a managed entitlement to a notarized build risks one that will not launch, so it was left out). Kiln cannot read other apps' notifications (macOS offers no API), uses the ordinary interruption level (time-sensitive needs an entitlement), and a notification only opens Kiln: approvals are answered in the app.
 
+## Weather covers the United States only
+
+Weather forecasts and alerts come from the National Weather Service, which has no data outside the United States and its territories (the tools say so). There is no radar layer and no WeatherKit yet. The Weather sheet in Maps has not been seen on screen, the tools have not been run end to end from the agent, and a forecast is only as fresh as the service's last run (older than four hours is marked stale). Official warnings, not Kiln's summary, decide safety.
+
 ## Reasoning options are unverified against live APIs
 
 The chat's reasoning control (the brain button) offers only levels that Kiln has a documented or tested request for: Ollama `think` (a switch for most thinking models, low, medium and high for gpt-oss), OpenRouter `reasoning.effort`, and NVIDIA GLM 5.3 `reasoning_effort` (low, high, max). Most other models (other NVIDIA models, custom endpoints, Apple and MLX models) show the control greyed out because Kiln does not know what they accept. The request bodies are unit-tested; no live call was made with a chosen level, and some models cannot be switched off even where Ollama accepts `think: false`.
