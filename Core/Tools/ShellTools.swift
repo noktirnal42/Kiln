@@ -121,14 +121,16 @@ enum ShellRunner {
         // commands run at once (parallel tests on a loaded runner) blocked threads starved the pool and a trivial command
         // was reported as timed out.
         let startError = StartErrorBox()
+        let timer = TimerBox()
         let finished: Bool = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             let state = TimeoutRaceState(continuation)
-            process.terminationHandler = { _ in state.finish(true) }
+            // The timer is cancelled as soon as the process exits, so a finished command does not leave a task sleeping until its timeout.
+            process.terminationHandler = { _ in state.finish(true); timer.cancel() }
             do { try process.run() } catch { startError.error = error; state.finish(true); return }
-            Task {
+            timer.set(Task {
                 try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
                 state.finish(false)
-            }
+            })
         }
         if let error = startError.error {
             throw AgentRunError.permissionDenied("Could not start the command: \(error.localizedDescription)")
@@ -168,6 +170,15 @@ enum ShellRunner {
 
 /// Carries a launch failure out of the continuation closure.
 final class StartErrorBox: @unchecked Sendable { var error: Error? }
+
+/// Holds the timeout task so the exit handler can cancel it. If the process exits before the task is stored, it is cancelled when stored.
+final class TimerBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: Task<Void, Never>?
+    private var cancelled = false
+    func set(_ new: Task<Void, Never>) { lock.lock(); defer { lock.unlock() }; if cancelled { new.cancel() } else { task = new } }
+    func cancel() { lock.lock(); defer { lock.unlock() }; cancelled = true; task?.cancel(); task = nil }
+}
 
 /// Collects pipe output off the reading thread without blocking the caller.
 /// `Pipe` buffers internally, so draining lazily on collect is enough for
