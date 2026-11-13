@@ -16,6 +16,10 @@ Mail, Contacts, Messages, Calendar, Notes, Cloud Drives, Research, GitHub, Slack
 
 The link path was seen working (an `ask` link put its text in the message box without sending) and the launch hang found on the way was fixed (see `docs/21`, item 13). Not seen: the menu-bar item and its popover, the Services entry in another app, the Share extension in a Share menu (it needs the installed, notarized build to register), and Writing Tools (needs Apple Intelligence). A link can open an extra window; the text still reaches the one chat session. Do not drive a SwiftUI `MenuBarExtra` from a stored setting in this app: it made the app scene graph re-run without end.
 
+## Notifications and Focus are unverified
+
+The notification policy, the coordinator and the tools are tested with fakes; no real notification has been posted from a build (the Settings card was seen on screen, with its permission buttons left alone). Focus status is optional and a hint at best: Apple requires authorization, and developers report `isFocused` may read "off" while a Focus is on unless the app has the Communication Notifications capability, which Kiln does not have (adding a managed entitlement to a notarized build risks one that will not launch, so it was left out). Kiln cannot read other apps' notifications (macOS offers no API), uses the ordinary interruption level (time-sensitive needs an entitlement), and a notification only opens Kiln: approvals are answered in the app.
+
 ## Reasoning options are unverified against live APIs
 
 The chat's reasoning control (the brain button) offers only levels that Kiln has a documented or tested request for: Ollama `think` (a switch for most thinking models, low, medium and high for gpt-oss), OpenRouter `reasoning.effort`, and NVIDIA GLM 5.3 `reasoning_effort` (low, high, max). Most other models (other NVIDIA models, custom endpoints, Apple and MLX models) show the control greyed out because Kiln does not know what they accept. The request bodies are unit-tested; no live call was made with a chosen level, and some models cannot be switched off even where Ollama accepts `think: false`.

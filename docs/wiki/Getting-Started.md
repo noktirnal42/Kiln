@@ -8,7 +8,7 @@ Two ways in: download the preview, or build from source.
 2. The build is Developer ID signed, notarized and stapled. Check the checksum with `shasum -a 256 -c` against the published `.sha256` file.
 3. Move Kiln to Applications and open it. There is no in-app updater; to update, download a newer build and replace the app. Your data lives in `~/Library/Application Support/Kiln`, so nothing is lost.
 
-The published preview (0.1.1) is far behind the current source: it predates Maps, News, Images, Mail through GitHub, on-demand tool loading and most of the interface work. Build from source to try them. The iPhone and Apple Watch apps are not in the download; see [[Building and Signing]].
+The published preview (0.1.1) is far behind the current source (a build from `main` calls itself 0.2.0 (3), the preview in preparation; no 0.2 has been released): it predates Maps, News, Images, Mail through GitHub, on-demand tool loading and most of the interface work. Build from source to try them. The iPhone and Apple Watch apps are not in the download; see [[Building and Signing]].
 
 ## Option 2: build from source
 
