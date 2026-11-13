@@ -552,7 +552,7 @@ public final class AgentOrchestrator: Sendable {
             }
 
             if let contextWindow {
-                yield(.contextMeasured(used: ContextCompactor.estimateTokens(history), window: contextWindow))
+                yield(.contextMeasured(used: ContextCompactor.requestTokens(messages: history, tools: providerTools), window: contextWindow))
             }
 
             var request = ChatRequest(
