@@ -4,6 +4,8 @@
 <dict>
     <key>NSLocationUsageDescription</key>
     <string>Kiln uses your location when you choose My Location in Maps. Approved agents can read the last location you requested.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Kiln uses your location when you choose My Location in Maps. Approved agents can read the last location you requested.</string>
     <key>NSServices</key>
     <array>
         <dict>
