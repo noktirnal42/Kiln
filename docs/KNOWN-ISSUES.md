@@ -133,3 +133,7 @@ The full Mac suite passed on `main` (`4b647e8`, 2026-11-12, run locally): 1,063 
 ## Computer use (experimental, 2026-11-03)
 
 Accessibility-based, so it only sees what an app exposes; no screenshots, coordinate clicks, keyboard or scrolling yet. Indices are valid only for the latest `inspect` of one app. Calendar and Messages have been read this way; other apps are untested. Read-only use is safe to automate; `press` and `set_value` act in other apps, so they still ask in Ask and Auto. Pre-existing Accessibility entries from builds signed differently do not apply to a new build.
+
+## Menu-bar item (checked 2026-11-12)
+
+Turning on "Show Kiln in the menu bar" crashed the notarized 0.2.0 build (stack overflow: creating the status item wrote to UserDefaults, which re-entered the code that creates it). Fixed with a re-entrancy guard in `MenuBarController`; the fixed build then ran through the same toggle without crashing. Not seen: the flame icon in the menu bar, and the popover. A test of the setting changed from outside the app showed no icon, which does not tell us whether the toggle inside Settings does; check this by hand.
