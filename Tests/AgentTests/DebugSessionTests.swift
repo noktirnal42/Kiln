@@ -52,8 +52,9 @@ struct DebugSessionTests {
         try await waitFor(session, timeout: 15) { if case .paused = $0 { true } else { false } }
         if !session.isPaused { Issue.record("state=\(session.state) console=\(session.console.prefix(600))") }
         #expect(session.isPaused)
-        for _ in 0..<100 where session.variables.isEmpty { try await Task.sleep(nanoseconds: 50_000_000) }
-        for _ in 0..<100 where session.frames.isEmpty { try await Task.sleep(nanoseconds: 50_000_000) }
+        // Up to 30 s: the debugger answers slowly when the machine is busy (a release build ran beside this test once).
+        for _ in 0..<600 where session.variables.isEmpty { try await Task.sleep(nanoseconds: 50_000_000) }
+        for _ in 0..<600 where session.frames.isEmpty { try await Task.sleep(nanoseconds: 50_000_000) }
         let top = try #require(session.frames.first)
         #expect(top.line == 3 && top.name.contains("compute"))
         #expect(session.currentLocation?.line == 3 && session.currentLocation?.path.hasSuffix("main.swift") == true)

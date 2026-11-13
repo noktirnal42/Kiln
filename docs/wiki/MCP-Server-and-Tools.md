@@ -25,6 +25,7 @@ Develop → MCP lists servers imported from Claude Code, Codex and OpenCode conf
 | Browser | `browser_open`, `browser_read_page`, `browser_click`, `browser_type` | `browser_type` refuses credential fields |
 | Devices | `device_list`, `device_boot`, `device_screenshot`, `device_install` | Reads free; execute and write gated |
 | Media | `media_open`, `media_list`, `media_generate_image`, `media_speak`, `media_transcribe` | Writes need approval |
+| Weather (development build) | `weather_forecast`, `weather_alerts` | Execute tier (they send coordinates to weather.gov); US places only; text labelled as data |
 | Images, Maps, News | `image_*`, `maps_*`, `news_*` | See [Maps and News](https://github.com/noktirnal42/Kiln/blob/main/docs/23-MAPS-AND-NEWS.md); image writes need approval |
 | Kiln itself | `kiln_memory_read`, `kiln_memory_write`, `kiln_command_*`, `kiln_hooks_list`, `kiln_schedule_*`, `kiln_checkpoint_list`, `kiln_usage_report`, `kiln_round_limit_*` | State changes need approval and are audited |
 | Swarm workers | `swarm_post`, `swarm_read`, `swarm_memory_get`, `swarm_memory_set`, `swarm_report_blocker` | Used by workers |

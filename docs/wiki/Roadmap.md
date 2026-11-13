@@ -15,7 +15,7 @@ Mail, Contacts, Messages, Slack, Calendar and Reminders, notifications that foll
 
 ## Planned, in the owner's priority order
 
-weather and a radar layer on the Maps view (sources and terms still to be verified); a document, spreadsheet and presentation studio. Details are in the [feature roadmap](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
+a radar layer on the Maps view (weather forecasts and alerts for US places are built; radar sources and terms are still to be verified); a document, spreadsheet and presentation studio. Details are in the [feature roadmap](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
 
 ## Next
 
