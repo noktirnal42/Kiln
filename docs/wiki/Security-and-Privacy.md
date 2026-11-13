@@ -38,6 +38,7 @@ These activities are in the current source and not in the published preview, and
 - **Cloud Drives:** Kiln reads the folders the provider apps already sync to this Mac and never signs in to a cloud service or handles a token. Copies never overwrite, and saving into a drive needs your approval.
 - **Notes:** reads and adds notes by asking the Notes app, which needs Automation permission for Notes. Kiln never edits or deletes notes and cannot read locked ones.
 - **GitHub:** read-only, through the `gh` sign-in already on your Mac. Kiln never sees the token.
+- **Notifications:** Kiln sends system notifications for approvals, finished runs and scheduled tasks, and the agent can send you one (`notify_user`, labelled "Kiln agent:", plain text, at most 5 in 10 minutes). Each kind can be turned off in Settings → Notifications. Kiln cannot read other apps' notifications. Reading whether a Focus is on is optional, asks macOS first, and is only a hint.
 - **Spotlight:** off by default. If you choose Titles only, or Titles and text (secrets redacted, tool output skipped), Kiln adds conversations to the system Spotlight index; choosing Off removes everything it added.
 - **Untrusted text:** mail, texts, notes, calendar entries and GitHub text come from other people. Kiln labels them untrusted for agents, and sending or creating anything still needs your approval.
 

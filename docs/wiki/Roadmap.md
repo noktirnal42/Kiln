@@ -11,11 +11,11 @@ Kiln has 22 registered activities. The published preview (0.1.1, 2026-11-03) is 
 
 ## Built as development builds (tested with fakes; not yet verified against real accounts or data)
 
-Mail, Contacts, Messages, Slack, Calendar and Reminders, GitHub pull requests and CI, PDF annotation with a research library and citations, cloud drive folders, Apple Notes, Spotlight indexing of conversations (Off by default), and Shortcuts for every activity plus "Ask Kiln". Their empty states and permission screens have been seen on screen, and Calendar read real events; nothing else has met real data. See [[Activities]] for their limits and [[Security and Privacy]] for the permissions they need.
+Mail, Contacts, Messages, Slack, Calendar and Reminders, notifications that follow your Focus, GitHub pull requests and CI, PDF annotation with a research library and citations, cloud drive folders, Apple Notes, Spotlight indexing of conversations (Off by default), and Shortcuts for every activity plus "Ask Kiln". Their empty states and permission screens have been seen on screen, and Calendar read real events; nothing else has met real data. See [[Activities]] for their limits and [[Security and Privacy]] for the permissions they need.
 
 ## Planned, in the owner's priority order
 
-Notification Center and Focus awareness; a menu-bar quick-ask and Share extension; Writing Tools and Services-menu actions; weather and a radar layer on the Maps view (sources and terms still to be verified); a document, spreadsheet and presentation studio. Details are in the [feature roadmap](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
+a menu-bar quick-ask and Share extension; Writing Tools and Services-menu actions; weather and a radar layer on the Maps view (sources and terms still to be verified); a document, spreadsheet and presentation studio. Details are in the [feature roadmap](https://github.com/noktirnal42/Kiln/blob/main/docs/21-EVERYTHING-APP-ROADMAP.md).
 
 ## Next
 

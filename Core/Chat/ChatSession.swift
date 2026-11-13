@@ -1091,6 +1091,11 @@ public final class ChatSession {
                 await self.platformAudit.record("plan.proposed", ["characters": .int(finalText.count)])
             }
             self?.setSessionState(.idle, for: conversationID)
+            if let self, !stop.stopped {
+                // Someone who has switched away learns that the run ended (the notification policy holds it back when Kiln is in front or the run was short).
+                let outcome: NotificationEvent.RunOutcome = self.errorText != nil ? .failed : (self.pausedAfterRounds != nil ? .paused : .completed)
+                self.attention?.runFinished(conversation: self.conversationTitle, outcome: outcome, seconds: Date().timeIntervalSince(startedAt))
+            }
             if let self, self.pendingApprovals > 0 { self.pendingApprovals = 0; self.attention?.cleared(pending: 0) }
             self?.updateContextMeter()
             self?.streamingText = ""

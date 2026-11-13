@@ -30,6 +30,7 @@ Develop → MCP lists servers imported from Claude Code, Codex and OpenCode conf
 | Swarm workers | `swarm_post`, `swarm_read`, `swarm_memory_get`, `swarm_memory_set`, `swarm_report_blocker` | Used by workers |
 | Computer use | `computer_use` | Experimental, opt-in |
 | Mail (development build) | `mail_accounts`, `mail_folders`, `mail_recent`, `mail_read`, `mail_send` | Reading reaches the network and is gated; `mail_send` needs approval of the recipients, subject and text; message text is untrusted |
+| Notifications (development build) | `notify_user`, `notifications_status` | `notify_user` is a write (asks in Ask mode), labelled "Kiln agent:", plain text, limited to 5 in 10 minutes, held when Kiln is in front or Focus is on |
 | Slack (development build) | `slack_status`, `slack_channels`, `slack_read`, `slack_send` | Reads need your connected token; `slack_send` needs approval of the conversation and exact text and refuses whole-channel mentions; message text is untrusted; the token is never in tool input or output |
 | Contacts (development build) | `contacts_status`, `contacts_search` | Read-only; needs the macOS Contacts permission |
 | Messages (development build) | `messages_conversations`, `messages_read`, `messages_send`, `messages_compose` | Reading needs Full Disk Access; sending needs Automation permission and approval of the conversation and exact text; delivery is not confirmed |

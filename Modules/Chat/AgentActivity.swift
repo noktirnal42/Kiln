@@ -11,8 +11,8 @@ enum AgentActivity {
         showsInSidebar: false,
         showsAgentDock: false,   // the dock would be a second copy of this conversation
         starterPrompts: { hasProject in StarterPrompts.project(hasProject) + [StarterPrompts.binary, StarterPrompts.hardware] },
-        toolPrefixes: ["mcp_", "computer_"],
-        agentToolPatterns: ["mcp_*", "computer_use", "kiln_*"],
+        toolPrefixes: ["mcp_", "computer_", "notify_", "notifications_"],
+        agentToolPatterns: ["mcp_*", "computer_use", "kiln_*", "notify_*", "notifications_*"],
         agentPromptSentence: "Use list_skills / read_skill for installed skills. Use mcp_list_tools and mcp_call_tool for connected MCP servers. Use computer_use to inspect or control running Mac apps after the user enables it; inspect before interacting. For a job with three or more steps, call kiln_todo_write with the whole list first and again as each step finishes (one item in_progress); it is a tool call, never a file.",
         capabilities: [
             .tool("web_fetch", "Fetch a web page", .execute),
@@ -30,6 +30,10 @@ enum AgentActivity {
             .tool("kiln_hooks_list", "List configured hooks", .read),
             .tool("kiln_checkpoint_list", "List file checkpoints", .read),
             .tool("kiln_todo_write", "Keep a visible task list for the current job", .read),
+            .tool("notify_user", "Send the person a system notification (held back in Focus or when Kiln is in front)", .write),
+            .tool("notifications_status", "Whether notifications are allowed and Focus is on", .read),
+            .exempt("notifications.preferences", "Choose which notices Kiln sends and allow Focus status", .admin,
+                    because: "Deliberate: what interrupts the person, and whether Kiln may read their Focus, are the person's settings, not an agent's."),
             .tool("kiln_round_limit_read", "Read a profile's step limit", .read),
             .tool("kiln_round_limit_set", "Set a profile's step limit for future runs", .write),
             .exempt("agent.rewind", "Rewind files and conversation to an earlier message", .write,
