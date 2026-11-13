@@ -20,8 +20,8 @@ Where the store lives (internal or external drive) is up to you; models can be l
 
 ## Image models
 
-Image Studio includes an image-model catalog and downloader. A unified catalog for downloading and deleting both Ollama and MLX language models is planned; the existing Hugging Face language-model search registers references and does not itself download them.
+Image Studio includes an image-model catalog and downloader. The model picker has an "Add or remove local models…" sheet for Ollama (download by name, progress, cancel, remove; Ollama must be running), and the agent has `models_*` tools for the same with approval. Downloading MLX models and a unified catalog are still planned; the existing Hugging Face language-model search registers references and does not itself download them.
 
 ---
 
-**Verified status.** An unsandboxed live test on 2026-11-10 exercised MLX text, conversation history and tool-result continuation using a model on the drive. Native MLX tool-call generation and vision remain unverified and are not advertised by this provider. First-run store selection and scan performance on other Macs have not been checked in this pass.
+**Verified status.** The Ollama library sheet was seen on screen listing the installed models from a live local Ollama on 2026-11-13; a real download and removal have not been tried. An unsandboxed live test on 2026-11-10 exercised MLX text, conversation history and tool-result continuation using a model on the drive. Native MLX tool-call generation and vision remain unverified and are not advertised by this provider. First-run store selection and scan performance on other Macs have not been checked in this pass.

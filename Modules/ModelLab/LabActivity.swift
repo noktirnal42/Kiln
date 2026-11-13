@@ -12,7 +12,7 @@ enum LabActivity {
              StarterPrompt(title: "Find a small model", symbol: "magnifyingglass",
                            text: "Search Hugging Face for a small instruction-tuned model that fits this Mac, and compare two good candidates.")]
         },
-        toolPrefixes: ["lab_"],
+        toolPrefixes: ["lab_", "models_"],
         agentPromptSentence: "Use the lab_* tools to inspect hardware, experiments and datasets.",
         capabilities: [
             .tool("lab_hardware", "Hardware report", .read),
@@ -32,6 +32,11 @@ enum LabActivity {
             .tool("lab_register_model", "Register a model", .write),
             .tool("lab_delete_model", "Delete a model", .execute),
             .tool("lab_export_model", "Export a model", .write),
+            .tool("models_installed", "List installed Ollama models", .read),
+            .tool("models_pull", "Download an Ollama model", .write),
+            .tool("models_progress", "Progress of model downloads", .read),
+            .tool("models_cancel", "Cancel a model download", .write),
+            .tool("models_remove", "Remove an installed Ollama model", .admin),
             .tool("lab_predict", "Classify text with a trained model", .read),
             .tool("lab_predict_images", "Classify images with a trained model", .read),
             .tool("lab_evaluate_predictions", "Accuracy, F1, BLEU, ROUGE", .read),
@@ -42,11 +47,12 @@ enum LabActivity {
             .exempt("lab.red-team", "Run a red-team assessment", .execute,
                     because: "Gap: no tool yet for red-team assessment or report export (docs/13, Model Lab)."),
             .exempt("lab.model-download", "Download a model into the library", .write,
-                    because: "Gap: model download has no tool yet (docs/13); lab_start_lora takes allow_download for its own base model only."),
+                    because: "Gap: Hugging Face and MLX model download has no tool yet (docs/13); Ollama models have models_pull; lab_start_lora takes allow_download for its own base model only."),
             .exempt("lab.edit-training-config", "Edit training configuration and compare runs", .write,
                     because: "Gap: training configuration edits and experiment comparison have no tool yet (docs/13)."),
         ],
         registerTools: { context in
+            ModelLibraryTool.register(into: context.registry)
             guard let lab = await context.module(ModelLabModule.identifier, as: ModelLabModule.self) else { return }
             ModelLabAgentTools.register(module: lab, into: context.registry)
         })

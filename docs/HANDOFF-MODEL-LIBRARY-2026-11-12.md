@@ -4,6 +4,16 @@ The owner's words: "a better model picker/library: for local MLX and Ollama mode
 
 Nothing of this is built. This document is the brief: what exists to build on, what the feature must do, the API facts to verify first, and how to prove it works. Read `docs/HANDOFF-CODEX-2026-11-12.md` first for how to work in this repository.
 
+## Status (2026-11-13): the Ollama half is built; MLX and Hugging Face are not
+
+Built and merged (branch `codex/ollama-library`): `Core/ModelLibrary/OllamaLibrary.swift` (list, loaded models, streaming pull with a free-space check against the first sized event and a 2 GB margin, delete of an exact installed name, name validation), `ModelLibraryState.swift` (shared state, the pull queue, cancel, audit records `models.pull.started/finished/failed/cancelled` and `models.removed`), `ModelLibraryTools.swift` (`models_installed`, `models_progress`, `models_pull`, `models_cancel`, `models_remove`, registered under the Lab activity; `docs/13` and the registry tests are in step) and `Modules/Chat/ModelLibrarySheet.swift`, opened from the model picker with "Add or remove local models…". Tests: `Tests/ModelLibraryTests` (in-process Ollama stub: validation, listing, progress, a full disk refused, an error in the stream, delete of an exact name, tool tiers, the shared state).
+
+Seen on screen: the picker button, and the sheet listing the real installed models with sizes and quantizations from the live local Ollama. **Not seen:** a real download, a real removal, the progress bars, the removal confirmation, the sheet at narrow widths and in light mode. The API shapes (`/api/tags`, `/api/pull`, `/api/delete`, `/api/ps`) follow Ollama's documentation and the stream format is tested only against a stub; check a real pull of a small model with the owner present.
+
+Defaults chosen where the brief asked the owner: the library is a sheet in the picker; agents can pull and remove (with approval); Kiln does not start or install Ollama; LM Studio's folder is not scanned.
+
+**Still to build:** MLX downloads from Hugging Face into the shared cache (generalize `ImageModelDownloader`, do not write a second one), Hugging Face GGUF discovery with a variant chooser (Ollama can already pull `hf.co/<user>/<repo>:<quant>` by name), a remote catalog (Ollama has no documented listing API; the sheet has a short dated list of suggestions), richer picker sections and filters, pause and resume across a quit, a download indicator visible from anywhere in the app, and the `docs/qa/` screenshots.
+
 ## What the owner wants, as requirements
 
 1. **Add (download) models** from inside Kiln:
