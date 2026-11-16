@@ -353,6 +353,7 @@ struct AgentModeBar: View {
                 }
                 .labelsHidden().controlSize(.small).frame(maxWidth: 150)
                 PermissionModeMenu(center: ApprovalCenter.shared)
+                RoundLimitMenu(session: session)
                 if session.workspaceRoot == nil {
                     Label("No project", systemImage: "folder.badge.questionmark")
                         .font(SSTypography.caption()).foregroundStyle(SSColor.warning)
@@ -449,5 +450,57 @@ struct LiveStatusLine: View {
     static func elapsed(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds))
         return total < 60 ? "\(total)s" : "\(total / 60)m \(String(format: "%02d", total % 60))s"
+    }
+}
+
+
+/// "Paused after N steps": the setting for the open profile, as a compact menu in the composer bar.
+struct RoundLimitMenu: View {
+    let session: ChatSession
+
+    var body: some View {
+        let current = session.roundLimitSetting
+        Menu {
+            Section("Pause the agent after") {
+                ForEach(RoundLimit.presets, id: \.self) { steps in
+                    Button { Task { await session.setRoundLimit(steps == AgentOrchestrator.defaultRoundLimit ? nil : steps) } } label: {
+                        if RoundLimit.resolve(current) == steps { Label("\(steps) steps", systemImage: "checkmark") } else { Text("\(steps) steps") }
+                    }
+                }
+                Button { Task { await session.setRoundLimit(RoundLimit.unlimited) } } label: {
+                    if current == RoundLimit.unlimited { Label("No pause", systemImage: "checkmark") } else { Text("No pause") }
+                }
+            }
+            Text("A step is one model round. Stop and the usage budget still end a run at any time.")
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "forward.end").font(.system(size: 10))
+                Text(current == RoundLimit.unlimited ? "∞" : "\(RoundLimit.resolve(current))").font(SSTypography.caption()).monospacedDigit()
+            }
+        }
+        .menuStyle(.borderlessButton).fixedSize()
+        .help("Paused after \(RoundLimit.label(current)) for \(session.agentProfile?.name ?? "this agent"). Click to change.")
+        .accessibilityLabel("Step limit, \(RoundLimit.label(current))")
+    }
+}
+
+/// Shown when a run stopped at its step limit: one click resumes it, no typing.
+struct PausedCardView: View {
+    let session: ChatSession
+    let steps: Int
+
+    var body: some View {
+        HStack(spacing: SSSpacing.s) {
+            Image(systemName: "pause.circle").foregroundStyle(SSColor.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Paused after \(steps) steps").font(SSTypography.headline())
+                Text("Nothing is wrong; the step limit for \(session.agentProfile?.name ?? "this agent") was reached. Keep going picks up where it left off.")
+                    .font(SSTypography.caption()).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Keep going") { Task { await session.keepGoing() } }.buttonStyle(.borderedProminent)
+        }
+        .padding(SSSpacing.m)
+        .background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 8))
     }
 }

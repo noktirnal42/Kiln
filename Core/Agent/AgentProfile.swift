@@ -19,6 +19,8 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
     public var maxConcurrentTasks: Int
     /// Wall-clock ceiling for one run, in seconds. Zero = no local ceiling.
     public var runTimeoutSeconds: Int
+    /// Model rounds ("steps") before the run pauses and waits for "keep going". nil = the default (200), 0 = never pause.
+    public var roundLimit: Int?
     public var redactSecrets: Bool
     public var createdAt: Date
     public var updatedAt: Date
@@ -39,6 +41,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
         toolPermissions: ToolPermissionSet = ToolPermissionSet(),
         maxConcurrentTasks: Int = 1,
         runTimeoutSeconds: Int = 0,
+        roundLimit: Int? = nil,
         redactSecrets: Bool = true,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
@@ -57,6 +60,7 @@ public struct AgentProfile: Codable, Identifiable, Equatable, Sendable {
         self.toolPermissions = toolPermissions
         self.maxConcurrentTasks = maxConcurrentTasks
         self.runTimeoutSeconds = runTimeoutSeconds
+        self.roundLimit = roundLimit
         self.redactSecrets = redactSecrets
         self.createdAt = createdAt
         self.updatedAt = updatedAt

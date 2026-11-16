@@ -26,7 +26,7 @@ enum PlatformSessionFactory {
     }
 
     static func make(project: URL?, home: URL? = nil, chain: AuditChain? = nil, stub: Stub = Stub(),
-                     toolRegistry: ToolRegistry = ToolRegistry(tools: []), autoResolve: ApprovalDecision? = nil, checkpoints: CheckpointStore? = nil, usage: UsageLedger? = nil, schedules: ScheduleStore? = nil) async throws -> ChatSession {
+                     toolRegistry: ToolRegistry = ToolRegistry(tools: []), autoResolve: ApprovalDecision? = nil, checkpoints: CheckpointStore? = nil, usage: UsageLedger? = nil, schedules: ScheduleStore? = nil, defaults: UserDefaults? = nil) async throws -> ChatSession {
         let schema = Schema([Conversation.self, Message.self, Artifact.self, ArtifactVersion.self])
         let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
         let session = ChatSession(
@@ -34,7 +34,7 @@ enum PlatformSessionFactory {
             conversations: ConversationStore(container: container),
             artifacts: ArtifactStore(container: container),
             workspaceRoot: project?.path,
-            compactionDefaults: nil,
+            compactionDefaults: defaults,
             memoryHome: home,
             checkpointStore: checkpoints,
             usageLedger: usage,

@@ -303,7 +303,7 @@ public final class AgentOrchestrator: Sendable {
 
     /// The message shown when a run reaches its step limit.
     public static func pauseMessage(rounds: Int) -> String {
-        "Paused after \(rounds) steps; say continue to pick up where it left off."
+        "Paused after \(rounds) steps. Press Keep going (or say continue) to pick up where it left off."
     }
 
     public func run(
@@ -313,7 +313,7 @@ public final class AgentOrchestrator: Sendable {
         workspaceRoot: URL? = nil,
         policy override: ExecutionPolicy? = nil,
         contextWindow: Int? = nil,
-        roundLimit: Int = AgentOrchestrator.defaultRoundLimit,
+        roundLimit explicitRoundLimit: Int? = nil,
         stop: AgentStopFlag = AgentStopFlag(),
         backoffUnitSeconds: Double = 1.0,
         hooks: [HookDefinition] = [],
@@ -321,7 +321,8 @@ public final class AgentOrchestrator: Sendable {
         budgetGate: UsageBudgetGate? = nil,
         chat: @escaping @Sendable (ChatRequest) async throws -> AsyncThrowingStream<ChatChunk, Error>
     ) -> AsyncThrowingStream<AgentEvent, Error> {
-        AsyncThrowingStream { continuation in
+        let roundLimit = explicitRoundLimit ?? RoundLimit.resolve(profile.roundLimit)
+        return AsyncThrowingStream { continuation in
             let recorder = self.auditChain.map { AgentAuditRecorder(chain: $0, health: self.auditHealth) }
             let task = Task {
                 do {
@@ -1159,5 +1160,43 @@ enum ApprovalPreview {
         default:
             return argumentsJSON
         }
+    }
+}
+
+
+/// The "Paused after N steps" setting: how many model rounds a run may take before it waits for "keep going".
+/// Stored per profile (by name) in preferences; an `AgentProfile.roundLimit` carries it into a run.
+public enum RoundLimit {
+    public static let minimum = 5
+    public static let maximum = 5000
+    /// Stored value meaning "never pause" (Stop and the budget gate remain the limits).
+    public static let unlimited = 0
+    /// Presets offered in menus; the stored value may be any number in range.
+    public static let presets = [25, 50, 100, 200, 500, 1000]
+
+    /// The number of rounds a run may take. nil = default, 0 = unlimited, anything else is clamped to the range.
+    public static func resolve(_ stored: Int?) -> Int {
+        guard let stored else { return AgentOrchestrator.defaultRoundLimit }
+        if stored == unlimited { return Int.max }
+        return min(max(stored, minimum), maximum)
+    }
+
+    public static func key(profileName: String) -> String { "agent.roundLimit.\(profileName)" }
+
+    public static func stored(profileName: String, defaults: UserDefaults?) -> Int? {
+        guard let defaults, defaults.object(forKey: key(profileName: profileName)) != nil else { return nil }
+        return defaults.integer(forKey: key(profileName: profileName))
+    }
+
+    /// Saves the setting; nil removes it (back to the default).
+    public static func store(_ value: Int?, profileName: String, defaults: UserDefaults?) {
+        guard let defaults else { return }
+        if let value { defaults.set(value == unlimited ? unlimited : min(max(value, minimum), maximum), forKey: key(profileName: profileName)) }
+        else { defaults.removeObject(forKey: key(profileName: profileName)) }
+    }
+
+    public static func label(_ stored: Int?) -> String {
+        let value = resolve(stored)
+        return value == Int.max ? "No pause" : "\(value) steps"
     }
 }
