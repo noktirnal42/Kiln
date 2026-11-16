@@ -147,7 +147,7 @@ behind `DeviceService.Input` that prefers `idb ui tap/swipe/text` when `idb_comp
 
 ## Session 2026-11-15 (continuing the handoff; branch `codex/kiln-qa-completion`)
 
-**No on-screen checks were possible:** access to the Kiln window was declined in this session, so everything below is built and unit-tested only. "Verified" here means targeted tests passed in a Debug build; nothing was seen in the running app.
+**On-screen checks:** access to the Kiln window was declined at first and granted later, so the table below is unit-tested, and the "Seen on screen" list after it says exactly what was also seen in the running Debug build (local `qwen3.5-abliterated:9b`, real model in the status bar, not `stub-m1`).
 
 Build note: builds failed with "Unable to resolve module dependency: SwiftSyntax" for `MLXHuggingFaceMacros` until the empty `SourcePackages/prebuilts/swift-syntax/603.0.2/.../Modules` folder in `/private/tmp/claude-501/build-triage` was refilled from a good copy in Xcode's DerivedData (the download had been cut off while the disk was almost full). Nothing in DerivedData was deleted; `/private/tmp/claude-501/build-pol` (2.3 GB, unused since Nov 13) was removed to make room.
 
@@ -160,3 +160,15 @@ Build note: builds failed with "Unable to resolve module dependency: SwiftSyntax
 | Thread management | Pin, archive, rename (without reordering history) and search across titles and message text in the store and session, with a Pinned group, an Archived section and row menu entries. 7 tests. **Sidebar not seen; there is no search box in the sidebar yet.** | `11ef181` |
 
 Still open from the handoff todo: file-name chips that open the editor, tables and math, dismissible banner above the composer, edit-and-resubmit (item 1); real-keystroke check of Shift+Return and the parity table (item 3); the whole layout rework: title-bar icon row, Canvas, Swarm in chat, native menu bar and Help (item 4); Maps place card, Look Around, suggestions, collections (item 5); images as pixels, `@symbol/@page/@device`, steering, background runs, PR/CI, push-to-talk (item 6); Develop and Analyze debugger UIs and a tool-calling model for the status line (item 7).
+
+### Seen on screen (2026-11-15, own Debug build in `/private/tmp/claude-501/build-triage`)
+
+- Shift+Return in the message box makes a line break and does not send (key delivered as raw input to the real text view; not typed on the physical keyboard). Return through accessibility only inserts a newline, so sending was done with the Send button.
+- The step-limit control ("200") shows in the composer bar. Its pop-up menu could not be opened by the automation, so the preset list, "No pause" and the **Keep going card were not seen**.
+- Settings → "Finished runs in the thread" picker, set to Sentences by default.
+- Model picker shows capabilities read from Ollama (tools, vision, reasoning, 8192 ctx) for the qwen3.5 model.
+- A real tool-using run (list a directory, read a file) showed the **narrative lines**: the model's own sentences interleaved with grey lines ("Read 1 file and searched 1 time", "Ran 1 command") while live and after saving; the live "Working 3m 33s" status line; the approval card for a shell command (denied; "Always Allow" was not used); the 60 s slow-reply hint ("No answer after 213 s…"); and the honest no-answer notice after Stop.
+- With `chat.runSummaryStyle=workedFor`, the same thread shows "Worked for 5m 47s ›" above the final text and expands to the narrative and tool lines. The preference was removed again afterwards.
+- The test conversation was deleted through Sessions → trash → confirmation.
+- **Still not seen:** the Keep going card, sidebar Pin/Rename/Archive (context menus cannot be opened by the automation), the Maps Directions sheet, the task-list card (the model never called `kiln_todo_write`), migration of an old store (the app opened the existing store and its old threads fine, which is the only evidence).
+- Observation: this 9B model on the 18 GB machine took minutes per step, invented a path (`project_root`), and asked for a shell command although told to read only.

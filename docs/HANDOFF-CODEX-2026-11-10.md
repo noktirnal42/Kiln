@@ -67,6 +67,6 @@ Task-list card, live status line, Shift+Return in the running app, drop of a fil
 ## Update 2026-11-15 (Claude, continuing on the same branch)
 
 - Done and committed with tests (see the last section of `docs/LEFTOVERS-2026-11-10.md`): step-limit setting with Keep going, per-round narrative and the Codex-style "Worked for" option, Maps (real GPX, alternatives with ETA, honest offline/flyover), thread pin/archive/rename/search.
-- **None of it has been seen on screen** (window access was declined). Do the GUI checks first: Shift+Return, the step-limit menu and Keep going card, narrative lines, Settings → "Finished runs in the thread", sidebar pin/archive/rename, Maps Directions sheet. Run `pgrep -fl "Contents/MacOS/Kiln"` and confirm a real model before checking.
+- Seen on screen later in the session: Shift+Return, the narrative lines, the live status line, "Worked for", the Settings picker (details and what is still unseen in the leftovers file). Still to check: the step-limit menu and Keep going card, sidebar pin/archive/rename, Maps Directions sheet. Run `pgrep -fl "Contents/MacOS/Kiln"` and confirm a real model before checking.
 - If a build fails with a SwiftSyntax module error, look for an empty `SourcePackages/prebuilts/swift-syntax/*/*MacroSupport/Modules` in the derived data folder (see the leftovers note).
 - Not started: the layout rework (item 4), Look Around and the place card, image pixels for vision models, steering a running agent.
