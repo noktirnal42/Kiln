@@ -31,6 +31,11 @@ struct MapPlace: Identifiable, Sendable {
     var placeResults: [MapPlace] = []
     var pins: [MapPlace] = []
     var route: MKRoute?
+    /// Every route of the last Directions request (alternatives), and the one shown.
+    var routes: [MKRoute] = []
+    var selectedRouteIndex = 0
+    /// A line from an imported GPX file.
+    var track: [CLLocationCoordinate2D] = []
     var routeRevision = 0
     var mapState: MapStateArtifact?  // saved map state
     var bookmarks: [MapBookmark] = []  // region bookmarks
@@ -80,31 +85,64 @@ struct MapPlace: Identifiable, Sendable {
         pins.append(MapPlace(name: name, latitude: latitude, longitude: longitude)); routeRevision += 1
     }
 
-    func directions(latitude: Double, longitude: Double) async throws -> String {
+    /// Routes from the map centre to a destination. With `alternatives` MapKit may return several; the first is shown on the map.
+    func directions(latitude: Double, longitude: Double, routeMode: RouteMode = .automobile, alternatives: Bool = false) async throws -> String {
         guard latitude.isFinite, longitude.isFinite, (-85...85).contains(latitude), (-180...180).contains(longitude) else { throw MapsError.invalid("Invalid destination coordinates.") }
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: self.latitude, longitude: self.longitude)))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude)))
-        request.transportType = .automobile
+        switch routeMode {
+        case .automobile: request.transportType = .automobile
+        case .walking: request.transportType = .walking
+        case .cycling: request.transportType = .cycling
+        case .transit: request.transportType = .transit
+        }
+        request.requestsAlternateRoutes = alternatives
         let result = try await MKDirections(request: request).calculate()
-        guard let route = result.routes.first else { throw MapsError.invalid("No driving route was found.") }
-        self.route = route; routeRevision += 1
-        return "Driving: \(Int(route.distance)) m, about \(Int(route.expectedTravelTime / 60)) min. " + route.steps.map(\.instructions).filter { !$0.isEmpty }.joined(separator: " → ")
+        guard let first = result.routes.first else { throw MapsError.invalid("No \(routeMode.rawValue) route was found.") }
+        routes = result.routes; selectRoute(0)
+        _ = first
+        return RouteSummary.describe(result.routes.map(Self.summary), mode: routeMode == .automobile ? "driving" : routeMode.rawValue)
     }
 
     func transitDirections(latitude: Double, longitude: Double, routeMode: RouteMode) async throws -> String {
-        guard latitude.isFinite, longitude.isFinite, (-85...85).contains(latitude), (-180...180).contains(longitude) else { throw MapsError.invalid("Invalid destination coordinates.") }
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: self.latitude, longitude: self.longitude)))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude)))
-        request.transportType = routeMode == .transit ? .transit : .automobile
-        if routeMode == .walking { request.transportType = .walking }
-        if routeMode == .cycling { request.transportType = .cycling }
-        let result = try await MKDirections(request: request).calculate()
-        guard let route = result.routes.first else { throw MapsError.invalid("No \(routeMode.rawValue) route was found.") }
-        self.route = route; routeRevision += 1
-        let modeString = routeMode.rawValue.capitalized
-        return "\(modeString): \(Int(route.distance)) m, about \(Int(route.expectedTravelTime / 60)) min. " + route.steps.map(\.instructions).filter { !$0.isEmpty }.joined(separator: " → ")
+        try await directions(latitude: latitude, longitude: longitude, routeMode: routeMode)
+    }
+
+    static func summary(_ route: MKRoute) -> RouteSummary {
+        RouteSummary(name: route.name, meters: route.distance, seconds: route.expectedTravelTime, steps: route.steps.map(\.instructions))
+    }
+
+    /// Shows one of the calculated alternatives on the map.
+    func selectRoute(_ index: Int) {
+        guard routes.indices.contains(index) else { return }
+        selectedRouteIndex = index; route = routes[index]; routeRevision += 1
+    }
+
+    /// Everything on the map as GPX: pins as waypoints, the shown route (or an imported track) as a track.
+    func exportGPX() -> String {
+        var line: [GPXPoint] = []
+        if let route {
+            let polyline = route.polyline
+            var coordinates = [CLLocationCoordinate2D](repeating: CLLocationCoordinate2D(), count: polyline.pointCount)
+            polyline.getCoordinates(&coordinates, range: NSRange(location: 0, length: polyline.pointCount))
+            line = coordinates.map { GPXPoint(name: nil, latitude: $0.latitude, longitude: $0.longitude) }
+        } else {
+            line = track.map { GPXPoint(name: nil, latitude: $0.latitude, longitude: $0.longitude) }
+        }
+        return GPX.encode(waypoints: pins.map { GPXPoint(name: $0.name, latitude: $0.latitude, longitude: $0.longitude) }, track: line)
+    }
+
+    /// Adds a GPX file's waypoints as pins and its first route or track as the line on the map. Returns a summary.
+    func importGPX(_ data: Data) throws -> String {
+        let document = try GPX.parse(data)
+        guard !document.isEmpty else { throw MapsError.invalid("The GPX file has no waypoints, routes or tracks.") }
+        for point in document.waypoints.prefix(500) { try addPin(name: point.name ?? "Waypoint", latitude: point.latitude, longitude: point.longitude) }
+        let line = document.tracks.first ?? document.routes.first ?? []
+        track = line.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+        route = nil; routeRevision += 1
+        if let focus = document.waypoints.first ?? line.first { try navigate(latitude: max(-85, min(85, focus.latitude)), longitude: focus.longitude, span: 0.15) }
+        return "Imported \(min(document.waypoints.count, 500)) waypoints and \(line.count) track points (\(document.routes.count) routes, \(document.tracks.count) tracks in the file; the first one is drawn)."
     }
 
     func places(_ query: String) async throws -> [MapPlace] {
@@ -162,21 +200,6 @@ struct MapPlace: Identifiable, Sendable {
     func removeBookmark(id: UUID) {
         bookmarks.removeAll { $0.id == id }
         routeRevision += 1
-    }
-
-    func directions(latitude: Double, longitude: Double, routeMode: RouteMode = .automobile) async throws -> String {
-        guard latitude.isFinite, longitude.isFinite, (-85...85).contains(latitude), (-180...180).contains(longitude) else { throw MapsError.invalid("Invalid destination coordinates.") }
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: self.latitude, longitude: self.longitude)))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude)))
-        request.transportType = routeMode == .transit ? .transit : .automobile
-        if routeMode == .walking { request.transportType = .walking }
-        if routeMode == .cycling { request.transportType = .cycling }
-        let result = try await MKDirections(request: request).calculate()
-        guard let route = result.routes.first else { throw MapsError.invalid("No \(routeMode.rawValue) route was found.") }
-        self.route = route; routeRevision += 1
-        let modeString = routeMode.rawValue.capitalized
-        return "\(modeString): \(Int(route.distance)) m, about \(Int(route.expectedTravelTime / 60)) min. " + route.steps.map(\.instructions).filter { !$0.isEmpty }.joined(separator: " → ")
     }
 }
 
