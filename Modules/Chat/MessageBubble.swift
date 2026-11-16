@@ -66,6 +66,19 @@ struct MessageBubble: View {
         VStack(alignment: .leading, spacing: 8) {
             if !reasoningText.isEmpty { reasoningView }
 
+            // Claude-style narrative: what the model said before each burst of tool calls, then that burst as one grey line.
+            ForEach(Array(message.segments.enumerated()), id: \.offset) { _, segment in
+                if !segment.text.isEmpty {
+                    MarkdownBlockView(text: segment.text)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if !isStreaming {
+                    let calls = message.toolCalls.filter { segment.callIDs.contains($0.id) }
+                    if !calls.isEmpty { StoredToolRunView(calls: calls) }
+                }
+            }
+
             if !message.content.isEmpty {
                 if !isStreaming, ToolPhrase.looksLikeToolCallText(message.content) {
                     ToolCallTextNotice(text: message.content, retry: { Task { await session.regenerate() } })
@@ -78,8 +91,11 @@ struct MessageBubble: View {
 
             if isStreaming { ThinkingDots(label: message.content.isEmpty && reasoningText.isEmpty ? "Working" : nil) }
 
-            if !message.toolCalls.isEmpty {
-                StoredToolRunView(calls: message.toolCalls)
+            // Calls no segment owns (replies saved before segments existed, or a stream still running).
+            let owned = Set(message.segments.flatMap(\.callIDs))
+            let loose = message.toolCalls.filter { !owned.contains($0.id) }
+            if !loose.isEmpty && (!isStreaming || message.segments.isEmpty) {
+                StoredToolRunView(calls: loose)
             }
 
             if !isStreaming { actionRow }

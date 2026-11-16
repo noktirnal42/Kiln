@@ -29,6 +29,8 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
     public var toolCalls: [ToolCall]
     public var modelID: String?
     public var createdAt: Date
+    /// Narrative text and the tool calls after it, one per tool round, in order. Empty for replies saved before this existed.
+    public var segments: [ReplySegment]
 
     public init(
         id: UUID,
@@ -39,7 +41,8 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
         order: Int = 0,
         toolCalls: [ToolCall] = [],
         modelID: String? = nil,
-        createdAt: Date
+        createdAt: Date,
+        segments: [ReplySegment] = []
     ) {
         self.id = id
         self.role = role
@@ -50,7 +53,33 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
         self.toolCalls = toolCalls
         self.modelID = modelID
         self.createdAt = createdAt
+        self.segments = segments
     }
+}
+
+/// One round of an agent run: what the model said before it called tools, and the calls it made (by id).
+public struct ReplySegment: Codable, Equatable, Sendable {
+    public var text: String
+    public var callIDs: [String]
+    public init(text: String, callIDs: [String]) { self.text = text; self.callIDs = callIDs }
+}
+
+/// Collects the rounds of a run as it streams: the text the model wrote in a round and the calls it made.
+public struct ReplySegmenter: Sendable {
+    public private(set) var segments: [ReplySegment] = []
+    private var calls: [String] = []
+    public init() {}
+
+    public mutating func callStarted(_ id: String) { if !calls.contains(id) { calls.append(id) } }
+
+    /// The current round ends (the next one starts, or the run is over). A round with no calls is the final reply, not a segment.
+    public mutating func roundEnded(text: String) {
+        defer { calls = [] }
+        guard !calls.isEmpty else { return }
+        segments.append(ReplySegment(text: text.trimmingCharacters(in: .whitespacesAndNewlines), callIDs: calls))
+    }
+
+    public var hasOpenRound: Bool { !calls.isEmpty }
 }
 
 public struct MessagePage: Equatable, Sendable {
@@ -165,9 +194,21 @@ public actor ConversationStore {
         reasoning: String? = nil,
         tokenCount: Int = 0,
         toolCalls: [ToolCall] = [],
-        modelID: String? = nil
+        modelID: String? = nil,
+        segments: [ReplySegment] = []
     ) throws -> MessageSnapshot? {
-        try appendMessages(conversationID: conversationID, items: [(role, content, reasoning, tokenCount, toolCalls, modelID)]).first
+        guard let saved = try appendMessages(conversationID: conversationID, items: [(role, content, reasoning, tokenCount, toolCalls, modelID)]).first else { return nil }
+        guard !segments.isEmpty else { return saved }
+        return try setSegments(saved.id, segments) ?? saved
+    }
+
+    /// Stores the per-round narrative of a reply and returns the updated snapshot.
+    @discardableResult
+    public func setSegments(_ id: UUID, _ segments: [ReplySegment]) throws -> MessageSnapshot? {
+        guard let message = try Self.fetchMessage(id, in: context) else { return nil }
+        message.segmentsJSON = segments.isEmpty ? nil : try JSONEncoder().encode(segments)
+        try context.save()
+        return Self.snapshot(of: message)
     }
 
     /// Bulk append: one fetch and one save regardless of item count.
@@ -253,7 +294,8 @@ public actor ConversationStore {
             order: message.order,
             toolCalls: toolCalls,
             modelID: message.modelID,
-            createdAt: message.createdAt
+            createdAt: message.createdAt,
+            segments: message.segmentsJSON.flatMap { try? JSONDecoder().decode([ReplySegment].self, from: $0) } ?? []
         )
     }
 }

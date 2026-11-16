@@ -41,7 +41,8 @@ struct ChatRootView: View {
                                     content: session.streamingText,
                                     toolCalls: session.streamingToolCalls,
                                     modelID: session.selectedModelID,
-                                    createdAt: Date()
+                                    createdAt: Date(),
+                                    segments: session.liveSegments
                                 ),
                                 isStreaming: true,
                                 liveReasoning: session.streamingReasoning

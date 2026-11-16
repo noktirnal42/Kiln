@@ -125,6 +125,8 @@ public final class ChatSession {
     }
     public private(set) var lastTiming: ResponseTiming?
     public private(set) var streamingToolCalls: [ToolCall] = []
+    /// Rounds of the running agent turn that are already finished: their narrative text and the calls that followed it.
+    public private(set) var liveSegments: [ReplySegment] = []
     public private(set) var errorText: String?
     public private(set) var lastUsage: ChatChunk.Usage?
     public private(set) var recentModelIDs: [String] = []
@@ -931,6 +933,7 @@ public final class ChatSession {
             var finalText = ""
             var tokens = 0
             var firstTokenAt: Date?
+            var segmenter = ReplySegmenter()
             let stream = orchestrator.run(
                 profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, stop: stop, hooks: hooks, checkpoint: recorder, budgetGate: gate?.isActive == true ? gate : nil,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
@@ -946,7 +949,11 @@ public final class ChatSession {
                     case .reasoningDelta(let thinking):
                         if firstTokenAt == nil { firstTokenAt = Date() }
                         self.streamingReasoning += thinking
-                    case .roundStarted(let round): self.agentRound = round; self.streamingText = ""; self.streamingReasoning = ""
+                    case .roundStarted(let round):
+                        segmenter.roundEnded(text: self.streamingText)
+                        self.liveSegments = segmenter.segments
+                        self.agentRound = round; self.streamingText = ""; self.streamingReasoning = ""
+                    case .toolCallStarted(let record): segmenter.callStarted(record.callID.isEmpty ? record.id.uuidString : record.callID)
                     case .retryScheduled(let attempt, let delay, let reason):
                         self.agentNotice = "Retrying (\(attempt)) in \(Int(delay))s: \(reason)"
                     case .policyDenied(let tool, _, let reason): self.agentNotice = "\(tool) was blocked: \(reason)"
@@ -977,6 +984,10 @@ public final class ChatSession {
                     self.agentActivity[index].status = .cancelled
                 }
             }
+            // A run that ended on a tool round (paused, stopped): that round's text belongs to its segment, not to the reply.
+            if segmenter.hasOpenRound { segmenter.roundEnded(text: finalText.isEmpty ? "" : (self?.streamingText ?? "")) }
+            let segments = segmenter.segments
+            self?.liveSegments = []
             if finalText.isEmpty { finalText = self?.streamingText ?? "" }
             // A run that ends without a word would otherwise leave no reply at all: say what happened, without claiming success.
             if finalText.isEmpty, let self, self.errorText == nil, !self.agentActivity.isEmpty {
@@ -984,7 +995,7 @@ public final class ChatSession {
             }
             if !finalText.isEmpty, let saved = try? await store.appendMessage(
                 conversationID: conversationID, role: .assistant, content: finalText,
-                reasoning: nil, tokenCount: tokens, toolCalls: self?.finishedToolCalls() ?? [], modelID: model
+                reasoning: nil, tokenCount: tokens, toolCalls: self?.finishedToolCalls() ?? [], modelID: model, segments: segments
             ) {
                 self?.messages.append(saved)
             }

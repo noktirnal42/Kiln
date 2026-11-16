@@ -76,6 +76,9 @@ public final class Message {
     public var modelID: String?
     public var createdAt: Date
     public var conversation: Conversation?
+    /// The model's own text of each tool round ("Now the tests."), with the calls that followed it. Optional, so
+    /// older stores open by lightweight migration and old replies simply have none.
+    public var segmentsJSON: Data?
 
     public init(
         role: String,
