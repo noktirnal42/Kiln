@@ -144,3 +144,19 @@ behind `DeviceService.Input` that prefers `idb ui tap/swipe/text` when `idb_comp
 - `huihui_ai/qwen3.5-abliterated:9b` is installed and makes real structured tool calls (checked with `Scripts/test-ollama-tools.sh`).
 - **Not done:** security models (`foundation-sec-abliterated:8b`, `baronllm-abliterated:8b`) could not be pulled, the external model drive is full (1.6 GB free). Owner decides which old models to remove; the audit and commands are in `docs/32-LOCAL-MODELS.md`.
 - **Not seen on screen:** the live status line, the task-list card and the new model in the picker; the screen was locked during the last session, so screenshots failed. Re-check once the screen is unlocked (select the qwen3.5 model, run a multi-tool task).
+
+## Session 2026-11-15 (continuing the handoff; branch `codex/kiln-qa-completion`)
+
+**No on-screen checks were possible:** access to the Kiln window was declined in this session, so everything below is built and unit-tested only. "Verified" here means targeted tests passed in a Debug build; nothing was seen in the running app.
+
+Build note: builds failed with "Unable to resolve module dependency: SwiftSyntax" for `MLXHuggingFaceMacros` until the empty `SourcePackages/prebuilts/swift-syntax/603.0.2/.../Modules` folder in `/private/tmp/claude-501/build-triage` was refilled from a good copy in Xcode's DerivedData (the download had been cut off while the disk was almost full). Nothing in DerivedData was deleted; `/private/tmp/claude-501/build-pol` (2.3 GB, unused since Nov 13) was removed to make room.
+
+| Item | State | Commit |
+|---|---|---|
+| Round limit ("Paused after N steps") | Per-profile setting (default 200, 0 = no pause), composer menu, audit record, a "Keep going" card that resumes without typing. Tests pass. **Not seen on screen.** Round count and cost are not yet in the live status line. | `0921391` |
+| Thread display: per-burst narrative | Each reply stores the model's text of every tool round (`Message.segmentsJSON`, optional, lightweight migration) and the thread shows it between grey tool lines. Tests pass. **Not seen on screen; migration not tried on a real store.** | `80e0d49` |
+| Thread display: "Worked for X ›" | Setting in Settings (Sentences or Worked for); duration is prompt-to-reply time, so it includes approval waits. Diff card paths truncate in the middle. **Not seen on screen.** The diff card already had "Undo all" and "View changes" (the handoff listed them as todo). | `64f7840` |
+| Maps | GPX 1.1 import/export are real (no overwrite, 10 MB cap, KML not supported); offline download now says it is not available (it used to claim success); flyover switches to realistic imagery (Apple's Flyover tours are not available to apps); directions take a mode and return alternatives with distance, time and arrival, with a route switcher in the Directions sheet; the transit mode was unreachable from the tool and is fixed. 9 tests. **UI not seen.** | `2c37727` |
+| Thread management | Pin, archive, rename (without reordering history) and search across titles and message text in the store and session, with a Pinned group, an Archived section and row menu entries. 7 tests. **Sidebar not seen; there is no search box in the sidebar yet.** | `11ef181` |
+
+Still open from the handoff todo: file-name chips that open the editor, tables and math, dismissible banner above the composer, edit-and-resubmit (item 1); real-keystroke check of Shift+Return and the parity table (item 3); the whole layout rework: title-bar icon row, Canvas, Swarm in chat, native menu bar and Help (item 4); Maps place card, Look Around, suggestions, collections (item 5); images as pixels, `@symbol/@page/@device`, steering, background runs, PR/CI, push-to-talk (item 6); Develop and Analyze debugger UIs and a tool-calling model for the status line (item 7).
