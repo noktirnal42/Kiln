@@ -8,8 +8,12 @@ public struct ConversationSummary: Identifiable, Equatable, Sendable {
     public var createdAt: Date
     public var updatedAt: Date
     public var messageCount: Int
+    public var isPinned: Bool
+    public var isArchived: Bool
 
-    public init(id: UUID, title: String, modelID: String?, createdAt: Date, updatedAt: Date, messageCount: Int) {
+    public init(id: UUID, title: String, modelID: String?, createdAt: Date, updatedAt: Date, messageCount: Int, isPinned: Bool = false, isArchived: Bool = false) {
+        self.isPinned = isPinned
+        self.isArchived = isArchived
         self.id = id
         self.title = title
         self.modelID = modelID
@@ -129,6 +133,34 @@ public actor ConversationStore {
         conversation.title = title
         if touch { conversation.updatedAt = Date() }
         try context.save()
+    }
+
+    public func setPinned(_ id: UUID, _ pinned: Bool) throws {
+        guard let conversation = try Self.fetchConversation(id, in: context) else { return }
+        conversation.isPinned = pinned
+        try context.save()
+    }
+
+    public func setArchived(_ id: UUID, _ archived: Bool) throws {
+        guard let conversation = try Self.fetchConversation(id, in: context) else { return }
+        conversation.isArchived = archived
+        if archived { conversation.isPinned = false }
+        try context.save()
+    }
+
+    /// Conversations whose title or any message contains the text (case and accent insensitive), newest first.
+    public func search(_ text: String, limit: Int = 100) throws -> [ConversationSummary] {
+        let needle = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return [] }
+        var byTitle = FetchDescriptor<Conversation>(predicate: #Predicate { $0.title.localizedStandardContains(needle) })
+        byTitle.fetchLimit = limit
+        var found = try context.fetch(byTitle)
+        var byMessage = FetchDescriptor<Message>(predicate: #Predicate { $0.content.localizedStandardContains(needle) })
+        byMessage.fetchLimit = 400
+        for message in try context.fetch(byMessage) {
+            if let conversation = message.conversation, !found.contains(where: { $0.id == conversation.id }) { found.append(conversation) }
+        }
+        return found.sorted { $0.updatedAt > $1.updatedAt }.prefix(limit).map(Self.summary(of:))
     }
 
     public func setConversationModel(_ id: UUID, modelID: String?) throws {
@@ -278,7 +310,9 @@ public actor ConversationStore {
             modelID: conversation.modelID,
             createdAt: conversation.createdAt,
             updatedAt: conversation.updatedAt,
-            messageCount: conversation.messages.count
+            messageCount: conversation.messages.count,
+            isPinned: conversation.isPinned,
+            isArchived: conversation.isArchived
         )
     }
 

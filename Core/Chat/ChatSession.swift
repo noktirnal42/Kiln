@@ -618,6 +618,30 @@ public final class ChatSession {
         (try? await conversations.conversations()) ?? []
     }
 
+    public func setPinned(_ id: UUID, _ pinned: Bool) async {
+        try? await conversations.setPinned(id, pinned)
+        conversationListGeneration += 1
+        await platformAudit.record(pinned ? "thread.pinned" : "thread.unpinned", ["conversation": .string(id.uuidString)])
+    }
+
+    public func setArchived(_ id: UUID, _ archived: Bool) async {
+        try? await conversations.setArchived(id, archived)
+        conversationListGeneration += 1
+        await platformAudit.record(archived ? "thread.archived" : "thread.unarchived", ["conversation": .string(id.uuidString)])
+    }
+
+    public func renameConversation(_ id: UUID, to title: String) async {
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        try? await conversations.renameConversation(id, to: clean, touch: false)
+        if conversationID == id { conversationTitle = clean }
+        conversationListGeneration += 1
+    }
+
+    public func searchConversations(_ text: String) async -> [ConversationSummary] {
+        (try? await conversations.search(text)) ?? []
+    }
+
     public func fork(at messageID: UUID) async {
         guard let conversationID else { return }
         do {

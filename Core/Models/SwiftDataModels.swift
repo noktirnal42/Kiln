@@ -52,6 +52,9 @@ public final class Conversation {
     public var createdAt: Date
     public var updatedAt: Date
     public var workspace: Workspace?
+    /// Pinned threads sit at the top of the sidebar; archived ones leave the list but are kept (defaults keep old stores opening).
+    public var isPinned: Bool = false
+    public var isArchived: Bool = false
     @Relationship(deleteRule: .cascade, inverse: \Message.conversation)
     public var messages: [Message] = []
 
