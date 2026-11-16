@@ -125,3 +125,29 @@ public enum ToolPhrase {
         return trimmed.contains("\"arguments\"") && trimmed.contains("\"name\"")
     }
 }
+
+
+/// How a finished run is summarised in the thread (Settings → Chat).
+public enum RunSummaryStyle: String, CaseIterable, Identifiable, Sendable {
+    /// The model's own sentences stay in view; each burst of tool calls is one grey line (Claude Code).
+    case sentences
+    /// Everything the run did folds into one "Worked for 42 s ›" line above the reply (Codex).
+    case workedFor
+
+    public static let key = "chat.runSummaryStyle"
+    public var id: String { rawValue }
+    public var label: String { self == .sentences ? "Sentences (Claude style)" : "Worked for … (Codex style)" }
+
+    public static func current(_ defaults: UserDefaults = .standard) -> RunSummaryStyle {
+        RunSummaryStyle(rawValue: defaults.string(forKey: key) ?? "") ?? .sentences
+    }
+
+    /// "Worked for 27s", "Worked for 1m 26s", "Worked for 2h 3m". Under a second reads "Worked for <1s".
+    public static func workedLabel(seconds: TimeInterval) -> String {
+        let total = Int(seconds.rounded())
+        if seconds < 1 { return "Worked for <1s" }
+        if total < 60 { return "Worked for \(total)s" }
+        if total < 3600 { return "Worked for \(total / 60)m \(total % 60)s" }
+        return "Worked for \(total / 3600)h \((total % 3600) / 60)m"
+    }
+}

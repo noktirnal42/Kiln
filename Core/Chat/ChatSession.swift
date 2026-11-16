@@ -192,6 +192,13 @@ public final class ChatSession {
         return profile
     }
 
+    /// Seconds from the prompt to a saved reply: the "Worked for …" figure (includes time spent waiting for approvals).
+    public func workedDuration(for messageID: UUID) -> TimeInterval? {
+        guard let index = messages.firstIndex(where: { $0.id == messageID }), index > 0,
+              let prompt = messages[..<index].last(where: { $0.role == .user }) else { return nil }
+        return max(0, messages[index].createdAt.timeIntervalSince(prompt.createdAt))
+    }
+
     // MARK: Round limit ("Paused after N steps")
     /// Bumped when the setting changes so views re-read it.
     public private(set) var roundLimitRevision = 0

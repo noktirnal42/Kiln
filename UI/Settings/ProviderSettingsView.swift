@@ -79,6 +79,7 @@ struct ProviderSettingsView: View {
     @State private var model = ProviderSettingsModel()
     @AppStorage("computerUse.enabled") private var computerUseEnabled = false
     @AppStorage("provider.firstChunkTimeout") private var firstChunkTimeout = 90.0
+    @AppStorage(RunSummaryStyle.key) private var runSummaryStyle = RunSummaryStyle.sentences.rawValue
     /// Live: macOS can say "Kiln: on" for another copy of Kiln while this copy is not trusted, so show what this copy sees.
     @State private var accessibilityTrusted = AXIsProcessTrusted()
 
@@ -99,6 +100,14 @@ struct ProviderSettingsView: View {
                     }
                     .pickerStyle(.segmented).fixedSize()
                     Text("Kiln follows the system by default. Light, Dark and High Contrast apply to every window.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                    Picker("Finished runs in the thread", selection: $runSummaryStyle) {
+                        ForEach(RunSummaryStyle.allCases) { Text($0.label).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.menu).fixedSize()
+                    Text("Sentences keeps the agent's own words and shows each burst of tool calls as one grey line. Worked for … folds the whole run into one line above the reply.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {

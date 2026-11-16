@@ -8,6 +8,7 @@ struct MessageBubble: View {
     var isStreaming = false
     /// Live thinking text while a reasoning model is still working on its answer.
     var liveReasoning = ""
+    @AppStorage(RunSummaryStyle.key) private var summaryStyleRaw = RunSummaryStyle.sentences.rawValue
     @State private var showReasoning = false
     @State private var hovering = false
 
@@ -67,6 +68,9 @@ struct MessageBubble: View {
             if !reasoningText.isEmpty { reasoningView }
 
             // Claude-style narrative: what the model said before each burst of tool calls, then that burst as one grey line.
+            if !isStreaming, summaryStyleRaw == RunSummaryStyle.workedFor.rawValue, !message.toolCalls.isEmpty {
+                WorkedForLine(message: message, seconds: session.workedDuration(for: message.id))
+            } else {
             ForEach(Array(message.segments.enumerated()), id: \.offset) { _, segment in
                 if !segment.text.isEmpty {
                     MarkdownBlockView(text: segment.text)
@@ -77,6 +81,7 @@ struct MessageBubble: View {
                     let calls = message.toolCalls.filter { segment.callIDs.contains($0.id) }
                     if !calls.isEmpty { StoredToolRunView(calls: calls) }
                 }
+            }
             }
 
             if !message.content.isEmpty {
@@ -94,7 +99,7 @@ struct MessageBubble: View {
             // Calls no segment owns (replies saved before segments existed, or a stream still running).
             let owned = Set(message.segments.flatMap(\.callIDs))
             let loose = message.toolCalls.filter { !owned.contains($0.id) }
-            if !loose.isEmpty && (!isStreaming || message.segments.isEmpty) {
+            if !loose.isEmpty && (!isStreaming || message.segments.isEmpty) && !(summaryStyleRaw == RunSummaryStyle.workedFor.rawValue && !isStreaming) {
                 StoredToolRunView(calls: loose)
             }
 
@@ -269,6 +274,48 @@ struct ToolCallTextNotice: View {
                 Text(text).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary).textSelection(.enabled)
                     .padding(8).frame(maxWidth: .infinity, alignment: .leading)
                     .background(SSColor.surface, in: RoundedRectangle(cornerRadius: 6))
+            }
+        }
+    }
+}
+
+
+/// Codex's run line: "Worked for 27s ›", a hairline above the reply; expanded it shows the narrative and the tool lines.
+struct WorkedForLine: View {
+    let message: MessageSnapshot
+    let seconds: TimeInterval?
+    @State private var expanded = false
+
+    private var title: String { seconds.map(RunSummaryStyle.workedLabel(seconds:)) ?? "Worked" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button { withAnimation(.easeOut(duration: 0.12)) { expanded.toggle() } } label: {
+                HStack(spacing: 8) {
+                    Rectangle().fill(SSColor.hairline).frame(height: 1)
+                    HStack(spacing: 4) {
+                        Text(title).font(SSTypography.caption())
+                        Image(systemName: expanded ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundStyle(.secondary).fixedSize()
+                    Rectangle().fill(SSColor.hairline).frame(height: 1)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(title). \(expanded ? "Hide" : "Show") the steps")
+            if expanded {
+                let owned = Set(message.segments.flatMap(\.callIDs))
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(message.segments.enumerated()), id: \.offset) { _, segment in
+                        if !segment.text.isEmpty { Text(segment.text).font(.system(size: 13)).foregroundStyle(.secondary).textSelection(.enabled) }
+                        let calls = message.toolCalls.filter { segment.callIDs.contains($0.id) }
+                        if !calls.isEmpty { StoredToolRunView(calls: calls) }
+                    }
+                    let loose = message.toolCalls.filter { !owned.contains($0.id) }
+                    if !loose.isEmpty { StoredToolRunView(calls: loose) }
+                }
+                .padding(.leading, 6)
             }
         }
     }
