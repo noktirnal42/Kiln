@@ -8,6 +8,7 @@ struct MessageBubble: View {
     var isStreaming = false
     /// Live thinking text while a reasoning model is still working on its answer.
     var liveReasoning = ""
+    @AppStorage(ToolSummaryStyle.defaultsKey) private var summaryStyleRaw = ToolSummaryStyle.sentence.rawValue
     @State private var showReasoning = false
     @State private var hovering = false
     @State private var editing = false
@@ -96,6 +97,22 @@ struct MessageBubble: View {
         VStack(alignment: .leading, spacing: 8) {
             if !reasoningText.isEmpty { reasoningView }
 
+            // Claude-style narrative: what the model said before each burst of tool calls, then that burst as one grey line.
+            // "How long it worked" folds the whole run into one line (below the reply); "What it did" keeps the narrative.
+            if !(summaryStyleRaw == ToolSummaryStyle.worked.rawValue && !isStreaming) {
+            ForEach(Array(message.segments.enumerated()), id: \.offset) { _, segment in
+                if !segment.text.isEmpty {
+                    MarkdownBlockView(text: segment.text)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if !isStreaming {
+                    let calls = message.toolCalls.filter { segment.callIDs.contains($0.id) }
+                    if !calls.isEmpty { StoredToolRunView(calls: calls) }
+                }
+            }
+            }
+
             if !message.content.isEmpty {
                 if !isStreaming, ToolPhrase.looksLikeToolCallText(message.content) {
                     ToolCallTextNotice(text: message.content, retry: { Task { await session.regenerate() } })
@@ -128,8 +145,13 @@ struct MessageBubble: View {
 
             if isStreaming { ThinkingDots(label: message.content.isEmpty && reasoningText.isEmpty ? "Working" : nil) }
 
-            if !message.toolCalls.isEmpty {
-                StoredToolRunView(calls: message.toolCalls, seconds: workedSeconds)
+            if summaryStyleRaw == ToolSummaryStyle.worked.rawValue && !isStreaming {
+                if !message.toolCalls.isEmpty { StoredToolRunView(calls: message.toolCalls, seconds: workedSeconds) }
+            } else {
+                // Calls no segment owns (replies saved before segments existed, or a stream still running).
+                let owned = Set(message.segments.flatMap(\.callIDs))
+                let loose = message.toolCalls.filter { !owned.contains($0.id) }
+                if !loose.isEmpty && (!isStreaming || message.segments.isEmpty) { StoredToolRunView(calls: loose) }
             }
 
             if !isStreaming { actionRow }

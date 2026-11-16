@@ -2,10 +2,11 @@ import Foundation
 import Observation
 
 enum HistoryBucket: Int, CaseIterable {
-    case today, yesterday, previousWeek, older
+    case pinned, today, yesterday, previousWeek, older
 
     var title: String {
         switch self {
+        case .pinned: "Pinned"
         case .today: "Today"
         case .yesterday: "Yesterday"
         case .previousWeek: "Previous 7 days"
@@ -31,8 +32,8 @@ enum HistoryGrouping {
     /// yet (it is just "New chat" waiting for its first message), so it is hidden unless it is the open one.
     static func group(_ items: [ConversationSummary], openID: UUID?, now: Date = Date(),
                       calendar: Calendar = .current) -> [(bucket: HistoryBucket, items: [ConversationSummary])] {
-        let visible = items.filter { $0.messageCount > 0 || $0.id == openID }
-        let byBucket = Dictionary(grouping: visible) { bucket(for: $0.updatedAt, now: now, calendar: calendar) }
+        let visible = items.filter { !$0.isArchived && ($0.messageCount > 0 || $0.id == openID) }
+        let byBucket = Dictionary(grouping: visible) { $0.isPinned ? HistoryBucket.pinned : bucket(for: $0.updatedAt, now: now, calendar: calendar) }
         return HistoryBucket.allCases.compactMap { bucket in
             guard let rows = byBucket[bucket], !rows.isEmpty else { return nil }
             return (bucket, rows.sorted { $0.updatedAt > $1.updatedAt })

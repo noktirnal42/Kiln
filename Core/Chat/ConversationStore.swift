@@ -8,8 +8,12 @@ public struct ConversationSummary: Identifiable, Equatable, Sendable {
     public var createdAt: Date
     public var updatedAt: Date
     public var messageCount: Int
+    public var isPinned: Bool
+    public var isArchived: Bool
 
-    public init(id: UUID, title: String, modelID: String?, createdAt: Date, updatedAt: Date, messageCount: Int) {
+    public init(id: UUID, title: String, modelID: String?, createdAt: Date, updatedAt: Date, messageCount: Int, isPinned: Bool = false, isArchived: Bool = false) {
+        self.isPinned = isPinned
+        self.isArchived = isArchived
         self.id = id
         self.title = title
         self.modelID = modelID
@@ -30,6 +34,8 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
     public var images: [ChatImage]
     public var modelID: String?
     public var createdAt: Date
+    /// Narrative text and the tool calls after it, one per tool round, in order. Empty for replies saved before this existed.
+    public var segments: [ReplySegment]
 
     public init(
         id: UUID,
@@ -41,7 +47,8 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
         toolCalls: [ToolCall] = [],
         images: [ChatImage] = [],
         modelID: String? = nil,
-        createdAt: Date
+        createdAt: Date,
+        segments: [ReplySegment] = []
     ) {
         self.id = id
         self.role = role
@@ -53,7 +60,33 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
         self.images = images
         self.modelID = modelID
         self.createdAt = createdAt
+        self.segments = segments
     }
+}
+
+/// One round of an agent run: what the model said before it called tools, and the calls it made (by id).
+public struct ReplySegment: Codable, Equatable, Sendable {
+    public var text: String
+    public var callIDs: [String]
+    public init(text: String, callIDs: [String]) { self.text = text; self.callIDs = callIDs }
+}
+
+/// Collects the rounds of a run as it streams: the text the model wrote in a round and the calls it made.
+public struct ReplySegmenter: Sendable {
+    public private(set) var segments: [ReplySegment] = []
+    private var calls: [String] = []
+    public init() {}
+
+    public mutating func callStarted(_ id: String) { if !calls.contains(id) { calls.append(id) } }
+
+    /// The current round ends (the next one starts, or the run is over). A round with no calls is the final reply, not a segment.
+    public mutating func roundEnded(text: String) {
+        defer { calls = [] }
+        guard !calls.isEmpty else { return }
+        segments.append(ReplySegment(text: text.trimmingCharacters(in: .whitespacesAndNewlines), callIDs: calls))
+    }
+
+    public var hasOpenRound: Bool { !calls.isEmpty }
 }
 
 public struct MessagePage: Equatable, Sendable {
@@ -103,6 +136,34 @@ public actor ConversationStore {
         conversation.title = title
         if touch { conversation.updatedAt = Date() }
         try context.save()
+    }
+
+    public func setPinned(_ id: UUID, _ pinned: Bool) throws {
+        guard let conversation = try Self.fetchConversation(id, in: context) else { return }
+        conversation.isPinned = pinned
+        try context.save()
+    }
+
+    public func setArchived(_ id: UUID, _ archived: Bool) throws {
+        guard let conversation = try Self.fetchConversation(id, in: context) else { return }
+        conversation.isArchived = archived
+        if archived { conversation.isPinned = false }
+        try context.save()
+    }
+
+    /// Conversations whose title or any message contains the text (case and accent insensitive), newest first.
+    public func search(_ text: String, limit: Int = 100) throws -> [ConversationSummary] {
+        let needle = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return [] }
+        var byTitle = FetchDescriptor<Conversation>(predicate: #Predicate { $0.title.localizedStandardContains(needle) })
+        byTitle.fetchLimit = limit
+        var found = try context.fetch(byTitle)
+        var byMessage = FetchDescriptor<Message>(predicate: #Predicate { $0.content.localizedStandardContains(needle) })
+        byMessage.fetchLimit = 400
+        for message in try context.fetch(byMessage) {
+            if let conversation = message.conversation, !found.contains(where: { $0.id == conversation.id }) { found.append(conversation) }
+        }
+        return found.sorted { $0.updatedAt > $1.updatedAt }.prefix(limit).map(Self.summary(of:))
     }
 
     public func setConversationModel(_ id: UUID, modelID: String?) throws {
@@ -170,9 +231,21 @@ public actor ConversationStore {
         tokenCount: Int = 0,
         toolCalls: [ToolCall] = [],
         modelID: String? = nil,
-        images: [ChatImage] = []
+        images: [ChatImage] = [],
+        segments: [ReplySegment] = []
     ) throws -> MessageSnapshot? {
-        try appendMessages(conversationID: conversationID, items: [(role, content, reasoning, tokenCount, toolCalls, modelID)], imagePayloads: [images]).first
+        guard let saved = try appendMessages(conversationID: conversationID, items: [(role, content, reasoning, tokenCount, toolCalls, modelID)], imagePayloads: [images]).first else { return nil }
+        guard !segments.isEmpty else { return saved }
+        return try setSegments(saved.id, segments) ?? saved
+    }
+
+    /// Stores the per-round narrative of a reply and returns the updated snapshot.
+    @discardableResult
+    public func setSegments(_ id: UUID, _ segments: [ReplySegment]) throws -> MessageSnapshot? {
+        guard let message = try Self.fetchMessage(id, in: context) else { return nil }
+        message.segmentsJSON = segments.isEmpty ? nil : try JSONEncoder().encode(segments)
+        try context.save()
+        return try Self.snapshot(of: message)
     }
 
     /// Bulk append: one fetch and one save regardless of item count.
@@ -245,7 +318,9 @@ public actor ConversationStore {
             modelID: conversation.modelID,
             createdAt: conversation.createdAt,
             updatedAt: conversation.updatedAt,
-            messageCount: conversation.messages.count
+            messageCount: conversation.messages.count,
+            isPinned: conversation.isPinned,
+            isArchived: conversation.isArchived
         )
     }
 
@@ -263,7 +338,8 @@ public actor ConversationStore {
             toolCalls: toolCalls,
             images: images,
             modelID: message.modelID,
-            createdAt: message.createdAt
+            createdAt: message.createdAt,
+            segments: message.segmentsJSON.flatMap { try? JSONDecoder().decode([ReplySegment].self, from: $0) } ?? []
         )
     }
 }

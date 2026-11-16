@@ -144,3 +144,26 @@ behind `DeviceService.Input` that prefers `idb ui tap/swipe/text` when `idb_comp
 - `huihui_ai/qwen3.5-abliterated:9b` is installed and makes real structured tool calls (checked with `Scripts/test-ollama-tools.sh`).
 - **Not done:** security models (`foundation-sec-abliterated:8b`, `baronllm-abliterated:8b`) could not be pulled, the external model drive is full (1.6 GB free). Owner decides which old models to remove; the audit and commands are in `docs/32-LOCAL-MODELS.md`.
 - **Not seen on screen:** the live status line, the task-list card and the new model in the picker; the screen was locked during the last session, so screenshots failed. Re-check once the screen is unlocked (select the qwen3.5 model, run a multi-tool task).
+
+## Session 2026-11-15 (continuing the handoff; branch `codex/kiln-qa-completion`, merged with `origin/main`)
+
+**Read this first.** The handoff was written before `origin/main` gained 109 commits from other sessions. Main already has several of the handoff's todo items, so this session's own versions of them were **dropped in the merge** and are not described as shipped here:
+
+- Round limit as a setting with a Keep going button (`AgentRoundLimits`, `continuePausedRun`): main's version is kept; mine (`RoundLimit`, `0921391`) was reverted.
+- Codex-style "Worked for 42s" next to the sentence summary (`ToolSummaryStyle`, Settings → "Finished steps in chat"): main's version is kept; mine (`RunSummaryStyle`) was removed.
+- File-name chips that open the editor, edit-and-resend of a message, and images as pixels for vision models (`ChatImage`) are on main; they were not rebuilt.
+
+**What this branch adds on top of main** (each with unit tests; the full suite passed before the merge, and again after it, see the end of this section):
+
+| Item | State |
+|---|---|
+| Per-round narrative | Each reply stores what the model said before each burst of tool calls (`Message.segmentsJSON`, optional, lightweight migration) and the thread shows it between the grey tool lines (in the "What it did" style; the "How long it worked" style still folds the run into one line). **Seen on screen before the merge**, live and after saving, with a real tool-using run. The merge changed how it is combined with main's summary styles; that combination has not been seen. |
+| Maps | GPX 1.1 import and export are real (no overwrite, 10 MB cap, KML not supported); offline download now says it is not available (it used to claim success); flyover switches to realistic imagery (Apple's Flyover tours are not available to apps); directions take a mode and return alternatives with distance, time and arrival, with a route switcher in the Directions sheet; transit mode was unreachable from the tool and is fixed. 9 tests. **UI not seen.** |
+| Thread management | Pin, archive, rename (without reordering history) and search across titles and message text in the store and session; the sidebar has a Pinned group, an Archived section and row menu entries. 7 tests. **Sidebar not seen; no search box in the sidebar yet.** |
+
+**Seen on screen (pre-merge Debug build, local `qwen3.5-abliterated:9b`, real model in the status bar):** Shift+Return makes a line break and does not send (raw key input; not typed on the physical keyboard); the narrative lines, the live "Working 3m 33s" status line, the approval card for a shell command (denied; "Always Allow" not used), the 60 s slow-reply hint, and the honest no-answer notice after Stop; model capabilities read from Ollama in the picker. A test conversation was created and deleted through Sessions.
+**Not seen:** sidebar Pin/Rename/Archive (the automation cannot open context menus), the Maps Directions sheet, the task-list card (the model never called `kiln_todo_write`), anything after the merge with main.
+
+Still open from the handoff todo: tables and math, the dismissible banner above the composer (item 1); a real-keystroke pass over doc 30's parity table (item 3); the layout rework: title-bar icon row, Canvas, Swarm folded into chat, native menu bar and Help (item 4; main has a toolbar and Work menu already, the rest is open); Maps place card, Look Around, suggestions, collections (item 5); `@symbol/@page/@device`, steering a running agent, background runs, PR/CI flow, push-to-talk (item 6); Develop and Analyze debugger UIs on screen and a tool-calling model for the task-list card (item 7).
+
+Build note: builds failed with "Unable to resolve module dependency: SwiftSyntax" for `MLXHuggingFaceMacros` until the empty `SourcePackages/prebuilts/swift-syntax/603.0.2/.../Modules` folder in the derived data folder was refilled from a good copy (the download had been cut off while the disk was almost full). `/private/tmp/claude-501/build-pol` (2.3 GB, unused) was removed to make room; nothing in Xcode's DerivedData was deleted. The tests leave a few `kiln.tests.*` preference files behind (the preferences daemon rewrites them); delete them by pattern.

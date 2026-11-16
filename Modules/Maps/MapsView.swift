@@ -7,6 +7,7 @@ struct MapsView: View {
     @State private var showDirections = false
     @State private var destination = ""
     @State private var directionText = ""
+    @State private var routeMode: MapsState.RouteMode = .automobile
     @State private var routing = false
     @State private var showWeather = false
     var body: some View {
@@ -87,13 +88,25 @@ struct MapsView: View {
         .sheet(isPresented: $showWeather) { WeatherSheet(latitude: state.latitude, longitude: state.longitude) { showWeather = false } }
         .sheet(isPresented: $showDirections) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack { Text("Driving directions").font(.headline); Spacer(); Button("Done") { showDirections = false }.keyboardShortcut(.cancelAction) }
+                HStack { Text("Directions").font(.headline)
+                    Picker("", selection: $routeMode) { Text("Drive").tag(MapsState.RouteMode.automobile); Text("Walk").tag(MapsState.RouteMode.walking); Text("Cycle").tag(MapsState.RouteMode.cycling); Text("Transit").tag(MapsState.RouteMode.transit) }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    Spacer(); Button("Done") { showDirections = false }.keyboardShortcut(.cancelAction) }
                 Text("Starting point: the current map center. Search for a destination below.").font(.caption).foregroundStyle(.secondary)
                 HStack {
                     TextField("Destination or address", text: $destination).textFieldStyle(.roundedBorder)
                     Button(routing ? "Finding…" : "Get directions") { calculateDirections() }.disabled(destination.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || routing)
                 }
                 if routing { ProgressView() }
+                if state.routes.count > 1 {
+                    HStack {
+                        ForEach(Array(state.routes.enumerated()), id: \.offset) { index, route in
+                            let summary = MapsState.summary(route)
+                            Button("Route \(index + 1) · \(summary.durationText) · \(summary.distanceText)") { state.selectRoute(index) }
+                                .buttonStyle(.bordered).tint(index == state.selectedRouteIndex ? .accentColor : .secondary)
+                        }
+                    }
+                }
                 ScrollView { Text(directionText.isEmpty ? "The route and its turn-by-turn instructions will appear here." : directionText).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .topLeading) }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }.padding(16).frame(width: 560, height: 400)
         }
@@ -106,7 +119,7 @@ struct MapsView: View {
             do {
                 let places = try await state.places(destination)
                 guard let place = places.first else { directionText = "No destination found. Try a more specific address."; return }
-                directionText = "Destination: \(place.name) (\(place.latitude), \(place.longitude))\n\n" + (try await state.directions(latitude: place.latitude, longitude: place.longitude))
+                directionText = "Destination: \(place.name) (\(place.latitude), \(place.longitude))\n\n" + (try await state.directions(latitude: place.latitude, longitude: place.longitude, routeMode: routeMode, alternatives: true))
             } catch { directionText = error.localizedDescription }
         }
     }
@@ -143,7 +156,7 @@ struct MapCanvas: NSViewRepresentable {
             view.removeAnnotations(view.annotations)
             for pin in state.pins { let point = MKPointAnnotation(); point.title = pin.name; point.coordinate = CLLocationCoordinate2D(latitude: pin.latitude, longitude: pin.longitude); view.addAnnotation(point) }
             if let old = coordinator.routeOverlay { view.removeOverlay(old) }
-            coordinator.routeOverlay = state.route?.polyline
+            coordinator.routeOverlay = state.route?.polyline ?? (state.track.count > 1 ? MKPolyline(coordinates: state.track, count: state.track.count) : nil)
             if let line = coordinator.routeOverlay { view.addOverlay(line); view.setVisibleMapRect(line.boundingMapRect, edgePadding: NSEdgeInsets(top: 40, left: 40, bottom: 40, right: 40), animated: true) }
         }
         if coordinator.layer != state.layer {
@@ -153,6 +166,7 @@ struct MapCanvas: NSViewRepresentable {
             case "satellite": view.preferredConfiguration = MKImageryMapConfiguration(elevationStyle: .flat)
             case "hybrid": view.preferredConfiguration = MKHybridMapConfiguration(elevationStyle: .flat)
             case "terrain": view.preferredConfiguration = MKStandardMapConfiguration(elevationStyle: .realistic)
+            case "flyover": view.preferredConfiguration = MKImageryMapConfiguration(elevationStyle: .realistic)
             default: view.preferredConfiguration = MKStandardMapConfiguration(elevationStyle: .flat)
             }
             if state.layer == "usgs_topo" {

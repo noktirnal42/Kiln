@@ -132,7 +132,7 @@ struct RunDiffCardView: View {
                     HStack(spacing: 6) {
                         Image(systemName: expanded.contains(file.path) ? "chevron.down" : "chevron.right").font(.system(size: 9)).foregroundStyle(.tertiary).frame(width: 10)
                         Image(systemName: symbol(file.change)).font(.system(size: 10)).foregroundStyle(tint(file.change))
-                        Text(file.path).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.head)
+                        Text(file.path).font(.system(size: 12, design: .monospaced)).lineLimit(1).truncationMode(.middle)
                         if file.summaryOnly { Text("binary or large").font(SSTypography.caption()).foregroundStyle(.tertiary) }
                         Spacer(minLength: 4)
                         Text("+\(file.additions)").font(.system(size: 11, design: .monospaced)).foregroundStyle(SSColor.success)

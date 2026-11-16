@@ -130,6 +130,8 @@ public final class ChatSession {
     }
     public private(set) var lastTiming: ResponseTiming?
     public private(set) var streamingToolCalls: [ToolCall] = []
+    /// Rounds of the running agent turn that are already finished: their narrative text and the calls that followed it.
+    public private(set) var liveSegments: [ReplySegment] = []
     public private(set) var errorText: String?
     /// Set by a file chip in the thread; the window opens the file in the editor and clears nothing (each request has its own id).
     public var fileOpenRequest: FileOpenRequest?
@@ -657,6 +659,30 @@ public final class ChatSession {
         (try? await conversations.conversations()) ?? []
     }
 
+    public func setPinned(_ id: UUID, _ pinned: Bool) async {
+        try? await conversations.setPinned(id, pinned)
+        conversationListGeneration += 1
+        await platformAudit.record(pinned ? "thread.pinned" : "thread.unpinned", ["conversation": .string(id.uuidString)])
+    }
+
+    public func setArchived(_ id: UUID, _ archived: Bool) async {
+        try? await conversations.setArchived(id, archived)
+        conversationListGeneration += 1
+        await platformAudit.record(archived ? "thread.archived" : "thread.unarchived", ["conversation": .string(id.uuidString)])
+    }
+
+    public func renameConversation(_ id: UUID, to title: String) async {
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return }
+        try? await conversations.renameConversation(id, to: clean, touch: false)
+        if conversationID == id { conversationTitle = clean }
+        conversationListGeneration += 1
+    }
+
+    public func searchConversations(_ text: String) async -> [ConversationSummary] {
+        (try? await conversations.search(text)) ?? []
+    }
+
     public func fork(at messageID: UUID) async {
         guard let conversationID else { return }
         do {
@@ -1004,6 +1030,7 @@ public final class ChatSession {
             var finalText = ""
             var tokens = 0
             var firstTokenAt: Date?
+            var segmenter = ReplySegmenter()
             let stream = orchestrator.run(
                 profile: profile, prompt: prompt, history: history, workspaceRoot: root, contextWindow: window, roundLimit: roundLimit, stop: stop, hooks: hooks, checkpoint: recorder, budgetGate: gate?.isActive == true ? gate : nil,
                 chat: { request in try await registry.streamChat(request, reasoning: reasoning) }
@@ -1019,7 +1046,11 @@ public final class ChatSession {
                     case .reasoningDelta(let thinking):
                         if firstTokenAt == nil { firstTokenAt = Date() }
                         self.streamingReasoning += thinking
-                    case .roundStarted(let round): self.agentRound = round; self.streamingText = ""; self.streamingReasoning = ""
+                    case .roundStarted(let round):
+                        segmenter.roundEnded(text: self.streamingText)
+                        self.liveSegments = segmenter.segments
+                        self.agentRound = round; self.streamingText = ""; self.streamingReasoning = ""
+                    case .toolCallStarted(let record): segmenter.callStarted(record.callID.isEmpty ? record.id.uuidString : record.callID)
                     case .retryScheduled(let attempt, let delay, let reason):
                         self.agentNotice = "Retrying (\(attempt)) in \(Int(delay))s: \(reason)"
                     case .policyDenied(let tool, _, let reason): self.agentNotice = "\(tool) was blocked: \(reason)"
@@ -1067,6 +1098,10 @@ public final class ChatSession {
                     self.agentActivity[index].status = .cancelled
                 }
             }
+            // A run that ended on a tool round (paused, stopped): that round's text belongs to its segment, not to the reply.
+            if segmenter.hasOpenRound { segmenter.roundEnded(text: finalText.isEmpty ? "" : (self?.streamingText ?? "")) }
+            let segments = segmenter.segments
+            self?.liveSegments = []
             if finalText.isEmpty { finalText = self?.streamingText ?? "" }
             // A run that ends without a word would otherwise leave no reply at all: say what happened, without claiming success.
             if finalText.isEmpty, let self, self.errorText == nil, !self.agentActivity.isEmpty {
@@ -1074,7 +1109,7 @@ public final class ChatSession {
             }
             if !finalText.isEmpty, let saved = try? await store.appendMessage(
                 conversationID: conversationID, role: .assistant, content: finalText,
-                reasoning: nil, tokenCount: tokens, toolCalls: self?.finishedToolCalls() ?? [], modelID: model
+                reasoning: nil, tokenCount: tokens, toolCalls: self?.finishedToolCalls() ?? [], modelID: model, segments: segments
             ) {
                 self?.messages.append(saved)
             }

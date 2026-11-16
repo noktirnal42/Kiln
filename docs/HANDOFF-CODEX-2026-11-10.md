@@ -62,3 +62,12 @@ Task-list card, live status line, Shift+Return in the running app, drop of a fil
 
 - Local model audit and capability detection: see `docs/32-LOCAL-MODELS.md` and the last section of `docs/LEFTOVERS-2026-11-10.md`. `Scripts/test-ollama-tools.sh <model>` checks structured tool calling.
 - Blocked: the external model drive is full (pulls fail), and GUI verification of the live status line and task card is pending an unlocked screen.
+
+
+## Update 2026-11-15 (Claude, continuing on the same branch)
+
+- **Check `origin/main` before starting any todo item:** it gained 109 commits from other sessions after this handoff and already has the round-limit setting with Keep going, the "Worked for" summary style, file-name chips, edit-and-resend and image pixels. This branch was merged with it and its duplicates dropped.
+- This branch adds, with tests: per-round narrative between tool lines (seen on screen before the merge), Maps GPX import/export, route alternatives with ETA and honest offline/flyover tools, and thread pin/archive/rename/search. Details and what was seen are in the last section of `docs/LEFTOVERS-2026-11-10.md`.
+- Still to check on screen after the merge: the narrative in both summary styles, sidebar pin/archive/rename, the Maps Directions sheet. Run `pgrep -fl "Contents/MacOS/Kiln"` and confirm a real model first.
+- If a build fails with a SwiftSyntax module error, look for an empty `SourcePackages/prebuilts/swift-syntax/*/*MacroSupport/Modules` in the derived data folder (see the leftovers note).
+- Not started: the layout rework (item 4: Canvas, Swarm in chat, native menu bar and Help), Look Around and the place card, steering a running agent.

@@ -8,6 +8,9 @@ struct WorkstationSidebar: View {
     var chatVisible = false
     @Environment(AppModel.self) private var app
     @State private var history = ChatHistoryModel()
+    @State private var renaming: ConversationSummary?
+    @State private var renameText = ""
+    @State private var showArchived = false
 
     private struct RefreshKey: Hashable {
         var conversation: UUID?
@@ -117,6 +120,21 @@ struct WorkstationSidebar: View {
                 ForEach(group.items) { item in chatRow(item) }
             }
         }
+        let archived = history.items.filter(\.isArchived)
+        if !archived.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                Button { withAnimation(.easeOut(duration: 0.12)) { showArchived.toggle() } } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: showArchived ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
+                        Text("Archived (\(archived.count))").font(SSTypography.caption())
+                        Spacer()
+                    }
+                    .foregroundStyle(.tertiary).padding(.horizontal, SSSpacing.s).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                if showArchived { ForEach(archived) { item in chatRow(item) } }
+            }
+        }
     }
 
     private func chatRow(_ item: ConversationSummary) -> some View {
@@ -138,7 +156,19 @@ struct WorkstationSidebar: View {
         .help(item.title)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .contextMenu {
+            Button(item.isPinned ? "Unpin" : "Pin") { Task { await app.chatSession?.setPinned(item.id, !item.isPinned) } }
+            Button("Rename…") { renameText = item.title; renaming = item }
+            Button(item.isArchived ? "Unarchive" : "Archive") { Task { await app.chatSession?.setArchived(item.id, !item.isArchived) } }
+            Divider()
             Button("Delete", role: .destructive) { Task { await app.chatSession?.deleteConversation(item.id) } }
+        }
+        .overlay(alignment: .trailing) {
+            if item.isPinned { Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(.tertiary).padding(.trailing, 6).allowsHitTesting(false) }
+        }
+        .alert("Rename conversation", isPresented: Binding(get: { renaming?.id == item.id }, set: { if !$0 { renaming = nil } })) {
+            TextField("Title", text: $renameText)
+            Button("Rename") { Task { await app.chatSession?.renameConversation(item.id, to: renameText) }; renaming = nil }
+            Button("Cancel", role: .cancel) { renaming = nil }
         }
     }
 

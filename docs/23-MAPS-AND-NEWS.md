@@ -21,3 +21,11 @@ News uses the user's ModernReader RSSReaderCore and its full curated source dire
 Agent/MCP tools `news_directory`, `news_subscriptions`, and `news_articles` read existing state; `news_subscribe` and `news_unsubscribe` write subscriptions; `news_refresh` fetches one source or all subscriptions; `news_articles` supports text, source, topic and date-order filtering. Writes and network actions use existing approval policy. Feed content and remote metadata are untrusted, and feed-host requests may disclose the user's IP address. Sources are not individually verified current merely because they appear in the directory.
 
 The activity is a first integration, not parity with every ModernReader feature. Test real sources, unreachable and malformed feeds, selection during refresh, privacy and full agent/MCP execution before claiming end-to-end coverage.
+
+
+## Update 2026-11-15: routes, GPX and honest limits
+
+- Directions take a mode (drive, walk, cycle, transit) and can return alternative routes with distance, time, arrival time and steps; the Directions sheet has a mode picker and a route switcher, and `maps_directions` / `maps_select_route` do the same for agents. Transit through MapKit may give little detail on macOS.
+- GPX 1.1 import and export work (`maps_import_gpx`, `maps_export_gpx`): waypoints become pins, the first track or route is drawn, export writes pins and the shown route to a new `.gpx` file and refuses to overwrite one. KML is not supported; files over 10 MB are refused.
+- `maps_flyover` switches the map to realistic 3D imagery; Apple's Flyover tours are not available to apps. `maps_offline_download` now says plainly that MapKit has no public offline-maps API (it used to report an initiated download that never happened). Indoor maps, hours, photos and ratings are likewise not public APIs.
+- **Evidence:** unit tests cover GPX parsing and round trip, route summaries, import/export and the tool answers (9 Maps tests). **Not seen on screen:** the new Directions sheet controls and an imported track.
