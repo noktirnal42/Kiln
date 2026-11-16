@@ -26,6 +26,23 @@ Kiln can run commands, edit files, call providers, inspect binaries and serve an
 
 Provider requests send prompts, selected context and tool results to the provider you chose. Local providers (Ollama, MLX, Apple Foundation Models on-device) keep them on the Mac. Kiln itself has no account and no telemetry service described in the repository documents.
 
+## Permissions for mail, contacts, messages, Slack, calendar, notes and drives (development builds)
+
+These activities are in the current source and not in the published preview, and none has been tried with real data. Each asks macOS for its own permission, and Kiln does not ask for any of them until you press the matching Allow button.
+
+- **Mail:** account passwords are stored in the macOS Keychain, never in preferences or logs. Kiln connects over TLS only (plain connections are accepted only for localhost). Sending needs an explicit Send in the window, or your approval of an agent's exact recipients and subject.
+- **Contacts:** read-only. Kiln never creates, edits or deletes contacts.
+- **Calendar and Reminders:** read, and add an event or reminder after approval. Nothing is edited or deleted.
+- **Messages:** reading your conversations needs Full Disk Access for Kiln (macOS has no lighter permission for this), and sending needs Automation permission to control the Messages app. Apple documents no supported interface for either, so a macOS update can break them. Nothing is uploaded.
+- **Slack:** a token you paste (a Slack bot or user token) is kept in the macOS Keychain, checked with Slack before it is saved, never shown again and never given to a model; Disconnect forgets it. Kiln posts only after you press Send or approve an agent's exact message, and refuses whole-channel mentions. A user token can read everything you can; a bot token only sees channels it was invited to.
+- **Cloud Drives:** Kiln reads the folders the provider apps already sync to this Mac and never signs in to a cloud service or handles a token. Copies never overwrite, and saving into a drive needs your approval.
+- **Notes:** reads and adds notes by asking the Notes app, which needs Automation permission for Notes. Kiln never edits or deletes notes and cannot read locked ones.
+- **GitHub:** read-only, through the `gh` sign-in already on your Mac. Kiln never sees the token.
+- **Notifications:** Kiln sends system notifications for approvals, finished runs and scheduled tasks, and the agent can send you one (`notify_user`, labelled "Kiln agent:", plain text, at most 5 in 10 minutes). Each kind can be turned off in Settings → Notifications. Kiln cannot read other apps' notifications. Reading whether a Focus is on is optional, asks macOS first, and is only a hint.
+- **Links, Services and Sharing:** `kiln://ask` and `kiln://share` links, the Services entry and the Share extension only add text to the message box, after anything you are typing, and never send it: a link can be opened by any web page or app. The menu-bar field, which you type into yourself, is the only thing that sends at once, and tool approvals still appear in Kiln.
+- **Spotlight:** off by default. If you choose Titles only, or Titles and text (secrets redacted, tool output skipped), Kiln adds conversations to the system Spotlight index; choosing Off removes everything it added.
+- **Untrusted text:** mail, texts, notes, calendar entries and GitHub text come from other people. Kiln labels them untrusted for agents, and sending or creating anything still needs your approval.
+
 ## Privacy do's
 
 - Keep keys in Settings; never in source, screenshots or issues.

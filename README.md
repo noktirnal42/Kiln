@@ -11,16 +11,36 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 
 ## Contents
 
-[What Kiln is](#what-kiln-is) · [Screenshots](#screenshots) · [The ten activities](#the-ten-activities) · [Agent and MCP integration](#agent-and-mcp-integration) · [Providers](#providers) · [Safety model](#safety-model) · [Install](#install) · [Build from source](#build-from-source) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
+[What Kiln is](#what-kiln-is) · [What's new](#whats-new) · [Screenshots](#screenshots) · [Activities](#activities) · [Agent and MCP integration](#agent-and-mcp-integration) · [Providers](#providers) · [Safety model](#safety-model) · [Install](#install) · [Build from source](#build-from-source) · [Documentation](#documentation) · [Roadmap](#roadmap) · [Contributing](#contributing) · [License](#license)
 
 ## What Kiln is
 
 - **One window, one conversation.** Chat opens in the center; Browser, Maps, Devices, Media and News can appear beside it on wider windows. Develop and Analyze keep a larger workspace with a compact chat panel. The sidebar provides projects, conversations and scheduled tasks; the toolbar and Work menu open activities.
-- **Agents with real tools.** File, shell, Git, reverse-engineering, Model Lab, browser, device, media and (opt-in) computer-use tools run through shared services, policy gates and approvals.
+- **Agents with real tools.** More than 200 tools (file, shell, Git, development, reverse-engineering, Model Lab, browser, device, media, maps, news, mail, messages, calendar, notes, drives, research, GitHub and opt-in computer use) run through shared services, policy gates and approvals. To save context, a run starts with the basics and the agent loads the rest by asking (`kiln_tool_search`).
 - **Bring your models.** Apple Foundation Models, MLX, Ollama (local and cloud), NVIDIA NIM, OpenRouter and any OpenAI-compatible endpoint, with keys in the macOS Keychain.
 - **Supervised by design.** Ask, Auto and Bypass approval modes, a behavior monitor, tripwires and a hash-chained audit log you can verify from the app.
 - **Take it with you.** Talk to the agent, hear replies, and approve tool calls from an iPhone or Apple Watch companion (built from source) over an encrypted link.
 - **Open.** Specifications, implementation and tests are in this repository.
+
+## What's new
+
+Built on `main` since the 0.2.0 preview; each item says what was seen on screen.
+
+<table>
+<tr>
+<td width="50%"><img src="site/assets/shots/maps-radar.jpg" alt="Kiln's Maps activity over Syracuse, New York with NOAA radar on: light echoes drawn over the map, a play button and time scrubber, an opacity slider, a colour legend and the source line" width="100%"></td>
+<td width="50%"><img src="site/assets/shots/theme-violet.jpg" alt="Kiln's chat window in the Violet theme with a serif font: purple accents and tinted panels" width="100%"></td>
+</tr>
+<tr>
+<td><sub><strong>Weather and radar.</strong> A Radar button on Maps shows NOAA's radar for the contiguous US with a two-hour loop, opacity and a legend, and a Weather sheet gives a US forecast and alerts. Seen: both on screen (debug build, light echoes only).</sub></td>
+<td><sub><strong>Themes.</strong> Seven built-in themes and your own saved ones: colours for dark and light, font design and text size, in Settings → Theme. Seen: switching, the editor, and a saved theme returning after a restart. Light mode not checked.</sub></td>
+</tr>
+</table>
+
+- **Models you manage.** An "Add or remove local models" sheet in the model picker downloads, tracks and removes Ollama models, with `models_*` agent tools that need approval. Seen: the sheet listing real models; a real download has not been tried. MLX and Hugging Face downloads are still to come.
+- **Reach Kiln from anywhere.** An optional menu-bar quick-ask, `kiln://` links, a Services entry and a Share extension that only add text to the message box and never send it; run-finished notifications with Focus awareness. Partly seen: links and the Settings card; the menu-bar icon and Share extension are not yet.
+- **Slack, and calmer chat.** A Slack activity (a token you create and paste yourself), reasoning options that follow each model, tools that load on demand to save context, and a decluttered chat bar. Seen: the bar and reasoning button; Slack has never been connected.
+- **Fixes you would notice.** The menu-bar toggle no longer crashes, Maps asks macOS for location permission and has its button back, the browser asks before a page uses the microphone, and the context meter agrees during and between runs.
 
 ## Screenshots
 
@@ -33,25 +53,34 @@ Kiln is a native macOS workstation, written in Swift and SwiftUI, where an AI ag
 <p align="center"><img src="site/assets/shots/iphone-approval.png" width="260" alt="Kiln Remote on iPhone showing a pending tool approval with Allow once and Deny buttons"></p>
 <p align="center"><sub>Companion: an approval answered from the iPhone app (iOS Simulator capture).</sub></p>
 
-## The ten activities
+## Activities
 
 Activities have registry-defined shortcuts (⌘1 to ⌘9, then ⌘0), and the registry in [`Core/Registry/`](Core/Registry/) is the single place an activity is declared.
 
 | Shortcut | Activity | What it is for | Honest limits |
 |---|---|---|---|
-| ⌘1 | **Home** | Overview, a get-started checklist, tiles for each activity | Overview only |
-| ⌘2 | **Agent** | Chat with a model, with tools; compaction, context meter, voice | Small local models often fail tool use |
+| ⌘1 | **Home** | Overview, a get-started checklist, and a card for each activity grouped as Work, Communication, and Files and knowledge | Overview only |
+| ⌘2 | **Agent** | Chat with a model, with tools; compaction, a context meter, a per-model reasoning control, tools loaded on demand, edit and resend, file-name chips, voice | Small local models often fail tool use; on-demand tool loading was seen working with one hosted model |
 | ⌘3 | **Swarm** | Give a goal to a team of agents (planner, parallel workers, blockers, shared bus) | No top-level tool yet to create or cancel a run from the agent |
 | ⌘4 | **Develop** | Editor, terminal, Git, search, build/test/run, LLDB launch debugger, MCP servers and the Kiln MCP server | A capable editor, not Xcode: no previews, debugger attach or non-Swift/C language servers |
 | ⌘5 | **Analyze** | Reverse engineering: import, strings, Mach-O inspection, Ghidra and radare2 engines, decompiler, xrefs, crypto scan, package downloader | Ghidra is separate software you install; the cipher classifier is a placeholder |
 | ⌘6 | **Lab** | Datasets, models, experiments, Create ML and MLX training, LoRA, distillation, evaluation, export | Full GUI lifecycle and export coverage still open |
 | ⌘7 | **Audit** | What agents did, and whether the record is intact | Agents cannot yet query the audit record |
-| ⌘8 | **Browser** | Tabbed WebKit browser the agent can read and drive | Sign-in, autofill and passkeys are unverified; see [browser authentication](docs/18-BROWSER-AUTHENTICATION.md) |
+| ⌘8 | **Browser** | Tabbed WebKit browser the agent can read and drive; identifies itself as Safari, with fullscreen and click-free playback, so streaming sites accept it | Sign-in, autofill and passkeys are unverified; no cloud-gaming service has been confirmed to start yet, and voice chat in a game has no microphone prompt; see [browser authentication](docs/18-BROWSER-AUTHENTICATION.md) |
 | ⌘9 | **Devices** | iOS simulators and Android emulators: boot, view, install, launch, logs, record | Apple simulator input is not possible through `simctl`; Windows/Linux is design only |
 | ⌘0 | **Media** | Viewer for video, images and audio; text to speech, speech to text, image generation hooks | Image generation needs Apple Image Playground or a configured endpoint (endpoint path unverified) |
 | — | **Images** | Local SD-Turbo generation, history and model catalog; optional external engines | SDXL and external-engine generation remain unverified; see [Image Studio](docs/18-IMAGE-STUDIO.md) |
-| — | **Maps** | MapKit, USGS Topo, historical catalog, pins and driving directions | Development build; location and routes need live QA |
+| — | **Maps** | MapKit, USGS Topo, historical catalog, pins and driving directions; a Weather button and `weather_forecast` and `weather_alerts` tools for US places (National Weather Service: forecast, hourly and active alerts, with source and issue time); a Radar button with a time loop, opacity and legend, and a `maps_radar` tool (NOAA MRMS radar, contiguous US); a My Location button (macOS asks for permission the first time) | Development build; location and routes need live QA. Weather and radar cover the United States only; the Weather sheet and the radar layer have been seen on screen, the agent tools have not been run end to end |
 | — | **News** | ModernReader directory, subscriptions, combined stories and RSS/Atom/JSON feeds | Development build; subscriptions are local and entries are session-only |
+| — | **Mail** | Add an account with name, address and password (servers are found automatically and the sign-in is checked before saving), then read, reply and compose; agent tools to list and read | Development build; the empty state was seen on screen, but it has been tested only against scripted local servers, not a real provider. No offline cache, search or folder actions. Outlook.com, Microsoft 365 and STARTTLS-only providers need a browser sign-in or STARTTLS, which is not supported yet |
+| — | **Contacts** | Read-only lookup in your Contacts; completes addresses in Mail | Development build; tested with a fake contact list only, and not yet seen with real contacts. Needs your macOS permission |
+| — | **Messages** | Conversations from your Messages history, threads that refresh, and sending through the Messages app | Development build. Reading needs Full Disk Access and sending needs Automation permission; Apple documents neither interface, so macOS updates can break it. Sending goes to each conversation by its own id (iMessage, SMS and groups) and a failure is shown in red. Delivery cannot be confirmed. Tested against a fixture database and fake senders; no real text has been sent from it yet |
+| — | **Calendar** | Next 7 days of events and open reminders; agents can add an event or reminder after approval | Development build; reading events and reminders was seen working against real data in the installed build (2026-11-12), creating one has not been tried. No edit or delete |
+| — | **Research** | A library of sources with notes and tags, citations in APA, MLA and BibTeX, DOI lookup through Crossref, and a PDF reader that highlights and saves a new annotated copy | Development build; scanned PDFs have no text (no OCR); the empty library was seen on screen and a real DOI lookup was run, but the PDF reader's highlight and save buttons are not yet seen |
+| — | **Cloud Drives** | Browse and search the names of iCloud Drive, Google Drive, Dropbox and OneDrive folders that their own apps sync to this Mac; read text files; copy files in and out | Development build. Kiln never signs in to a cloud service; online-only files are not read; macOS may ask for folder access; the empty state was seen on screen, and no real drive folder has been browsed yet |
+| — | **Notes** | Recent notes, search, read, and add a new note in Apple Notes by driving the Notes app | Development build. Needs Automation permission; Apple documents no data API so it can change with macOS; creates only, never edits or deletes; locked notes cannot be read; the permission screen was seen on screen, and it has not been run against real notes |
+| — | **Slack** | Channels, direct messages and history of your Slack workspace, and posting with your approval, using a token you create in your own Slack app and paste into Kiln (kept in the Keychain, never shown again or given to a model) | Development build, tested only against a stub of the Slack API: not seen on screen and not tried against a real workspace. Polls every 15 seconds; no real-time events, search, files or reactions; refuses `@channel`, `@here` and `@everyone`; other chat services (Discord, Teams) are not built |
+| — | **GitHub** | Pull requests, CI runs and issues of the open project, read-only, through the `gh` sign-in already on your Mac | Development build; no comments, reviews or merges. Seen on screen in a folder that is not a repository, not yet against a live repository |
 
 Details for each are in the [wiki](https://github.com/noktirnal42/Kiln/wiki) (source in [`docs/wiki/`](docs/wiki/Activities.md)) and on the [website](https://noktirnal42.github.io/Kiln/activities.html).
 
@@ -63,10 +92,16 @@ See the [feature and Maps roadmap](docs/21-EVERYTHING-APP-ROADMAP.md) and [compe
 
 Application services are registered as ordinary tools with a declared permission level (read, write or execute). The in-app agent and Kiln's own MCP server use the same registry and gates.
 
-- **Agent profiles:** Research Assistant (read-only), Coding Agent, and Workstation Agent (adds `re_*`, `lab_*`, `browser_*`, `device_*`, `media_*` and others).
+- **Agent profiles:** Research Assistant (read-only), Coding Agent, and Workstation Agent (adds `re_*`, `lab_*`, `ide_*`, `browser_*`, `device_*`, `media_*` and the other module tools).
+- **Tools on demand:** when all tool definitions would use more than a tenth of the model's context window (they are about 21,000 tokens), a run starts with the file, search, shell, Git and web tools plus one tool, `kiln_tool_search`. The agent searches by what it needs ("email", "calendar") and the matching tools are added for the rest of the run; calling a tool that is not loaded loads it and returns its arguments. Permissions and approvals are unchanged. A window too small even for the basics is trimmed to fit. Swarm workers still get their tools up front.
 - **Kiln as an MCP server:** Develop → MCP → Start. Loopback only, bearer-token protected, with reads free and everything else waiting for approval in Kiln. External calls are audited as "External: <client>".
 - **Kiln as an MCP client:** it reads, never copies, MCP servers and skills already configured for Claude Code, Codex and OpenCode. Each imported server still needs "Approve & Connect".
-- **Tool families:** `re_*` (reverse engineering), `lab_*` (Model Lab), `browser_*`, `device_*`, `media_*`, `swarm_*`, Git, search, shell and file tools, `list_skills` / `read_skill`, and opt-in `computer_use`.
+- **Tool families:** `re_*` (reverse engineering), `lab_*` (Model Lab), `ide_*` (Develop), `browser_*`, `device_*`, `media_*`, `image_*`, `maps_*`, `news_*`, `swarm_*`, `kiln_*` (memory, commands, schedules, checkpoints, usage, round limit), Git, search, shell and file tools, `list_skills` / `read_skill`, and opt-in `computer_use`. Development builds add `mail_*`, `contacts_*`, `messages_*`, `calendar_*` / `reminders_*`, `notes_*`, `drive_*`, `pdf_*` / `library_*` and `github_*` and `slack_*`. Reading mail, messages, notes, Slack and calendar is gated by macOS permissions; sending a mail or text and creating a calendar event or note need your approval of the exact recipients and text, and text from other people is labelled untrusted.
+- **Notifications and Focus (Settings → Notifications):** Kiln tells you outside its window when an agent needs an approval, when a long run finishes, fails or pauses, and when a scheduled task finishes; you choose which, and a minimum run length. It holds the notices that can wait while a Focus is on and while Kiln is in front, and never reads other apps' notifications (macOS gives an app no view of them). Reading Focus status is optional, asks macOS first, and is experimental: developers report `isFocused` may read "off" without the Communication Notifications capability, which Kiln does not have. The agent has `notify_user` (a write, so it asks; labelled "Kiln agent:", plain text, at most 5 in 10 minutes) and `notifications_status`. Unit-tested with fakes, and the Settings card was seen on screen (2026-11-12); no real notification has been posted from a build yet and Focus has not been read.
+- **Themes:** seven built-in looks (Ember, Midnight, Forest, Violet, Rose, Graphite, Paper) and your own saved themes: Settings → Theme, duplicate any theme and change its accent, background, panel and raised colours for dark and light, its font design (System, Rounded, Serif, Monospaced) and text size. Most text follows the font and size (icons and a few views keep their own). Seen working on screen for switching, the editor, the serif font and a saved theme coming back after a restart; light mode is not checked.
+- **Quick ask, links, Services and Sharing:** an optional Kiln item in the menu bar (Settings → Menu bar and links; off by default) with a field that sends a question to the chat or just puts it in the message box; `kiln://ask?text=…` and `kiln://share?title=…&url=…&text=…` links; an "Ask Kiln" entry in the Services menu for selected text; an "Ask Kiln" Share extension for text and web addresses; and Apple's Writing Tools in the message box where the Mac has them. Only the menu-bar field can send at once: a link, a service or a share is added to the message box after what you are typing and never sends by itself. Unit-tested; the link path was seen working on screen; the menu-bar item, the Services entry, the Share extension and Writing Tools have not been seen.
+- **Spotlight:** conversations can be added to Spotlight (Settings: Off, which is the default, Titles only, or Titles and text). Secrets are redacted, choosing Off removes everything Kiln added, and a result opens that conversation. Unit-tested; a real Spotlight search has not been tried.
+- **Shortcuts:** Kiln offers App Shortcuts to open any activity, open a website, or put a question in the message box ("Ask Kiln").
 
 The [agent capability matrix](docs/13-AGENT-CAPABILITY-MATRIX.md) lists what is covered and, as importantly, the registry gaps that have no agent tool yet.
 
@@ -97,7 +132,7 @@ An Apple Private Cloud Compute provider is **in development and untested** (it n
 
 ## Install
 
-A Developer ID signed, notarized and stapled **preview** build is on the [Releases page](https://github.com/noktirnal42/Kiln/releases). Read each release's notes for what was and was not verified. It is a preview, not a stable release, and there is no in-app updater: download a new build and replace the app (data lives in `~/Library/Application Support/Kiln`). The iPhone and Apple Watch apps are not in the download; build them from [`Companion/`](Companion/) with your own signing team. The published preview predates some development-branch features (Browser, Devices, Media and the registry); build from source to try them.
+A Developer ID signed, notarized and stapled **preview** build is on the [Releases page](https://github.com/noktirnal42/Kiln/releases). Read each release's notes for what was and was not verified. It is a preview, not a stable release, and there is no in-app updater: download a new build and replace the app (data lives in `~/Library/Application Support/Kiln`). The iPhone and Apple Watch apps are not in the download; build them from [`Companion/`](Companion/) with your own signing team. The published preview (0.1.1, 2026-11-03) is far behind `main`. Builds made from `main` identify themselves as **0.2.0 (3)** (see Settings, About) because `project.yml` is already versioned for the next preview; no 0.2 release has been published, so 0.1.1 is the only download. The published preview it predates Maps, News, Images and every communications and knowledge activity (Mail through GitHub), the on-demand tool loading and most of the interface work. Build from source to try them; the release notes of a future preview will list what it contains.
 
 ## Build from source
 
@@ -126,7 +161,7 @@ xcodebuild test -project Kiln.xcodeproj -scheme Kiln \
 
 Opt-in live QA suites spend provider credits; see [CONTRIBUTING.md](CONTRIBUTING.md). Add API keys only through Settings and never commit them. A [build/run script](script/build_and_run.sh), a [clean-clone walkthrough](docs/GETTING-STARTED.md) and [signing and release notes](docs/RELEASING.md) are included. A clean-checkout build took about six minutes in the walkthrough; first builds download several GB of packages.
 
-**Test status:** the integration branch's last full Mac run was 772 passing tests at commit `15b90a4`, as reported by the maintainers' session; older documents quote earlier counts. A passing suite does not certify every provider, model or workflow.
+**Test status:** the full Mac suite passed 1,063 tests in 216 suites on `main` (`4b647e8`, 2026-11-12, run locally; CI on a hosted macOS runner runs the same suite in about 15 minutes, but GitHub's macOS capacity is sometimes short). Older documents quote earlier counts. A passing suite does not certify every provider, model or workflow.
 
 ## Documentation
 
@@ -144,11 +179,11 @@ Specifications include future ambitions; they are not feature-completion claims.
 
 ## Roadmap
 
-The following is **planned or in parallel development and is not in the current release or integration branch.** Nothing here has been verified in the running app yet. The full list with per-module bars is in [Parity and beyond](docs/17-PARITY-AND-BEYOND.md).
+Image studio, the agent platform (slash commands, hooks, memory files, plan mode, checkpoints and rewind, sessions, usage and cost, schedules), Mail, Contacts, Messages, Calendar and Reminders, Notes, Cloud Drives, Research, GitHub, Spotlight indexing and Shortcuts are built and are in the table above with their limits. Several are development builds that have not been tried with real accounts. **What follows is not built.** The full list with per-module bars is in [Parity and beyond](docs/17-PARITY-AND-BEYOND.md).
 
-- **Image studio:** a catalog of open image models, resumable downloads into the model store, and engines behind one protocol (in-process on Apple silicon, or an installed Draw Things, ComfyUI or AUTOMATIC1111/Forge); agent and MCP image tools.
-- **Agent platform:** slash commands, hooks, memory files, plan mode, checkpoints and rewind, a sessions list, a usage and cost view, and editable permission rules.
-- **Develop and Analyze upgrades:** toward an Xcode and Ghidra bar (symbol outline, refactoring, debugger variables and threads, graph view, structure editor, patching, binary diffing).
+- **Next, in the order the owner set:** WeatherKit forecasts for places outside the US (weather forecasts, alerts and radar for the US are built); and a document, spreadsheet and presentation studio. The details and acceptance notes are in the [feature roadmap](docs/21-EVERYTHING-APP-ROADMAP.md).
+- **Develop and Analyze upgrades (ongoing):** toward an Xcode and Ghidra bar. Much of the Develop and Analyze service layer exists (symbols, references, rename, debugger conditions, control-flow and call graphs, patching, binary diffing); many of the new views have not been seen in the running app.
+- **Chat and layout:** a title-bar icon row with a canvas beside the thread, Swarm folded into chat, images sent as pixels to vision models, thread rename, pin and search. See the [chat and layout plan](docs/30-CHAT-MAPS-LAYOUT-PLAN.md).
 - **Beyond parity:** evidence ledger and signed run bundles, a Pinboard context tray, saved workflows, closed-loop app analysis, a verifier agent, privacy tiers and local-first routing, and policy as code.
 - **Platform work with outside dependencies:** passkeys in the Browser need an Apple entitlement that has been requested and not granted; iCloud sync, push and Private Cloud Compute are not implemented or verified; no dates are promised.
 

@@ -1,10 +1,52 @@
 import Foundation
+import ImageIO
 import SwiftData
 import Testing
+import UniformTypeIdentifiers
 @testable import Kiln
 
 @Suite("Composer context: mentions, attachments, expansion")
 struct ComposerContextTests {
+    @Test func preparedImageIsBoundedAndStripsSourceMetadata() throws {
+        let root = try makeProject(["photo.png": ""])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("photo.png")
+        let context = try #require(CGContext(data: nil, width: 80, height: 40, bitsPerComponent: 8, bytesPerRow: 0,
+                                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 80, height: 40))
+        let image = try #require(context.makeImage())
+        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, [kCGImagePropertyPNGDictionary: [kCGImagePropertyPNGDescription: "private metadata"]] as CFDictionary)
+        #expect(CGImageDestinationFinalize(destination))
+        let prepared = try ImageAttachmentPreparer.prepare(url, maxDimension: 20)
+        #expect(prepared.mimeType == "image/png")
+        let source = try #require(CGImageSourceCreateWithData(prepared.data as CFData, nil))
+        let decoded = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        #expect(decoded.width == 20 && decoded.height == 10)
+        let properties = try #require(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+        let png = properties[kCGImagePropertyPNGDictionary] as? [CFString: Any]
+        #expect(png?[kCGImagePropertyPNGDescription] == nil)
+        let expansion = ContextExpander.expand(prompt: "describe @photo.png", attachments: [ComposerAttachment(url: url)], workspaceRoot: root, includeImages: true)
+        #expect(expansion.images.count == 1, "a mention and attachment of the same file must not duplicate it")
+        #expect(expansion.imageFailures.isEmpty)
+        #expect(expansion.text.contains("image supplied separately"))
+        #expect(!expansion.text.contains(url.path))
+        #expect(throws: ImageAttachmentPreparer.Failure.tooLarge) { try ImageAttachmentPreparer.prepare(url, maxOutputBytes: 1) }
+    }
+
+    @Test func imagePreparationRejectsInvalidAndOversizedFiles() throws {
+        let root = try makeProject(["bad.png": "not an image"])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("bad.png")
+        #expect(throws: ImageAttachmentPreparer.Failure.invalidImage) { try ImageAttachmentPreparer.prepare(url) }
+        #expect(throws: ImageAttachmentPreparer.Failure.tooLarge) { try ImageAttachmentPreparer.prepare(url, maxSourceBytes: 2) }
+        #expect(throws: ImageAttachmentPreparer.Failure.unreadable) { try ImageAttachmentPreparer.prepare(root.appendingPathComponent("missing.png")) }
+        let result = ContextExpander.expand(prompt: "see @missing.png", attachments: [ComposerAttachment(url: url)], workspaceRoot: root, includeImages: true)
+        #expect(result.imageFailures.count == 2)
+        #expect(result.images.isEmpty)
+    }
+
     // MARK: Mentions
 
     @Test func theActiveMentionIsTheLastWordWhenItStartsWithAt() {

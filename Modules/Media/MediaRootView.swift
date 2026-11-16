@@ -154,7 +154,7 @@ private struct ImagePane: View {
                     .font(SSTypography.caption()).foregroundStyle(.secondary)
             }
             Section("Generate") {
-                TextEditor(text: $prompt).frame(minHeight: 70).font(.system(size: 14))
+                TextEditor(text: $prompt).frame(minHeight: 70).font(ThemeRuntime.font(14))
                     .accessibilityLabel("Image prompt")
                 HStack {
                     Button("Generate") { generate() }

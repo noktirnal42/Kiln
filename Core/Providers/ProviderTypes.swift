@@ -127,6 +127,13 @@ public struct ProviderJSON: Codable, Equatable, Sendable {
     }
 }
 
+/// An image explicitly supplied with a message. Pixel data is kept separate from text and tool arguments.
+public struct ChatImage: Codable, Equatable, Sendable {
+    public var data: Data
+    public var mimeType: String
+    public init(data: Data, mimeType: String) { self.data = data; self.mimeType = mimeType }
+}
+
 public struct ChatMessage: Codable, Equatable, Sendable {
     public enum Role: String, Codable, Equatable, Sendable {
         case system, user, assistant, tool
@@ -136,12 +143,24 @@ public struct ChatMessage: Codable, Equatable, Sendable {
     public var content: String
     public var metadata: [String: String]
     public var toolCalls: [ToolCall]
+    public var images: [ChatImage]
 
-    public init(role: Role, content: String, metadata: [String: String] = [:], toolCalls: [ToolCall] = []) {
+    public init(role: Role, content: String, metadata: [String: String] = [:], toolCalls: [ToolCall] = [], images: [ChatImage] = []) {
         self.role = role
         self.content = content
         self.metadata = metadata
         self.toolCalls = toolCalls
+        self.images = images
+    }
+
+    private enum CodingKeys: String, CodingKey { case role, content, metadata, toolCalls, images }
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        role = try values.decode(Role.self, forKey: .role)
+        content = try values.decode(String.self, forKey: .content)
+        metadata = try values.decodeIfPresent([String: String].self, forKey: .metadata) ?? [:]
+        toolCalls = try values.decodeIfPresent([ToolCall].self, forKey: .toolCalls) ?? []
+        images = try values.decodeIfPresent([ChatImage].self, forKey: .images) ?? []
     }
 }
 

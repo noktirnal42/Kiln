@@ -18,7 +18,7 @@
 
 **Can I control Kiln from my phone or watch?** You can read the conversation, send messages and allow once or deny approvals with the companion apps, which you build yourself. See [[Activities]]. Physical-device coverage is partial.
 
-**Does it support passkeys or iCloud sync? Siri? Private Cloud Compute?** Not as verified features. The browser passkey entitlement has been requested and not granted; iCloud sync is not implemented or verified; Private Cloud Compute is an untested provider in development; Siri is not covered by the verified documentation and should not be assumed. See [[Browser]] and [[Providers and Keys]].
+**Does it support passkeys or iCloud sync? Siri? Private Cloud Compute?** Not as verified features. The browser passkey entitlement has been requested and not granted; iCloud sync is not implemented or verified; Private Cloud Compute is an untested provider in development; Kiln offers App Shortcuts (open an activity or website, "Ask Kiln"), but Siri phrases have not been tried and should not be assumed. See [[Browser]] and [[Providers and Keys]].
 
 **Why does a small local model fail at tasks?** Chat and tool use are different skills; see [[Troubleshooting]].
 

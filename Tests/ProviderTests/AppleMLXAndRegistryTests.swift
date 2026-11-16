@@ -3,6 +3,19 @@ import Testing
 @testable import Kiln
 
 struct AppleAndMLXProviderTests {
+    @Test func providersWithoutImageSupportRejectRatherThanDiscardPixels() async throws {
+        let request = ChatRequest(messages: [ChatMessage(role: .user, content: "describe", images: [ChatImage(data: Data([1]), mimeType: "image/png")])], model: "test")
+        let providers: [any ModelProvider] = [AppleFoundationProvider(), ApplePrivateCloudProvider(), MLXProvider()]
+        for provider in providers {
+            do {
+                _ = try await provider.streamChat(request, reasoning: nil)
+                Issue.record("\(provider.id) silently accepted an image")
+            } catch let error as ProviderError {
+                guard case .engineUnavailable(let message) = error else { Issue.record("unexpected error: \(error)"); continue }
+                #expect(message.contains("Image input"))
+            }
+        }
+    }
     @Test func appleCloudAndOnDeviceAreSeparateProviderChoices() {
         let local = AppleFoundationProvider()
         let cloud = ApplePrivateCloudProvider()

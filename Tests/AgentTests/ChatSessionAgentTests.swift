@@ -6,6 +6,81 @@ import ModelLabCore
 
 @MainActor
 struct ChatSessionAgentTests {
+    @Test func configuredLimitPausesQueueAndCanContinue() async throws {
+        final class Counter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var count = 0
+            private var recorded: [ChatRequest] = []
+            func next(_ request: ChatRequest) -> Int { lock.withLock { recorded.append(request); count += 1; return count } }
+            var requests: [ChatRequest] { lock.withLock { recorded } }
+        }
+        struct Provider: Kiln.ModelProvider {
+            let counter: Counter
+            let id = "stub"
+            let name = "Stub"
+            let providerType: ProviderType = .customEndpoint
+            let capabilities: ProviderCapabilities = [.streaming, .tools]
+            func fetchModels() async throws -> [ModelDescriptor] {
+                [ModelDescriptor(id: "stub-m1", name: "m1", providerID: id, providerType: providerType, supportsTools: true)]
+            }
+            func checkAvailability() async -> ProviderAvailability { .available() }
+            func streamChat(_ request: ChatRequest, reasoning: ReasoningConfig?) async throws -> AsyncThrowingStream<ChatChunk, Error> {
+                let number = counter.next(request)
+                return AsyncThrowingStream { c in
+                    Task {
+                        if number == 1 {
+                            try? await Task.sleep(for: .milliseconds(200))
+                            c.yield(ChatChunk(finishReason: .toolCalls, toolCalls: [ToolCall(id: "call-1", name: "read_file", arguments: #"{"path":"a.txt"}"#)]))
+                        } else {
+                            c.yield(ChatChunk(delta: ChatMessage(role: .assistant, content: "Done."), finishReason: .stop))
+                        }
+                        c.finish()
+                    }
+                }
+            }
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-limit-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "sample".write(to: root.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+        let schema = Schema([Conversation.self, Message.self, Artifact.self, ArtifactVersion.self])
+        let container = try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
+        let registry = ModelRegistry(eventBus: ModuleEventBus())
+        let counter = Counter()
+        await registry.register(Provider(counter: counter))
+        let limits = AgentRoundLimits(defaults: nil)
+        #expect(limits.set(1, for: "Workstation Agent"))
+        let session = ChatSession(registry: registry, conversations: ConversationStore(container: container), artifacts: ArtifactStore(container: container), workspaceRoot: root.path, roundLimits: limits)
+        let (center, watcher) = try makeTestApprovalCenter(autoResolve: nil)
+        defer { watcher.cancel() }
+        session.attachOrchestrator(AgentOrchestrator(toolRegistry: ToolRegistry(tools: [ReadFileTool()]), approvalCenter: center))
+        await session.newConversation()
+        session.selectedModelID = "stub-m1"
+        let run = Task { await session.send("Read the file") }
+        for _ in 0..<100 where !session.isStreaming { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(session.isStreaming)
+        await session.send("queued follow-up")
+        await run.value
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(session.pausedAfterRounds == 1)
+        #expect(session.queuePaused && session.queuedMessages.map(\.text) == ["queued follow-up"])
+        session.selectedModelID = "different-model"
+        await session.continuePausedRun()
+        #expect(session.errorText?.contains("model, profile, project or agent mode changed") == true)
+        #expect(counter.requests.count == 1)
+        session.selectedModelID = "stub-m1"
+        await session.continuePausedRun()
+        #expect(session.messages.contains { $0.role == .user && $0.content.hasPrefix("Continue the previous task") })
+        let requests = counter.requests
+        let resumed = try #require(requests.dropFirst().first)
+        #expect(resumed.messages.contains { $0.role == .assistant && $0.toolCalls.contains { $0.id == "call-1" && $0.name == "read_file" } })
+        #expect(resumed.messages.contains { $0.role == .tool && $0.metadata["tool_call_id"] == "call-1" && $0.content.contains("sample") })
+        #expect(resumed.messages.filter { $0.metadata["kiln_profile_system"] == "1" }.count == 1)
+        for _ in 0..<100 where counter.requests.count < 3 || session.isStreaming { try await Task.sleep(for: .milliseconds(10)) }
+        let followUp = try #require(counter.requests.dropFirst(2).first)
+        #expect(!followUp.messages.contains { $0.role == .tool }, "paused context must not leak into a later queued turn")
+    }
+
     private func record(_ id: UUID, _ status: ToolCallStatus) -> ToolCallRecord {
         ToolCallRecord(id: id, toolName: "read_file", argumentsJSON: "{\"path\":\"a.txt\"}", status: status)
     }

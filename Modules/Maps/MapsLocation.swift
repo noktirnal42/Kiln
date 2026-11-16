@@ -12,7 +12,17 @@ import Observation
     func request() {
         switch manager.authorizationStatus {
         case .denied, .restricted: message = "Location is unavailable. Enable it for Kiln in macOS Privacy & Security settings."
+        case .notDetermined:
+            // macOS only shows the permission prompt after an explicit authorization request.
+            message = "Waiting for your answer to the macOS location prompt…"; manager.requestWhenInUseAuthorization()
         default: message = "Finding your location…"; manager.requestLocation()
+        }
+    }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse: if location == nil { message = "Finding your location…"; manager.requestLocation() }
+        case .denied, .restricted: message = "Location is unavailable. Enable it for Kiln in macOS Privacy & Security settings."
+        default: break
         }
     }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {

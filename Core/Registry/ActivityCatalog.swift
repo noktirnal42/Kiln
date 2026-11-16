@@ -17,5 +17,14 @@ enum ActivityCatalog {
         ImageStudioActivity.descriptor,
         MapsActivity.descriptor,
         NewsActivity.descriptor,
+        MailActivity.descriptor,
+        CalendarActivity.descriptor,
+        ContactsActivity.descriptor,
+        MessagesActivity.descriptor,
+        GitHubActivity.descriptor,
+        ResearchActivity.descriptor,
+        DrivesActivity.descriptor,
+        NotesActivity.descriptor,
+        SlackActivity.descriptor,
     ]
 }

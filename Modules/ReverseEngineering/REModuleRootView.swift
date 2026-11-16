@@ -23,9 +23,15 @@ struct REModuleRootView: View {
                     REProjectDetail(module: module, project: project, analysis: analysis, projectsVisible: $projectsVisible)
                         .id(project.id)
                 } else {
-                    SSEmptyState(symbol: "cube", title: "No project selected",
-                                 message: "Import a binary or download a package from the Projects pane to begin analysis.")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: SSSpacing.m) {
+                        SSEmptyState(symbol: "cube", title: "No project selected",
+                                     message: "Import a binary or download a package from the Projects pane to begin analysis.")
+                        if !projectsVisible {
+                            Button("Show Projects") { projectsVisible = true }
+                                .buttonStyle(.borderedProminent)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -33,7 +39,7 @@ struct REModuleRootView: View {
         .onAppear {
             guard !decidedInitialLayout else { return }
             decidedInitialLayout = true
-            projectsVisible = geometry.size.width >= 820
+            projectsVisible = module.selected == nil || geometry.size.width >= 820
         }
         }
         .background(SSColor.canvas)
@@ -109,7 +115,7 @@ struct REProjectBrowser: View {
                 HStack(spacing: SSSpacing.s) {
                     Image(systemName: "cube").foregroundStyle(selected ? SSColor.accent : .secondary).frame(width: 18)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(project.binaryURL.lastPathComponent).font(.system(size: 12.5, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                        Text(project.binaryURL.lastPathComponent).font(ThemeRuntime.font(12.5, .medium)).lineLimit(1).truncationMode(.middle)
                         Text(functionSummary(for: project)).font(SSTypography.caption()).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)

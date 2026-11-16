@@ -4,14 +4,15 @@ import Metal
 #endif
 import FoundationModels
 
-/// One row the Settings → Capabilities screen shows verbatim. Every status
-/// here is the result of an actual runtime check, never a hardcoded
-/// assumption, per the app's "don't fake capabilities" requirement.
+/// One capabilities row. Unverified capabilities remain explicitly not checked.
 public struct CapabilityReport: Identifiable, Sendable {
     public let id = UUID()
     public let name: String
     public let status: CapabilityStatus
     public let detail: String
+    public init(name: String, status: CapabilityStatus, detail: String) {
+        self.name = name; self.status = status; self.detail = detail
+    }
 }
 
 public enum CapabilityDetector {
@@ -87,16 +88,36 @@ public enum CapabilityDetector {
         }
         return CapabilityReport(
             name: "MLX (local LLM inference)",
-            status: .available,
-            detail: "mlx-swift-lm linked. Actual generation still requires downloading a model on first use."
+            status: .notChecked,
+            detail: "MLX is linked; generation requires a compatible installed model and a successful run."
         )
     }
 
     public static func detectNetwork() -> CapabilityReport {
         CapabilityReport(
-            name: "Network (dataset/model discovery)",
-            status: .available,
-            detail: "Checked live per-request; Datasets and Playground surface network errors inline rather than assuming connectivity."
+            name: "Hugging Face catalog",
+            status: .notChecked,
+            detail: "Not checked here. Datasets and Playground report network errors when a request is made."
         )
+    }
+
+    /// Checks the actual model catalog endpoint, without downloading model artifacts.
+    public static func checkNetwork(session: URLSession = .shared) async -> CapabilityReport {
+        let name = "Hugging Face catalog"
+        var request = URLRequest(url: URL(string: "https://huggingface.co/api/models?limit=1")!)
+        request.timeoutInterval = 10
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                return CapabilityReport(name: name, status: .unavailable(reason: "Catalog request returned HTTP \(code)."), detail: "")
+            }
+            guard (try? JSONSerialization.jsonObject(with: data)) is [Any] else {
+                return CapabilityReport(name: name, status: .unavailable(reason: "Catalog returned an unexpected response."), detail: "")
+            }
+            return CapabilityReport(name: name, status: .available, detail: "The public model catalog responded. Other services may have different connectivity.")
+        } catch {
+            return CapabilityReport(name: name, status: .unavailable(reason: "Catalog request failed: \(error.localizedDescription)"), detail: "")
+        }
     }
 }

@@ -103,6 +103,12 @@ public enum ContextCompactor {
         return Int((Double(data.count) / charsPerToken).rounded(.up))
     }
 
+    /// What the next request carries: the messages (the system prompt is one of them) and the tool list. The context meter shows this
+    /// both during a run and when idle, so the two agree.
+    public static func requestTokens(messages: [ChatMessage], tools: [ProviderTool]) -> Int {
+        estimateTokens(messages) + toolSchemaTokens(tools)
+    }
+
     public static func budget(window: Int, maxTokens: Int, tools: [ProviderTool]) -> ContextBudget {
         ContextBudget(window: window, reservedForOutput: maxTokens, toolSchemaTokens: toolSchemaTokens(tools))
     }

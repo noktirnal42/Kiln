@@ -21,4 +21,11 @@ struct CapabilityDetectorTests {
         let reports = CapabilityDetector.detectAll()
         #expect(reports.count == 7)
     }
+
+    @Test func networkAndInferenceAreNotClaimedWithoutARun() {
+        #expect(CapabilityDetector.detectNetwork().status == .notChecked)
+        if CapabilityDetector.detectHardware().status.isAvailable {
+            #expect(CapabilityDetector.detectMLX().status == .notChecked)
+        }
+    }
 }

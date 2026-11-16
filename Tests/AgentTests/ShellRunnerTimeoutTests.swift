@@ -14,7 +14,8 @@ struct ShellRunnerTimeoutTests {
     }
 
     @Test func normalCommandReportsItsExitStatus() async throws {
-        let result = try await ShellRunner.run(command: "echo hi; exit 3", cwd: nil, timeout: 5)
+        // This checks the exit status, not speed: on a loaded hosted runner a trivial command has taken more than 5 s.
+        let result = try await ShellRunner.run(command: "echo hi; exit 3", cwd: nil, timeout: 60)
         #expect(!result.timedOut)
         #expect(result.exitStatus == 3)
         #expect(result.output == "hi")

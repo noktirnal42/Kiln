@@ -5,6 +5,34 @@ import Testing
 
 @MainActor
 struct ConversationStoreTests {
+    @Test func inspectLegacyMigrationFixture() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("kiln-migration-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/LegacyConversationStore/Kiln.store")
+        try FileManager.default.copyItem(at: fixture, to: directory.appendingPathComponent("Kiln.store"))
+        let schema = Schema([Workspace.self, ModuleState.self, Conversation.self, Message.self, Artifact.self, ArtifactVersion.self, SettingsEntry.self])
+        let configuration = ModelConfiguration(schema: schema, url: directory.appendingPathComponent("Kiln.store"))
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let store = ConversationStore(container: container)
+        let conversations = try await store.conversations()
+        let conversation = try #require(conversations.first(where: { $0.title == "Legacy migration fixture" }))
+        let messages = try await store.messages(conversationID: conversation.id)
+        #expect(messages.messages.map(\.content) == ["Preserve this existing message"])
+        #expect(messages.messages.first?.images.isEmpty == true)
+    }
+
+    @Test func imagePayloadSurvivesFetchAndFork() async throws {
+        let store = ConversationStore(container: try makeContainer())
+        let conversation = try await store.createConversation(title: "Images")
+        let image = ChatImage(data: Data([1, 2, 3]), mimeType: "image/png")
+        let message = try #require(await store.appendMessage(conversationID: conversation.id, role: .user, content: "describe", images: [image]))
+        #expect(message.images == [image])
+        #expect(try await store.messages(conversationID: conversation.id).messages.first?.images == [image])
+        let fork = try #require(await store.fork(conversationID: conversation.id, atMessageID: message.id, newTitle: "Fork"))
+        #expect(try await store.messages(conversationID: fork.id).messages.first?.images == [image])
+    }
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema([Workspace.self, Conversation.self, Message.self, Artifact.self, ArtifactVersion.self])
         return try ModelContainer(

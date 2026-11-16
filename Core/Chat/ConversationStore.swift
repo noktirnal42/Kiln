@@ -31,6 +31,7 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
     public var tokenCount: Int
     public var order: Int
     public var toolCalls: [ToolCall]
+    public var images: [ChatImage]
     public var modelID: String?
     public var createdAt: Date
     /// Narrative text and the tool calls after it, one per tool round, in order. Empty for replies saved before this existed.
@@ -44,6 +45,7 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
         tokenCount: Int = 0,
         order: Int = 0,
         toolCalls: [ToolCall] = [],
+        images: [ChatImage] = [],
         modelID: String? = nil,
         createdAt: Date,
         segments: [ReplySegment] = []
@@ -55,6 +57,7 @@ public struct MessageSnapshot: Identifiable, Equatable, Sendable {
         self.tokenCount = tokenCount
         self.order = order
         self.toolCalls = toolCalls
+        self.images = images
         self.modelID = modelID
         self.createdAt = createdAt
         self.segments = segments
@@ -191,6 +194,7 @@ public actor ConversationStore {
                 tokenCount: message.tokenCount,
                 order: offset,
                 toolCallsJSON: message.toolCallsJSON,
+                imagesJSON: message.imagesJSON,
                 modelID: message.modelID
             )
             copy.createdAt = message.createdAt
@@ -212,7 +216,7 @@ public actor ConversationStore {
         let truncated = total > limit
         let page = truncated ? ordered.suffix(limit) : ordered[...]
         return MessagePage(
-            messages: page.map(Self.snapshot(of:)),
+            messages: try page.map(Self.snapshot(of:)),
             truncated: truncated,
             total: total
         )
@@ -227,9 +231,10 @@ public actor ConversationStore {
         tokenCount: Int = 0,
         toolCalls: [ToolCall] = [],
         modelID: String? = nil,
+        images: [ChatImage] = [],
         segments: [ReplySegment] = []
     ) throws -> MessageSnapshot? {
-        guard let saved = try appendMessages(conversationID: conversationID, items: [(role, content, reasoning, tokenCount, toolCalls, modelID)]).first else { return nil }
+        guard let saved = try appendMessages(conversationID: conversationID, items: [(role, content, reasoning, tokenCount, toolCalls, modelID)], imagePayloads: [images]).first else { return nil }
         guard !segments.isEmpty else { return saved }
         return try setSegments(saved.id, segments) ?? saved
     }
@@ -240,19 +245,21 @@ public actor ConversationStore {
         guard let message = try Self.fetchMessage(id, in: context) else { return nil }
         message.segmentsJSON = segments.isEmpty ? nil : try JSONEncoder().encode(segments)
         try context.save()
-        return Self.snapshot(of: message)
+        return try Self.snapshot(of: message)
     }
 
     /// Bulk append: one fetch and one save regardless of item count.
     public func appendMessages(
         conversationID: UUID,
-        items: [(role: ChatMessage.Role, content: String, reasoning: String?, tokenCount: Int, toolCalls: [ToolCall], modelID: String?)]
+        items: [(role: ChatMessage.Role, content: String, reasoning: String?, tokenCount: Int, toolCalls: [ToolCall], modelID: String?)],
+        imagePayloads: [[ChatImage]]? = nil
     ) throws -> [MessageSnapshot] {
         guard let conversation = try Self.fetchConversation(conversationID, in: context) else { return [] }
         var nextOrder = (conversation.messages.map(\.order).max() ?? -1) + 1
         var snapshots: [MessageSnapshot] = []
         snapshots.reserveCapacity(items.count)
-        for item in items {
+        for (index, item) in items.enumerated() {
+            let images = imagePayloads.flatMap { $0.indices.contains(index) ? $0[index] : nil } ?? []
             let message = Message(
                 role: item.role.rawValue,
                 content: item.content,
@@ -260,11 +267,12 @@ public actor ConversationStore {
                 tokenCount: item.tokenCount,
                 order: nextOrder,
                 toolCallsJSON: item.toolCalls.isEmpty ? nil : try JSONEncoder().encode(item.toolCalls),
+                imagesJSON: images.isEmpty ? nil : try JSONEncoder().encode(images),
                 modelID: item.modelID
             )
             message.conversation = conversation
             context.insert(message)
-            snapshots.append(Self.snapshot(of: message))
+            snapshots.append(try Self.snapshot(of: message))
             nextOrder += 1
         }
         conversation.updatedAt = Date()
@@ -316,9 +324,10 @@ public actor ConversationStore {
         )
     }
 
-    private static func snapshot(of message: Message) -> MessageSnapshot {
+    private static func snapshot(of message: Message) throws -> MessageSnapshot {
         let role = ChatMessage.Role(rawValue: message.role) ?? .user
         let toolCalls = message.toolCallsJSON.flatMap { try? JSONDecoder().decode([ToolCall].self, from: $0) } ?? []
+        let images = try message.imagesJSON.map { try JSONDecoder().decode([ChatImage].self, from: $0) } ?? []
         return MessageSnapshot(
             id: message.id,
             role: role,
@@ -327,6 +336,7 @@ public actor ConversationStore {
             tokenCount: message.tokenCount,
             order: message.order,
             toolCalls: toolCalls,
+            images: images,
             modelID: message.modelID,
             createdAt: message.createdAt,
             segments: message.segmentsJSON.flatMap { try? JSONDecoder().decode([ReplySegment].self, from: $0) } ?? []

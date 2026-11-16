@@ -214,4 +214,12 @@ struct ContextCompactorStageTests {
         let sent = log.transcripts.first?.count ?? Int.max
         #expect(sent <= Int(Double(small.available) * 0.7 * ContextCompactor.charsPerToken) + 200)
     }
+
+    @Test func theRequestSizeCountsMessagesAndTheToolList() {
+        let messages = [ChatMessage(role: .system, content: "You are an agent."), ChatMessage(role: .user, content: "hello there")]
+        let tool = ProviderTool(name: "read_file", description: String(repeating: "x", count: 700))
+        let withTools = ContextCompactor.requestTokens(messages: messages, tools: [tool])
+        #expect(withTools == ContextCompactor.estimateTokens(messages) + ContextCompactor.toolSchemaTokens([tool]))
+        #expect(withTools > ContextCompactor.requestTokens(messages: messages, tools: []))
+    }
 }

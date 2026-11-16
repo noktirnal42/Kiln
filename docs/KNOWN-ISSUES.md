@@ -4,6 +4,38 @@ See the [public work-item index](ISSUE-INDEX.md) for scoped issues and acceptanc
 
 This is the contributor-facing gap list for Kiln's current development state. The [issue tracker](https://github.com/noktirnal42/Kiln/issues) owns assignment, discussion, and implementation status. Specifications describe intended behavior; they are not evidence that a feature is complete.
 
+## The newer activities have not met real data (2026-11-12)
+
+Mail, Contacts, Messages, Calendar, Notes, Cloud Drives, Research, GitHub, Slack and Spotlight were built against fakes, fixtures and generated files, and checked on screen only as far as their empty states and permission screens. Calendar is the exception: it read real events and reminders in the installed build. **Not tried:** a real mail account (and Outlook.com and Microsoft 365 cannot sign in at all, which needs browser sign-in; STARTTLS-only servers are unsupported), the real Messages database (reading needs Full Disk Access) or a real send (Automation permission), Contacts with real contacts, Notes (Automation permission; Apple documents no data API, so it can change with macOS), a real cloud-drive folder, the PDF reader's highlight and save buttons, a real Spotlight search, a real Slack workspace (the Slack screen itself has not been seen either), and creating a calendar event or reminder. Messages, Notes and the others that drive another app through Apple Events depend on interfaces Apple does not document. If Messages will not send, the red error text in the thread says whether it is a permission or a script error; please include it in a report.
+
+## Tools are loaded on demand, and the meter has two readings
+
+**Observed (fixed 2026-11-12):** all 200-plus tool definitions, about 21,000 tokens, went to the model on every request, so any window smaller than that overflowed and the context meter sat at 100%. Tools are now loaded on demand (`kiln_tool_search`) and trimmed to fit small windows; see `docs/11-CURRENT-STATE.md`. **Limits:** it was seen working with one hosted model; a small local model that ignores the search tool will simply lack the module tools; swarm workers still receive their tools up front; and the meter counts only the conversation while a run is going but also the system prompt and loaded tools when idle, so the two readings differ (about 3% against 11% on an empty chat with a large window).
+
+## Quick ask, links, Services and Sharing are partly unverified
+
+The link path was seen working (an `ask` link put its text in the message box without sending) and the launch hang found on the way was fixed (see `docs/21`, item 13). Not seen: the menu-bar item and its popover, the Services entry in another app, the Share extension in a Share menu (it needs the installed, notarized build to register), and Writing Tools (needs Apple Intelligence). A link can open an extra window; the text still reaches the one chat session. Do not drive a SwiftUI `MenuBarExtra` from a stored setting in this app: it made the app scene graph re-run without end.
+
+## Notifications and Focus are unverified
+
+The notification policy, the coordinator and the tools are tested with fakes; no real notification has been posted from a build (the Settings card was seen on screen, with its permission buttons left alone). Focus status is optional and a hint at best: Apple requires authorization, and developers report `isFocused` may read "off" while a Focus is on unless the app has the Communication Notifications capability, which Kiln does not have (adding a managed entitlement to a notarized build risks one that will not launch, so it was left out). Kiln cannot read other apps' notifications (macOS offers no API), uses the ordinary interruption level (time-sensitive needs an entitlement), and a notification only opens Kiln: approvals are answered in the app.
+
+## Weather covers the United States only
+
+Weather forecasts and alerts come from the National Weather Service, which has no data outside the United States and its territories (the tools say so). The Maps radar layer (NOAA MRMS, contiguous US only, about the last two hours, no published rate limit or service promise) has been seen on screen with light echoes and the loop, but not with heavy echoes; there is no WeatherKit yet. Radar shows rain already falling, not a forecast, and is as fresh as the service's last frame (marked stale after 20 minutes). The Weather sheet in Maps was seen on screen on 2026-11-12 (Phoenix, live NWS forecast with source and issue time); the tools have not been run end to end from the agent, and a forecast is only as fresh as the service's last run (older than four hours is marked stale). Official warnings, not Kiln's summary, decide safety.
+
+## Reasoning options are unverified against live APIs
+
+The chat's reasoning control (the brain button) offers only levels that Kiln has a documented or tested request for: Ollama `think` (a switch for most thinking models, low, medium and high for gpt-oss), OpenRouter `reasoning.effort`, and NVIDIA GLM 5.3 `reasoning_effort` (low, high, max). Most other models (other NVIDIA models, custom endpoints, Apple and MLX models) show the control greyed out because Kiln does not know what they accept. The request bodies are unit-tested; no live call was made with a chosen level, and some models cannot be switched off even where Ollama accepts `think: false`.
+
+## Browser and cloud gaming
+
+The browser now identifies as Safari and enables fullscreen and click-free playback, which streaming sites check for. No cloud-gaming service has been confirmed to start, because that needs a sign-in; some services check more than the browser name. Voice chat in a page needs a microphone permission prompt that the browser does not have yet.
+
+## CI depends on GitHub's macOS runners
+
+The workflow runs on `macos-latest` and takes about 15 minutes. GitHub's macOS capacity is sometimes short: on 2026-11-12 three attempts on one pull request ended with "The job was not acquired by Runner of type hosted" and no test ran. A speech-synthesis test is skipped on CI (the workflow passes `CI=true` to the test process as `TEST_RUNNER_CI`). When the hosted runner is unavailable, the local full run is the evidence.
+
 ## Develop is a capable editor, not Xcode
 
 **Observed:** Develop → Editor has a language server (Swift and C-family only), build/test/run with schemes, git gutter markers and a split pane (see `docs/11-CURRENT-STATE.md`). It now has a launch debugger backed by LLDB: file/line breakpoints, stepping, stack, locals and console. It now has code folding, ⌘D multi-cursor (add-cursor Return/Tab behaviour is untested) and VoiceOver access to the gutter. It has no debugger attach, conditional breakpoints or watches, no SwiftUI previews, no language server for other languages, and no stage-hunk or blame UI in the editor.
@@ -28,7 +60,7 @@ This is the contributor-facing gap list for Kiln's current development state. Th
 
 ## Agent streaming needs visible end-to-end verification
 
-**Observed:** plain chat supports streamed chunks. The agent event model has a text-delta event, but the audited agent turn path accumulated text without emitting it. A fix with regression coverage has since landed; the running GUI has not yet been checked against a real provider.
+**Observed:** plain chat supports streamed chunks. The agent event model has a text-delta event, but the audited agent turn path accumulated text without emitting it. A fix with regression coverage has since landed. On 2026-11-12 an agent run against NVIDIA NIM (`nemotron-3.5-super`) was watched on screen: thinking text and the answer appeared while it ran. Other providers have not been rechecked in the running app.
 
 **Needed:** visible incremental text before the provider finishes, responsive Stop, correct retry/reset behavior, and no duplicated final text. Verify both a deterministic delayed-chunk test and the running GUI with a real provider. Do not equate eventual response delivery with smooth streaming.
 
@@ -56,7 +88,7 @@ GGUF conversion depends on external tooling and is not certified by a successful
 
 ## Visual and accessibility QA is incomplete
 
-Layout fixes have addressed pane navigation, embedded Search placement, model-picker loading/search, and clipped analysis tabs. A complete pass still needs narrow/wide windows, light/dark appearance, keyboard focus and shortcuts, VoiceOver labels, long data, and loading/error/empty states across every workspace. Nested sidebars and toolbars need particular attention for cohesion and usable space.
+Layout fixes have addressed pane navigation, embedded Search placement, model-picker loading/search, and clipped analysis tabs. A screen pass of the newer activities and Home on 2026-11-12 (dark mode, one window size) fixed six problems. A complete pass still needs narrow/wide windows, light appearance, keyboard focus and shortcuts, VoiceOver labels, long data, and loading/error states with real data across every workspace; Settings below the first few provider rows, Maps, News, Media, Images, Devices, Audit, Swarm and Analyze were not looked at in that pass. Nested sidebars and toolbars need particular attention for cohesion and usable space.
 
 ## Composer keys
 
@@ -90,17 +122,9 @@ Layout fixes have addressed pane navigation, embedded Search placement, model-pi
 
 The Approval Queue sheet now has a Done button and a scrolling grants list; this was checked only by build, not in the running app.
 
-## Test-status notes
+## Test status
 
-A full regression run exercised 456 tests and found one nested-path indexing failure. It was reproduced as `/var` versus `/private/var` aliasing; the root and enumerated paths are now normalized, and the focused indexing recheck passed. A later full run passed all 463 tests; the suite is now 466.
-
-Live tests require compatible providers, credentials, model availability, and sometimes API credits. A listed model may return a payment error even when another model on the same provider works. A command reporting success with zero selected tests is not verification.
-
-The suite was 520 tests and passing on 2026-11-02.
-
-## Latest debugger and Ghidra verification
-
-The 2026-11-02 continuation passed **538 tests in 100 suites**, including one opt-in installed-Ghidra integration test (537 regular tests). See [the QA record](14-DEBUGGER-AND-GHIDRA-QA.md) for scope and remaining limits. A passing app suite does not certify every provider/model, every model-training lifecycle or full Xcode/Ghidra parity.
+The full Mac suite passed on `main` (`4b647e8`, 2026-11-12, run locally): 1,063 tests in 216 suites. Earlier counts in older documents (456, 520, 538, 592, 772, 924, 1011, 1037) are history. Live tests require compatible providers, credentials, model availability, and sometimes API credits; they are off by default. A listed model may return a payment error even when another model on the same provider works. A command reporting success with zero selected tests is not verification: `-only-testing:KilnTests/<Suite>` needs the Swift suite's type name, and a wrong name matches nothing and still reports success. A passing suite does not certify every provider, model, training lifecycle or full Xcode and Ghidra parity; see [the debugger and Ghidra QA record](14-DEBUGGER-AND-GHIDRA-QA.md) for that scope.
 
 ## Voice and remote control (new, 2026-11-03)
 
@@ -109,3 +133,7 @@ The 2026-11-02 continuation passed **538 tests in 100 suites**, including one op
 ## Computer use (experimental, 2026-11-03)
 
 Accessibility-based, so it only sees what an app exposes; no screenshots, coordinate clicks, keyboard or scrolling yet. Indices are valid only for the latest `inspect` of one app. Calendar and Messages have been read this way; other apps are untested. Read-only use is safe to automate; `press` and `set_value` act in other apps, so they still ask in Ask and Auto. Pre-existing Accessibility entries from builds signed differently do not apply to a new build.
+
+## Menu-bar item (checked 2026-11-12)
+
+Turning on "Show Kiln in the menu bar" crashed the notarized 0.2.0 build (stack overflow: creating the status item wrote to UserDefaults, which re-entered the code that creates it). Fixed with a re-entrancy guard in `MenuBarController`; the fixed build then ran through the same toggle without crashing. On 2026-11-13 the installed notarized build (main at 84a0232) was driven on a disposable profile: turning the Settings checkbox off and on again did not crash it and wrote no crash report. The flame icon did not show in the menu bar, and the cause was found the same day: Kiln's status item exists (macOS Accessibility lists it as "Ask Kiln", 24 by 24 points) but it sits at the same parked position (x 859 to 869) as the items of Ollama, PlateWatchHub and Claude, none of which is visible either, because this Mac's menu bar (notched display, many items) has no room left and macOS hides the overflow. It is not a Kiln defect; the popover has still not been seen because the icon could not be clicked. To see it, free space in System Settings → Menu Bar. Settings now says so.

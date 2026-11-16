@@ -49,21 +49,3 @@ struct ReplySegmentStoreTests {
         #expect(session.liveSegments.isEmpty)
     }
 }
-
-struct RunSummaryStyleTests {
-    @Test func workedLabelsReadLikeCodexs() {
-        #expect(RunSummaryStyle.workedLabel(seconds: 0.2) == "Worked for <1s")
-        #expect(RunSummaryStyle.workedLabel(seconds: 27) == "Worked for 27s")
-        #expect(RunSummaryStyle.workedLabel(seconds: 86) == "Worked for 1m 26s")
-        #expect(RunSummaryStyle.workedLabel(seconds: 7_380) == "Worked for 2h 3m")
-    }
-
-    @Test func theStyleDefaultsToSentencesAndReadsThePreference() throws {
-        let defaults = try #require(TestDefaults.suite("kiln.tests.runsummary.\(UUID().uuidString)"))
-        #expect(RunSummaryStyle.current(defaults) == .sentences)
-        defaults.set("workedFor", forKey: RunSummaryStyle.key)
-        #expect(RunSummaryStyle.current(defaults) == .workedFor)
-        defaults.set("nonsense", forKey: RunSummaryStyle.key)
-        #expect(RunSummaryStyle.current(defaults) == .sentences)
-    }
-}

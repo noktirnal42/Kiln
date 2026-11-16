@@ -9,25 +9,39 @@ struct MapsView: View {
     @State private var directionText = ""
     @State private var routeMode: MapsState.RouteMode = .automobile
     @State private var routing = false
+    @State private var showWeather = false
     var body: some View {
         VStack(spacing: 0) {
             SSActivityHeader(title: "Maps", subtitle: "Explore places and USGS maps", symbol: "map", trailing: { EmptyView() })
-            ScrollView(.horizontal) {
+            VStack(alignment: .leading, spacing: 8) {
               HStack(spacing: 8) {
-                TextField("Search a place or address", text: $state.query).textFieldStyle(.roundedBorder).frame(width: 240)
+                TextField("Search a place or address", text: $state.query).textFieldStyle(.roundedBorder)
                     .onSubmit { search() }
                 Button("Search", action: search).disabled(state.busy || state.query.isEmpty)
+              }
+              HStack(spacing: 8) {
                 Button("Directions…") { showDirections = true }
+                Button { location.request() } label: { Image(systemName: "location") }
+                    .help("Go to my location (macOS asks for permission the first time)").accessibilityLabel("My Location")
+                Button(state.radarOn ? "Radar on" : "Radar") { Task { await state.setRadar(!state.radarOn) } }
+                    .help("NOAA weather radar over the map (contiguous US)")
+                Button("Weather") { showWeather = true }.help("Forecast and alerts for the map center (US only, National Weather Service)")
                 Picker("Map layer", selection: $state.layer) {
                     Text("Map").tag("standard"); Text("Satellite").tag("satellite"); Text("Hybrid").tag("hybrid"); Text("Terrain").tag("terrain"); Text("USGS Topo").tag("usgs_topo")
-                }.fixedSize()
-                if state.route != nil { Button("Clear route") { state.route = nil; state.routeRevision += 1 } }
-                if !state.pins.isEmpty { Menu("Pins") { ForEach(state.pins) { pin in Button("Remove \(pin.name)") { state.pins.removeAll { $0.id == pin.id }; state.routeRevision += 1 } } } }
-                Button("Pin center") { try? state.addPin(name: "Pin \(state.pins.count + 1)", latitude: state.latitude, longitude: state.longitude) }
-                Button { location.request() } label: { Label("My Location", systemImage: "location") }.help("Request your location from macOS")
-                Button("Historical maps") { historical() }.disabled(state.busy)
-              }.fixedSize(horizontal: true, vertical: false).padding(10)
-            }
+                }.labelsHidden().frame(width: 120).accessibilityLabel("Map layer")
+                Menu("Map actions") {
+                    Button("Pin center") {
+                        do { try state.addPin(name: "Pin \(state.pins.count + 1)", latitude: state.latitude, longitude: state.longitude) }
+                        catch { state.message = error.localizedDescription }
+                    }
+                    Button("My Location") { location.request() }
+                    Button("Historical maps") { historical() }.disabled(state.busy)
+                    if state.route != nil { Button("Clear route") { state.route = nil; state.routeRevision += 1 } }
+                    if !state.pins.isEmpty { Menu("Remove pin") { ForEach(state.pins) { pin in Button(pin.name) { state.pins.removeAll { $0.id == pin.id }; state.routeRevision += 1 } } } }
+                }
+                Spacer(minLength: 0)
+              }
+            }.padding(10)
             HStack(spacing: 0) {
                 MapCanvas(state: state).frame(maxWidth: .infinity, maxHeight: .infinity)
                 if !state.placeResults.isEmpty {
@@ -61,6 +75,7 @@ struct MapsView: View {
                     }.padding(10).frame(width: 300)
                 }
             }
+            if state.radarOn || state.radarMessage != nil { Divider(); RadarBar(state: state) }
             HStack {
                 Text(String(format: "%.5f, %.5f", state.latitude, state.longitude)).monospacedDigit()
                 Text(state.layer == "usgs_topo" ? "USGS The National Map · USGS Topo" : "Map data © Apple")
@@ -70,6 +85,7 @@ struct MapsView: View {
                 else if location.message != "Location has not been requested." { Text(location.message).lineLimit(1) }
             }.font(.caption).foregroundStyle(.secondary).padding(8)
         }
+        .sheet(isPresented: $showWeather) { WeatherSheet(latitude: state.latitude, longitude: state.longitude) { showWeather = false } }
         .sheet(isPresented: $showDirections) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack { Text("Directions").font(.headline)
@@ -145,7 +161,7 @@ struct MapCanvas: NSViewRepresentable {
         }
         if coordinator.layer != state.layer {
             coordinator.layer = state.layer
-            view.removeOverlays(view.overlays.filter { $0 is MKTileOverlay })
+            view.removeOverlays(view.overlays.filter { $0 is MKTileOverlay && !($0 is RadarTileOverlay) })
             switch state.layer {
             case "satellite": view.preferredConfiguration = MKImageryMapConfiguration(elevationStyle: .flat)
             case "hybrid": view.preferredConfiguration = MKHybridMapConfiguration(elevationStyle: .flat)
@@ -158,6 +174,19 @@ struct MapCanvas: NSViewRepresentable {
                 overlay.canReplaceMapContent = true; view.addOverlay(overlay, level: .aboveLabels)
             }
         }
+        if coordinator.radarRevision != state.radarRevision {
+            coordinator.radarRevision = state.radarRevision
+            let old = view.overlays.compactMap { $0 as? RadarTileOverlay }
+            if state.radarOn {
+                // Add the new frame first and drop the old one a moment later so the loop does not flash.
+                view.addOverlay(RadarTileOverlay(frame: state.radarFrame), level: .aboveLabels)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak view] in view?.removeOverlays(old) }
+            } else { view.removeOverlays(old) }
+        }
+        if coordinator.radarOpacity != state.radarOpacity {
+            coordinator.radarOpacity = state.radarOpacity
+            for overlay in view.overlays where overlay is RadarTileOverlay { (view.renderer(for: overlay) as? MKTileOverlayRenderer)?.alpha = state.radarOpacity }
+        }
     }
     final class Coordinator: NSObject, MKMapViewDelegate {
         let state: MapsState
@@ -165,6 +194,8 @@ struct MapCanvas: NSViewRepresentable {
         var routeRevision = 0
         var routeOverlay: MKPolyline?
         var layer = ""
+        var radarRevision = 0
+        var radarOpacity = 0.7
         init(state: MapsState) { self.state = state }
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
             let region = mapView.region
@@ -173,7 +204,7 @@ struct MapCanvas: NSViewRepresentable {
         }
         func mapView(_ mapView: MKMapView, rendererFor overlay: any MKOverlay) -> MKOverlayRenderer {
             if let line = overlay as? MKPolyline { let renderer = MKPolylineRenderer(polyline: line); renderer.strokeColor = .systemBlue; renderer.lineWidth = 5; return renderer }
-            if let tiles = overlay as? MKTileOverlay { return MKTileOverlayRenderer(tileOverlay: tiles) }
+            if let tiles = overlay as? MKTileOverlay { let renderer = MKTileOverlayRenderer(tileOverlay: tiles); if tiles is RadarTileOverlay { renderer.alpha = state.radarOpacity }; return renderer }
             return MKOverlayRenderer(overlay: overlay)
         }
     }

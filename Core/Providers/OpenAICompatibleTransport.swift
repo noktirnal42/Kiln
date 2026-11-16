@@ -57,6 +57,13 @@ public enum OpenAICompatibleTransport {
                     "role": ProviderJSON(message.role.rawValue),
                     "content": ProviderJSON(message.content),
                 ]
+                if !message.images.isEmpty {
+                    var parts: [ProviderJSON] = [ProviderJSON(["type": ProviderJSON("text"), "text": ProviderJSON(message.content)])]
+                    parts += message.images.map { image in
+                        ProviderJSON(["type": ProviderJSON("image_url"), "image_url": ProviderJSON(["url": ProviderJSON("data:\(image.mimeType);base64,\(image.data.base64EncodedString())")])])
+                    }
+                    value["content"] = ProviderJSON(parts)
+                }
                 if !message.toolCalls.isEmpty {
                     value["tool_calls"] = ProviderJSON(message.toolCalls.map { call in
                         ProviderJSON([
@@ -86,7 +93,8 @@ public enum OpenAICompatibleTransport {
             payload["tools"] = toolsJSON(request.tools)
         }
         if let reasoning, reasoning.enabled {
-            payload["reasoning"] = ProviderJSON(reasoning.openAIRReasoningFields)
+            // A level the person chose for a model that offers levels goes as `reasoning.effort`; otherwise the budget as before.
+            payload["reasoning"] = ProviderJSON(reasoning.level.map { ["effort": ProviderJSON($0)] } ?? reasoning.openAIRReasoningFields)
         }
         for (key, value) in extraFields {
             payload[key] = value

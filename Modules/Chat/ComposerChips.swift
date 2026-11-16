@@ -13,8 +13,8 @@ struct ComposerChip: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: symbol).font(.system(size: 10, weight: .medium)).foregroundStyle(tint)
-            Text(title).font(.system(size: 11.5)).lineLimit(1).truncationMode(.middle)
-            if let detail { Text(detail).font(.system(size: 10)).foregroundStyle(.tertiary) }
+            Text(title).font(ThemeRuntime.font(11.5)).lineLimit(1).truncationMode(.middle)
+            if let detail { Text(detail).font(ThemeRuntime.font(10)).foregroundStyle(.tertiary) }
             if let onRemove {
                 Button(action: onRemove) { Image(systemName: "xmark").font(.system(size: 8, weight: .bold)) }
                     .buttonStyle(.plain)
@@ -84,7 +84,7 @@ struct MentionList: View {
                     HStack(spacing: SSSpacing.s) {
                         Image(systemName: path.hasSuffix("/") ? "folder" : "doc.text").font(.system(size: 11)).foregroundStyle(.secondary).frame(width: 16)
                         Text((path as NSString).lastPathComponent.isEmpty ? path : (path.hasSuffix("/") ? (String(path.dropLast()) as NSString).lastPathComponent + "/" : (path as NSString).lastPathComponent))
-                            .font(.system(size: 12, weight: .medium))
+                            .font(ThemeRuntime.font(12, .medium))
                         Text(path).font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
                         Spacer()
                         if index == 0 { SSKeyCap("⇥") }

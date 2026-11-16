@@ -54,6 +54,12 @@ enum CommandRanking {
         let q = query.lowercased().trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return 0 }
         let t = title.lowercased()
+        // "Go to Mail" is the way into the Mail activity: an exact or prefix match on the activity's own
+        // name must beat agent-tool rows such as "Mail: List email accounts".
+        let isGoTo = t.hasPrefix("go to ")
+        let name = isGoTo ? String(t.dropFirst(6)) : t
+        if isGoTo, name == q { return 130 }
+        if isGoTo, name.hasPrefix(q) { return 110 }
         if t == q { return 120 }
         if t.hasPrefix(q) { return 100 }
         if t.split(separator: " ").contains(where: { $0.hasPrefix(q) }) { return 80 }

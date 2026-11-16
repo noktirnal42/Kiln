@@ -202,7 +202,9 @@ public struct NVIDIANIMProvider: ModelProvider {
     static func requestOptions(model: String, reasoning: ReasoningConfig?) -> [String: ProviderJSON] {
         guard model.hasPrefix("z-ai/glm-5.3") || model.hasSuffix("z-ai/glm-5.3-flash") || model.contains("z-ai/glm-5.3") else { return [:] }
         let effort: String
-        if reasoning?.enabled != true || reasoning?.depth == .minimal {
+        if let level = reasoning?.level, ["low", "high", "max"].contains(level) {
+            effort = level
+        } else if reasoning?.enabled != true || reasoning?.depth == .minimal {
             effort = "low"
         } else if reasoning?.depth == .balanced {
             effort = "high"

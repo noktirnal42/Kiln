@@ -412,7 +412,7 @@ private struct ModelsView: View {
         return HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(entry.name).font(.system(size: 13, weight: .semibold))
+                    Text(entry.name).font(ThemeRuntime.font(13, .semibold))
                     Text(entry.kind.title).font(.caption2).padding(.horizontal, 4).background(SSColor.surface, in: Capsule())
                     Text(entry.family.title).font(.caption2).foregroundStyle(.secondary)
                     if entry.gating != .open { Image(systemName: "lock").help("Needs a token and accepted terms") }

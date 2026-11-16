@@ -101,6 +101,7 @@ public enum LogLevel: String, Codable, Sendable {
 public enum CapabilityStatus: Sendable, Equatable {
     case available
     case unavailable(reason: String)
+    case notChecked
 
     public var isAvailable: Bool {
         if case .available = self { return true }

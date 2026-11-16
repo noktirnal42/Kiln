@@ -35,6 +35,22 @@ struct ChatSessionTests {
         #expect(session.attachments.map(\.url) == [file])
     }
 
+    @Test func dismissingTheBannerClearsTheError() async throws {
+        let (session, _, _) = try makeSession()
+        session.reportError("Something failed")
+        #expect(session.errorText == "Something failed")
+        session.dismissError()
+        #expect(session.errorText == nil)
+    }
+
+    @Test func resubmitOnlyAcceptsANonEmptyUserMessage() async throws {
+        let (session, _, _) = try makeSession()
+        await session.newConversation()
+        await session.resubmit(UUID(), text: "hello")
+        await session.resubmit(UUID(), text: "   ")
+        #expect(session.messages.isEmpty)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema([Conversation.self, Message.self, Artifact.self, ArtifactVersion.self])
         return try ModelContainer(

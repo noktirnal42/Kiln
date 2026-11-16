@@ -1,6 +1,6 @@
 # Kiln: instructions for coding agents
 
-Start with `docs/HANDOFF-CODEX-2026-11-10.md` (state, todo in priority order, how to build, test and check the UI, pitfalls), then `docs/LEFTOVERS-2026-11-10.md` and `docs/30-CHAT-MAPS-LAYOUT-PLAN.md`.
+Start with `docs/HANDOFF-CODEX-2026-11-12.md` (state, todo in priority order, how to build, test and check the UI, pitfalls), then `docs/LEFTOVERS-2026-11-12.md`, `docs/HANDOFF-MODEL-LIBRARY-2026-11-12.md` (the owner's next big feature) and `docs/30-CHAT-MAPS-LAYOUT-PLAN.md`. The 2026-11-10 handoff is older but its build and GUI-check advice still holds.
 
 - `project.yml` is the source of truth (XcodeGen); run `xcodegen generate` after adding files. `Kiln.xcodeproj` is generated and gitignored.
 - Never commit `Packages/ModelLabCore/Package.resolved`. Never read, print or enter API keys. Do not push or publish without the owner.

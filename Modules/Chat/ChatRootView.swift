@@ -68,11 +68,17 @@ struct ChatRootView: View {
             }
             Divider()
             if let error = session.errorText {
-                Text(error)
-                    .font(SSTypography.caption())
-                    .foregroundStyle(SSColor.danger)
-                    .padding(.horizontal, SSSpacing.m)
-                    .padding(.vertical, SSSpacing.xs)
+                HStack(alignment: .firstTextBaseline, spacing: SSSpacing.s) {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 11)).foregroundStyle(SSColor.danger)
+                    Text(error).font(SSTypography.caption()).foregroundStyle(SSColor.danger).textSelection(.enabled)
+                    Spacer(minLength: 0)
+                    Button { session.dismissError() } label: { Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)) }
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                        .help("Dismiss").accessibilityLabel("Dismiss this message")
+                }
+                .padding(.horizontal, SSSpacing.m)
+                .padding(.vertical, SSSpacing.xs)
+                .background(SSColor.danger.opacity(0.08))
                 Divider()
             }
             ComposerView(session: session, voice: voice, input: $session.composerText, onSend: send)
@@ -179,11 +185,11 @@ struct ChatHero: View {
         VStack(spacing: SSSpacing.s) {
             Image("KilnMark").resizable().scaledToFit().frame(width: 44, height: 44).opacity(0.9)
             if let root = session.workspaceRoot {
-                Text("What should we work on in ").font(.system(size: 24, weight: .light))
-                    + Text(URL(fileURLWithPath: root).lastPathComponent).font(.system(size: 24, weight: .medium)).foregroundColor(SSColor.accent)
-                    + Text("?").font(.system(size: 24, weight: .light))
+                Text("What should we work on in ").font(ThemeRuntime.font(24, .light))
+                    + Text(URL(fileURLWithPath: root).lastPathComponent).font(ThemeRuntime.font(24, .medium)).foregroundColor(SSColor.accent)
+                    + Text("?").font(ThemeRuntime.font(24, .light))
             } else {
-                Text("What should we work on?").font(.system(size: 24, weight: .light))
+                Text("What should we work on?").font(ThemeRuntime.font(24, .light))
             }
             Text(session.selectedModelID.isEmpty
                  ? "Pick a model below to begin."
@@ -221,6 +227,16 @@ struct ComposerView: View {
             }
             TodoCardView(session: session)
             ComposerContextRow(session: session)
+            if let steps = session.pausedAfterRounds, !session.isStreaming {
+                HStack {
+                    Text("Paused after \(steps) steps").font(SSTypography.caption()).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Keep going") { Task { await session.continuePausedRun() } }
+                        .controlSize(.small)
+                        .help("Continue in a new turn with the in-memory tool context. Approvals and budget limits still apply.")
+                }
+                .padding(.horizontal, SSSpacing.m).padding(.vertical, SSSpacing.xs)
+            }
             composer
             AgentModeBar(session: session).padding(.top, 2)
         }
@@ -309,7 +325,7 @@ struct ComposerView: View {
                         .padding(.horizontal, 8).padding(.top, 8).allowsHitTesting(false)
                 } else if input.isEmpty {
                     Text(placeholder)
-                        .foregroundStyle(.tertiary).font(.system(size: 13))
+                        .foregroundStyle(.tertiary).font(ThemeRuntime.font(13))
                         .padding(.horizontal, 8).padding(.top, 7).allowsHitTesting(false)
                 }
             }
@@ -337,11 +353,13 @@ struct ComposerView: View {
             Button("Attach files or folders…", systemImage: "paperclip") { attachFiles() }
             Button("Reference a project file (@)", systemImage: "at") { if !input.hasSuffix("@") { input += (input.isEmpty || input.hasSuffix(" ") ? "" : " ") + "@" } }
             Button("Slash commands (/)", systemImage: "slash.circle") { if input.isEmpty { input = "/" } }
+            Divider()
+            Button(session.memory.totalTokens > 0 ? "Memory files (\(session.memory.totalTokens.formatted()) tokens)…" : "Memory files…", systemImage: "brain") { session.requestedPane = .memory }
         } label: {
             Image(systemName: "plus").font(.system(size: 13, weight: .medium)).frame(width: 26, height: 26)
         }
         .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-        .help("Attach files, reference a file with @, or run a slash command. You can also drop files here.")
+        .help("Attach files, reference a file with @, run a slash command, or open the memory files (KILN.md, AGENTS.md, CLAUDE.md). You can also drop files here.")
         .accessibilityLabel("Add to message")
     }
 

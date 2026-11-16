@@ -12,7 +12,7 @@ struct TodoCardView: View {
                 Button { withAnimation(.easeOut(duration: 0.15)) { expanded.toggle() } } label: {
                     HStack(spacing: SSSpacing.s) {
                         Image(systemName: "checklist").font(.system(size: 11)).foregroundStyle(SSColor.accent)
-                        Text("Tasks").font(.system(size: 11, weight: .semibold))
+                        Text("Tasks").font(ThemeRuntime.font(11, .semibold))
                         Text(TodoBoard.summary(items)).font(SSTypography.caption()).foregroundStyle(.secondary).lineLimit(1)
                         Spacer(minLength: 0)
                         Image(systemName: expanded ? "chevron.down" : "chevron.right").font(.system(size: 9)).foregroundStyle(.tertiary)
@@ -27,7 +27,7 @@ struct TodoCardView: View {
                         ForEach(items) { item in
                             HStack(alignment: .firstTextBaseline, spacing: 6) {
                                 Image(systemName: symbol(item.status)).font(.system(size: 10)).foregroundStyle(tint(item.status))
-                                Text(item.content).font(.system(size: 12))
+                                Text(item.content).font(ThemeRuntime.font(12))
                                     .strikethrough(item.status == .completed)
                                     .foregroundStyle(item.status == .completed ? Color.secondary : Color.primary)
                                     .fontWeight(item.status == .in_progress ? .medium : .regular)
@@ -76,7 +76,7 @@ struct RunDiffCardView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(spacing: SSSpacing.s) {
                         Image(systemName: "plus.forwardslash.minus").font(.system(size: 11)).foregroundStyle(SSColor.accent)
-                        Text("Changed \(files.count) \(files.count == 1 ? "file" : "files")").font(.system(size: 12, weight: .semibold))
+                        Text("Changed \(files.count) \(files.count == 1 ? "file" : "files")").font(ThemeRuntime.font(12, .semibold))
                         Text("+\(files.reduce(0) { $0 + $1.additions })").font(.system(size: 11, design: .monospaced)).foregroundStyle(SSColor.success)
                         Text("−\(files.reduce(0) { $0 + $1.deletions })").font(.system(size: 11, design: .monospaced)).foregroundStyle(SSColor.danger)
                         Spacer()

@@ -8,10 +8,18 @@ struct MessageBubble: View {
     var isStreaming = false
     /// Live thinking text while a reasoning model is still working on its answer.
     var liveReasoning = ""
-    @AppStorage(RunSummaryStyle.key) private var summaryStyleRaw = RunSummaryStyle.sentences.rawValue
+    @AppStorage(ToolSummaryStyle.defaultsKey) private var summaryStyleRaw = ToolSummaryStyle.sentence.rawValue
     @State private var showReasoning = false
     @State private var hovering = false
+    @State private var editing = false
+    @State private var editText = ""
 
+    /// Time from the question to this saved reply; nil while streaming or when there is no question before it.
+    private var workedSeconds: TimeInterval? {
+        guard !isStreaming, let index = session.messages.firstIndex(where: { $0.id == message.id }),
+              let question = session.messages[..<index].last(where: { $0.role == .user }) else { return nil }
+        return message.createdAt.timeIntervalSince(question.createdAt)
+    }
     private var isUser: Bool { message.role == .user }
     private var reasoningText: String {
         isStreaming ? liveReasoning : (message.reasoning ?? "")
@@ -24,6 +32,9 @@ struct MessageBubble: View {
         .onHover { hovering = $0 }
         .contextMenu {
             Button("Copy") { copy() }
+            if message.role == .user {
+                Button("Edit and resend…") { beginEdit() }.disabled(session.isStreaming)
+            }
             Button("Fork from here") { Task { await session.fork(at: message.id) } }
             if message.role == .user {
                 Button("Rewind to here (restore files)") { Task { await session.rewind(to: message.id, restoreFiles: true) } }
@@ -40,12 +51,31 @@ struct MessageBubble: View {
     private var userBody: some View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack {
-                Spacer(minLength: 60)
+                Spacer(minLength: editing ? 0 : 60)
                 let parts = ContextExpander.split(message.content)
                 VStack(alignment: .trailing, spacing: 6) {
-                    Text(parts.visible)
-                        .font(.system(size: 14))
-                        .textSelection(.enabled)
+                    if editing {
+                        VStack(alignment: .trailing, spacing: 6) {
+                            TextEditor(text: $editText)
+                                .font(ThemeRuntime.font(14)).frame(maxWidth: .infinity, minHeight: 60, maxHeight: 180)
+                                .scrollContentBackground(.hidden)
+                                .padding(4).background(SSColor.surfaceRaised, in: RoundedRectangle(cornerRadius: 6))
+                                .accessibilityLabel("Edit message")
+                            HStack(spacing: 6) {
+                                Spacer(minLength: 0)
+                                Button("Cancel") { editing = false }.keyboardShortcut(.cancelAction)
+                                Button("Resend") { editing = false; Task { await session.resubmit(message.id, text: editText) } }
+                                    .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                                    .disabled(editText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }.controlSize(.small)
+                            Text("Resending removes the replies after this message. Files the agent changed stay as they are.")
+                                .font(SSTypography.caption()).foregroundStyle(.secondary).multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true)
+                        }
+                    } else {
+                        Text(parts.visible)
+                            .font(ThemeRuntime.font(14))
+                            .textSelection(.enabled)
+                    }
                     if !parts.attached.isEmpty {
                         HStack(spacing: 4) {
                             ForEach(parts.attached, id: \.self) { ComposerChip(symbol: "paperclip", title: $0, tint: SSColor.accent) }
@@ -68,9 +98,8 @@ struct MessageBubble: View {
             if !reasoningText.isEmpty { reasoningView }
 
             // Claude-style narrative: what the model said before each burst of tool calls, then that burst as one grey line.
-            if !isStreaming, summaryStyleRaw == RunSummaryStyle.workedFor.rawValue, !message.toolCalls.isEmpty {
-                WorkedForLine(message: message, seconds: session.workedDuration(for: message.id))
-            } else {
+            // "How long it worked" folds the whole run into one line (below the reply); "What it did" keeps the narrative.
+            if !(summaryStyleRaw == ToolSummaryStyle.worked.rawValue && !isStreaming) {
             ForEach(Array(message.segments.enumerated()), id: \.offset) { _, segment in
                 if !segment.text.isEmpty {
                     MarkdownBlockView(text: segment.text)
@@ -94,13 +123,35 @@ struct MessageBubble: View {
                 }
             }
 
+            if !isStreaming, !message.content.isEmpty {
+                let mentions = FileMentions.extract(from: message.content, root: session.workspaceRoot)
+                if !mentions.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(mentions) { mention in
+                            Button { session.fileOpenRequest = FileOpenRequest(path: mention.path, line: mention.line) } label: {
+                                Label(mention.line.map { "\(mention.name):\($0)" } ?? mention.name, systemImage: "doc.text")
+                                    .font(.system(size: 11.5, design: .monospaced)).lineLimit(1)
+                                    .padding(.horizontal, 7).padding(.vertical, 3)
+                                    .background(SSColor.surfaceRaised, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(SSColor.hairline))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Open \(mention.path) in the editor")
+                            .accessibilityLabel("Open \(mention.path) in the editor")
+                        }
+                    }
+                }
+            }
+
             if isStreaming { ThinkingDots(label: message.content.isEmpty && reasoningText.isEmpty ? "Working" : nil) }
 
-            // Calls no segment owns (replies saved before segments existed, or a stream still running).
-            let owned = Set(message.segments.flatMap(\.callIDs))
-            let loose = message.toolCalls.filter { !owned.contains($0.id) }
-            if !loose.isEmpty && (!isStreaming || message.segments.isEmpty) && !(summaryStyleRaw == RunSummaryStyle.workedFor.rawValue && !isStreaming) {
-                StoredToolRunView(calls: loose)
+            if summaryStyleRaw == ToolSummaryStyle.worked.rawValue && !isStreaming {
+                if !message.toolCalls.isEmpty { StoredToolRunView(calls: message.toolCalls, seconds: workedSeconds) }
+            } else {
+                // Calls no segment owns (replies saved before segments existed, or a stream still running).
+                let owned = Set(message.segments.flatMap(\.callIDs))
+                let loose = message.toolCalls.filter { !owned.contains($0.id) }
+                if !loose.isEmpty && (!isStreaming || message.segments.isEmpty) { StoredToolRunView(calls: loose) }
             }
 
             if !isStreaming { actionRow }
@@ -116,7 +167,7 @@ struct MessageBubble: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: open ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
-                    Text(isStreaming ? "Thinking…" : "Thought process").font(.system(size: 12))
+                    Text(isStreaming ? "Thinking…" : "Thought process").font(ThemeRuntime.font(12))
                 }
                 .foregroundStyle(.secondary)
             }
@@ -124,7 +175,7 @@ struct MessageBubble: View {
             if open {
                 ScrollView {
                     Text(reasoningText)
-                        .font(.system(size: 12))
+                        .font(ThemeRuntime.font(12))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -134,6 +185,11 @@ struct MessageBubble: View {
                 .overlay(alignment: .leading) { Rectangle().fill(Color.secondary.opacity(0.3)).frame(width: 2) }
             }
         }
+    }
+
+    private func beginEdit() {
+        editText = ContextExpander.split(message.content).visible
+        editing = true
     }
 
     // MARK: Actions
@@ -152,6 +208,9 @@ struct MessageBubble: View {
             }
             HStack(spacing: 2) {
                 actionButton("doc.on.doc", "Copy") { copy() }
+                if message.role == .user && !session.isStreaming {
+                    actionButton("pencil", "Edit and resend") { beginEdit() }
+                }
                 if message.role == .assistant {
                     actionButton("arrow.clockwise", "Regenerate") { Task { await session.regenerate() } }
                 }
@@ -159,7 +218,7 @@ struct MessageBubble: View {
                 actionButton("trash", "Delete message") { Task { await session.deleteMessage(message.id) } }
                 if message.role == .assistant {
                     Text(meta)
-                        .font(.system(size: 11))
+                        .font(ThemeRuntime.font(11))
                         .foregroundStyle(.tertiary)
                         .padding(.leading, 6)
                         .lineLimit(1)
@@ -227,7 +286,7 @@ struct ThinkingDots: View {
             if let label {
                 Text(waited > 60 ? "No answer after \(Int(waited)) s. The provider may be busy: Stop, then pick another model from the model menu."
                      : waited > 15 ? "Still waiting for the model to start responding" : label)
-                    .font(.system(size: 12)).foregroundStyle(waited > 60 ? SSColor.warning : .secondary)
+                    .font(ThemeRuntime.font(12)).foregroundStyle(waited > 60 ? SSColor.warning : .secondary)
             }
         }
     }
@@ -266,7 +325,7 @@ struct ToolCallTextNotice: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle").font(.system(size: 11)).foregroundStyle(SSColor.warning)
-                Text("This model wrote a tool call as text instead of making it, so nothing ran.").font(.system(size: 13))
+                Text("This model wrote a tool call as text instead of making it, so nothing ran.").font(ThemeRuntime.font(13))
                 Button(showing ? "Hide" : "Show text") { showing.toggle() }.buttonStyle(.borderless).font(SSTypography.caption())
                 Button("Try again", action: retry).buttonStyle(.borderless).font(SSTypography.caption())
             }
@@ -274,48 +333,6 @@ struct ToolCallTextNotice: View {
                 Text(text).font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary).textSelection(.enabled)
                     .padding(8).frame(maxWidth: .infinity, alignment: .leading)
                     .background(SSColor.surface, in: RoundedRectangle(cornerRadius: 6))
-            }
-        }
-    }
-}
-
-
-/// Codex's run line: "Worked for 27s ›", a hairline above the reply; expanded it shows the narrative and the tool lines.
-struct WorkedForLine: View {
-    let message: MessageSnapshot
-    let seconds: TimeInterval?
-    @State private var expanded = false
-
-    private var title: String { seconds.map(RunSummaryStyle.workedLabel(seconds:)) ?? "Worked" }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button { withAnimation(.easeOut(duration: 0.12)) { expanded.toggle() } } label: {
-                HStack(spacing: 8) {
-                    Rectangle().fill(SSColor.hairline).frame(height: 1)
-                    HStack(spacing: 4) {
-                        Text(title).font(SSTypography.caption())
-                        Image(systemName: expanded ? "chevron.down" : "chevron.right").font(.system(size: 9, weight: .semibold))
-                    }
-                    .foregroundStyle(.secondary).fixedSize()
-                    Rectangle().fill(SSColor.hairline).frame(height: 1)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(title). \(expanded ? "Hide" : "Show") the steps")
-            if expanded {
-                let owned = Set(message.segments.flatMap(\.callIDs))
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(message.segments.enumerated()), id: \.offset) { _, segment in
-                        if !segment.text.isEmpty { Text(segment.text).font(.system(size: 13)).foregroundStyle(.secondary).textSelection(.enabled) }
-                        let calls = message.toolCalls.filter { segment.callIDs.contains($0.id) }
-                        if !calls.isEmpty { StoredToolRunView(calls: calls) }
-                    }
-                    let loose = message.toolCalls.filter { !owned.contains($0.id) }
-                    if !loose.isEmpty { StoredToolRunView(calls: loose) }
-                }
-                .padding(.leading, 6)
             }
         }
     }

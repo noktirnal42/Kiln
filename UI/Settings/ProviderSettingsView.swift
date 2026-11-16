@@ -79,7 +79,8 @@ struct ProviderSettingsView: View {
     @State private var model = ProviderSettingsModel()
     @AppStorage("computerUse.enabled") private var computerUseEnabled = false
     @AppStorage("provider.firstChunkTimeout") private var firstChunkTimeout = 90.0
-    @AppStorage(RunSummaryStyle.key) private var runSummaryStyle = RunSummaryStyle.sentences.rawValue
+    @AppStorage(ToolSummaryStyle.defaultsKey) private var toolSummaryStyle = ToolSummaryStyle.sentence.rawValue
+    @AppStorage(SpotlightMode.defaultsKey) private var spotlightMode = SpotlightMode.off.rawValue
     /// Live: macOS can say "Kiln: on" for another copy of Kiln while this copy is not trusted, so show what this copy sees.
     @State private var accessibilityTrusted = AXIsProcessTrusted()
 
@@ -103,11 +104,20 @@ struct ProviderSettingsView: View {
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
-                    Picker("Finished runs in the thread", selection: $runSummaryStyle) {
-                        ForEach(RunSummaryStyle.allCases) { Text($0.label).tag($0.rawValue) }
+                    Picker("Search conversations in Spotlight", selection: $spotlightMode) {
+                        ForEach(SpotlightMode.allCases) { Text($0.label).tag($0.rawValue) }
                     }
-                    .pickerStyle(.menu).fixedSize()
-                    Text("Sentences keeps the agent's own words and shows each burst of tool calls as one grey line. Worked for … folds the whole run into one line above the reply.")
+                    .pickerStyle(.segmented).fixedSize()
+                    .onChange(of: spotlightMode) { _, _ in Task { await app.chatSession?.spotlight?.rebuild() } }
+                    Text("Off by default. Spotlight is shared by everyone who uses this Mac account. Titles only adds conversation names; Titles and text also adds what was said, with secrets removed first. Choosing Off removes everything Kiln added.")
+                        .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                    Picker("Finished steps in chat", selection: $toolSummaryStyle) {
+                        ForEach(ToolSummaryStyle.allCases) { Text($0.label).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented).fixedSize()
+                    Text("After a run, the steps fold into one line: what it did (\"Ran 2 commands and read 3 files\") or how long it worked (\"Worked for 42s\"). Click the line to see each step.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
@@ -116,6 +126,18 @@ struct ProviderSettingsView: View {
                     }
                     Text("Hosted models sometimes queue a request for a minute or more before answering. A request with no reply by then is reported as stalled instead of hanging.")
                         .font(SSTypography.caption()).foregroundStyle(.secondary)
+                }
+                if let session = app.chatSession {
+                    VStack(alignment: .leading, spacing: SSSpacing.xs) {
+                        Text("Agent step limits").font(SSTypography.headline())
+                        ForEach(session.agentProfiles, id: \.name) { profile in
+                            Stepper(value: Binding(get: { session.roundLimit(for: profile) }, set: { session.setRoundLimit($0, for: profile) }), in: AgentRoundLimits.allowed, step: 50) {
+                                Text("\(profile.name): \(session.roundLimit(for: profile)) steps")
+                            }
+                        }
+                        Text("Each run pauses at its profile's limit. Changes apply to the next run; approvals and budgets still apply.")
+                            .font(SSTypography.caption()).foregroundStyle(.secondary)
+                    }
                 }
                 VStack(alignment: .leading, spacing: SSSpacing.xs) {
                     Toggle("Computer use", isOn: $computerUseEnabled)
@@ -143,6 +165,9 @@ struct ProviderSettingsView: View {
                         Button("Relaunch Kiln") { Self.relaunch() }
                     }
                 }
+                ThemeSettingsCard()
+                NotificationSettingsCard()
+                QuickAskSettingsCard()
                 ModelStoreCard()
                 Divider()
                 AboutKilnView()

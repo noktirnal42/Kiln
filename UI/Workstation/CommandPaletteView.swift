@@ -7,6 +7,9 @@ struct CommandPaletteView: View {
 
     @State private var query = ""
     @State private var selection = 0
+    /// A row takes the highlight only when the pointer really moved, so a list that appears, reorders or scrolls
+    /// under a resting pointer cannot steal it from the top result.
+    @State private var pointer = PaletteHoverGate()
     @FocusState private var searchFocused: Bool
 
     private var results: [WorkstationCommand] { CommandRanking.rank(commands, query: query) }
@@ -17,7 +20,7 @@ struct CommandPaletteView: View {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Type a command or where to go…", text: $query)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15))
+                    .font(ThemeRuntime.font(15))
                     .focused($searchFocused)
                     .onSubmit { runSelected() }
                     .onKeyPress(.downArrow) { move(1); return .handled }
@@ -45,12 +48,15 @@ struct CommandPaletteView: View {
                                 Button { run(command) } label: { row(command, selected: index == selection) }
                                     .buttonStyle(.plain)
                                     .id(command.id)
-                                    .onHover { if $0 { selection = index } }
+                                    .onContinuousHover(coordinateSpace: .named("paletteList")) { phase in
+                                        if case .active(let point) = phase, pointer.pointerMoved(to: point) { selection = index }
+                                    }
                                     .accessibilityLabel("\(command.title). \(command.subtitle)")
                             }
                         }
                         .padding(SSSpacing.xs)
                     }
+                    .coordinateSpace(name: "paletteList")
                     .frame(maxHeight: 340)
                     .onChange(of: selection) { _, new in
                         if results.indices.contains(new) { proxy.scrollTo(results[new].id) }
@@ -98,5 +104,17 @@ struct CommandPaletteView: View {
     private func run(_ command: WorkstationCommand) {
         dismiss()
         command.run()
+    }
+}
+
+/// Decides whether a hover event means the pointer moved. The first event only records where the pointer is: a pointer
+/// already resting on the list when the palette opens must not take the highlight from the top result.
+struct PaletteHoverGate: Equatable {
+    private var last: CGPoint?
+
+    mutating func pointerMoved(to point: CGPoint) -> Bool {
+        defer { last = point }
+        guard let last else { return false }
+        return abs(last.x - point.x) > 0.5 || abs(last.y - point.y) > 0.5
     }
 }

@@ -81,7 +81,7 @@ struct WorkstationTests {
         let list = [
             command("fuzzy", "Take extra mini nail"),   // t-e-r-m-i-n-a-l as a scattered subsequence only
             command("substring", "Subterminal"),         // contains it, but not at a word start
-            command("word", "Go to Terminal"),           // a word starts with it
+            command("word", "Open Terminal"),            // a word starts with it
             command("prefix", "Terminal tools"),         // the title starts with it
             command("exact", "terminal"),
         ]
@@ -123,6 +123,52 @@ struct WorkstationTests {
 
     @Test func rankingIsCaseInsensitive() {
         #expect(CommandRanking.rank([command("a", "Go to Audit")], query: "AUDIT").count == 1)
+    }
+
+    @Test func goToAnActivityOutranksItsAgentToolsWhenTheNameIsTyped() {
+        let commands = [command("tool", "Mail: List email accounts"), command("mail", "Go to Mail"), command("notes", "Go to Notes")]
+        #expect(CommandRanking.rank(commands, query: "mail").first?.id == "mail")
+        #expect(CommandRanking.rank(commands, query: "mai").first?.id == "mail", "a prefix of the activity name also wins")
+        #expect(CommandRanking.rank(commands, query: "go to mail").first?.id == "mail")
+        #expect(CommandRanking.rank(commands, query: "list email").first?.id == "tool", "tool names still rank for their own words")
+    }
+
+    @Test func homeGroupsEveryActivityExactlyOnce() {
+        let all = Activity.allCases.filter { $0 != .home }
+        let sections = HomeSections.grouped(all)
+        let listed = sections.flatMap(\.activities)
+        #expect(Set(listed.map(\.id)) == Set(all.map(\.id)))
+        #expect(listed.count == all.count, "no activity appears twice")
+        #expect(sections.first?.title == "Work")
+        #expect(sections.first { $0.title == "Communication" }?.activities.map(\.id) == ["mail", "messages", "slack", "contacts", "calendar"])
+        #expect(sections.first { $0.title == "More" } == nil, "every registered activity has a home section today")
+    }
+
+    @Test func anUnlistedActivityStillAppearsUnderMore() {
+        let sections = HomeSections.grouped([Activity("mail"), Activity("brand-new")])
+        #expect(sections.map(\.title) == ["Communication", "More"])
+        #expect(sections.last?.activities.map(\.id) == ["brand-new"])
+    }
+
+    @Test func aPointerRestingOnThePaletteNeverStealsTheHighlight() {
+        var gate = PaletteHoverGate()
+        let first = gate.pointerMoved(to: CGPoint(x: 300, y: 250))
+        let repeated = gate.pointerMoved(to: CGPoint(x: 300, y: 250))
+        let jitter = gate.pointerMoved(to: CGPoint(x: 300.2, y: 250.3))
+        let moved = gate.pointerMoved(to: CGPoint(x: 300, y: 262))
+        let restingAgain = gate.pointerMoved(to: CGPoint(x: 300, y: 262))
+        #expect(!first, "the first event only records where the pointer is")
+        #expect(!repeated, "the list reordering under a resting pointer repeats the position")
+        #expect(!jitter, "sub-point jitter is not movement")
+        #expect(moved, "a real move selects the row under the pointer")
+        #expect(!restingAgain)
+    }
+
+    @Test func recentModelsThatAreNotOfferedNeverShow() {
+        let recents = ["stub-m1", "ollama-qwen3:8b", "ollama-cloud-gemma4:31b", "nvidia-nim-glm"]
+        #expect(ModelPickerRecents.visible(recents, selected: "nvidia-nim-glm", available: ["ollama-qwen3:8b", "nvidia-nim-glm"]) == ["ollama-qwen3:8b", "nvidia-nim-glm"])
+        #expect(ModelPickerRecents.visible(recents, selected: "stub-m1", available: []) == ["stub-m1"], "while loading, only the model in use shows")
+        #expect(ModelPickerRecents.visible([], selected: "x", available: ["x"]).isEmpty)
     }
 
     // MARK: Status

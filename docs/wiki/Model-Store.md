@@ -16,12 +16,12 @@ Where the store lives (internal or external drive) is up to you; models can be l
 - Agents can register a Hub repository (`lab_register_model`, downloads nothing) and remove a library entry (`lab_delete_model`, which never touches the cache). LoRA and distillation tools use only cached base models unless `allow_download` is passed.
 - LM Studio's own model folder and Ollama's model directory are not scanned. Ollama uses only what its running server knows.
 - Kiln never deletes the shared cache.
-- In the `codex/kiln-qa-completion` development branch, Lab's installed-model list can be filtered by name and estimated memory fit, and sorted by name or size. The estimate uses the model's stored size and the current Mac's hardware; it does not establish that an architecture or a particular context length will run.
+- Lab's installed-model list can be filtered by name and estimated memory fit, and sorted by name or size. The estimate uses the model's stored size and the current Mac's hardware; it does not establish that an architecture or a particular context length will run.
 
 ## Image models
 
-Image Studio includes an image-model catalog and downloader. A unified catalog for downloading and deleting both Ollama and MLX language models is planned; the existing Hugging Face language-model search registers references and does not itself download them.
+Image Studio includes an image-model catalog and downloader. The model picker has an "Add or remove local models…" sheet for Ollama (download by name, progress, cancel, remove; Ollama must be running), and the agent has `models_*` tools for the same with approval. Downloading MLX models and a unified catalog are still planned; the existing Hugging Face language-model search registers references and does not itself download them.
 
 ---
 
-**Verified status.** An unsandboxed live test on 2026-11-10 exercised MLX text, conversation history and tool-result continuation using a model on the drive. Native MLX tool-call generation and vision remain unverified and are not advertised by this provider. First-run store selection and scan performance on other Macs have not been checked in this pass.
+**Verified status.** The Ollama library sheet was seen on screen listing the installed models from a live local Ollama on 2026-11-13; a real download and removal have not been tried. An unsandboxed live test on 2026-11-10 exercised MLX text, conversation history and tool-result continuation using a model on the drive. Native MLX tool-call generation and vision remain unverified and are not advertised by this provider. First-run store selection and scan performance on other Macs have not been checked in this pass.

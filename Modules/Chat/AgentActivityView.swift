@@ -96,6 +96,9 @@ struct ToolRunSummaryView: View {
 /// Persisted tool calls (name and arguments only: results are not kept) under a reply, collapsed the same way.
 struct StoredToolRunView: View {
     let calls: [ToolCall]
+    /// How long the run took, when it is known (the gap between the question and the saved reply).
+    var seconds: TimeInterval?
+    @AppStorage(ToolSummaryStyle.defaultsKey) private var styleRaw = ToolSummaryStyle.sentence.rawValue
     @State private var expanded = false
 
     var body: some View {
@@ -114,7 +117,7 @@ struct StoredToolRunView: View {
                     ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
                         let title = ToolPhrase.title(name: call.name, argumentsJSON: call.arguments)
                         HStack(spacing: SSSpacing.xs) {
-                            Text(title.verb).font(.system(size: 12)).foregroundStyle(.secondary)
+                            Text(title.verb).font(ThemeRuntime.font(12)).foregroundStyle(.secondary)
                             Text(title.object).font(.system(size: 11.5, design: .monospaced)).foregroundStyle(.primary.opacity(0.85))
                                 .lineLimit(1).truncationMode(.middle)
                         }
@@ -126,7 +129,8 @@ struct StoredToolRunView: View {
     }
 
     private var line: String {
-        ToolActivitySummary.line(for: calls.map { ToolActivityItem(name: $0.name, argumentsJSON: $0.arguments) })
+        (ToolSummaryStyle(rawValue: styleRaw) ?? .sentence)
+            .line(for: calls.map { ToolActivityItem(name: $0.name, argumentsJSON: $0.arguments) }, seconds: seconds)
     }
 }
 
@@ -346,12 +350,36 @@ struct AgentModeBar: View {
                 Toggle(isOn: $session.planMode) { Label("Plan", systemImage: "list.bullet.clipboard") }
                     .toggleStyle(.button).controlSize(.small)
                     .help("Plan mode: the agent explores read-only, then proposes a plan you approve before anything changes (/plan)")
-                Picker("", selection: $session.agentProfileIndex) {
-                    ForEach(Array(session.agentProfiles.enumerated()), id: \.offset) { index, profile in
-                        Text(profile.name).tag(index)
+                Menu {
+                    Section("Agent profile") {
+                        ForEach(Array(session.agentProfiles.enumerated()), id: \.offset) { index, profile in
+                            Button { session.agentProfileIndex = index } label: {
+                                if session.agentProfileIndex == index { Label(profile.name, systemImage: "checkmark") } else { Text(profile.name) }
+                            }
+                        }
                     }
+                    if let profile = session.agentProfile {
+                        Menu("Step limit: \(session.roundLimit(for: profile))") {
+                            ForEach(AgentRoundLimits.presets, id: \.self) { limit in
+                                Button { session.setRoundLimit(limit, for: profile) } label: {
+                                    if session.roundLimit(for: profile) == limit { Label("\(limit) steps", systemImage: "checkmark") } else { Text("\(limit) steps") }
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.crop.rectangle").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text(session.agentProfile?.name ?? "Profile").font(ThemeRuntime.font(11)).lineLimit(1).truncationMode(.tail).frame(maxWidth: 110)
+                        Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(SSColor.surfaceRaised, in: Capsule())
                 }
-                .labelsHidden().controlSize(.small).frame(maxWidth: 150)
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .help(session.agentProfile.map { "Agent profile: \($0.name). Up to \(session.roundLimit(for: $0)) model rounds per run; changes apply to the next run." } ?? "Agent profile")
+                .accessibilityLabel("Agent profile and step limit")
                 PermissionModeMenu(center: ApprovalCenter.shared)
                 if session.workspaceRoot == nil {
                     Label("No project", systemImage: "folder.badge.questionmark")
@@ -361,15 +389,7 @@ struct AgentModeBar: View {
                 }
             }
             Spacer()
-            Button { showMemory = true } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "brain").font(.system(size: 10))
-                    if session.memory.totalTokens > 0 { Text(session.memory.totalTokens.formatted()).font(SSTypography.caption()).monospacedDigit() }
-                }
-            }
-            .buttonStyle(.borderless)
-            .help(session.memory.injected.isEmpty ? "Memory: no KILN.md, AGENTS.md or CLAUDE.md found. Click to create one." : "Memory files in use: \(session.memory.injected.map(\.name).joined(separator: ", ")) (\(session.memory.totalTokens.formatted()) tokens). Click to edit.")
-            .accessibilityLabel("Memory files")
+            ReasoningMenu(session: session)
             ContextMeterView(session: session)
         }
         .padding(.horizontal, SSSpacing.m)
@@ -407,7 +427,7 @@ struct PlanCardView: View {
         VStack(alignment: .leading, spacing: SSSpacing.s) {
             Label("Plan — nothing has been changed yet", systemImage: "list.bullet.clipboard").font(SSTypography.headline())
             if editing {
-                TextEditor(text: $draft).font(.system(size: 12)).frame(minHeight: 160, maxHeight: 320)
+                TextEditor(text: $draft).font(ThemeRuntime.font(12)).frame(minHeight: 160, maxHeight: 320)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.25)))
             } else if session.messages.last?.content != plan.text {
                 // The plan is normally the reply right above this card; it is repeated only when it is not.
@@ -438,8 +458,8 @@ struct LiveStatusLine: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             HStack(spacing: SSSpacing.xs) {
                 ProgressView().controlSize(.mini)
-                Text(status).font(.system(size: 12.5)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                if let since { Text(Self.elapsed(context.date.timeIntervalSince(since))).font(.system(size: 11)).monospacedDigit().foregroundStyle(.tertiary) }
+                Text(status).font(ThemeRuntime.font(12.5)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                if let since { Text(Self.elapsed(context.date.timeIntervalSince(since))).font(ThemeRuntime.font(11)).monospacedDigit().foregroundStyle(.tertiary) }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Working: \(status)")
@@ -447,7 +467,53 @@ struct LiveStatusLine: View {
     }
 
     static func elapsed(_ seconds: TimeInterval) -> String {
-        let total = max(0, Int(seconds))
-        return total < 60 ? "\(total)s" : "\(total / 60)m \(String(format: "%02d", total % 60))s"
+        ToolSummaryStyle.duration(seconds)
+    }
+}
+
+/// The brain button: the reasoning levels the selected model actually offers. A model that offers none shows it greyed out, with the reason.
+struct ReasoningMenu: View {
+    let session: ChatSession
+
+    private func title(_ selection: ReasoningSelection?, _ control: ReasoningControl) -> String? {
+        switch (control, selection) {
+        case (.toggle, .some(.off)): "Off"
+        case (.toggle, _): "On"
+        case (.levels(let levels), .some(.level(let id))): levels.first { $0.id == id }?.title
+        default: nil
+        }
+    }
+
+    var body: some View {
+        let control = session.reasoningControl
+        let selection = session.reasoningSelection
+        Menu {
+            switch control {
+            case .unavailable(let why):
+                Text(why)
+            case .toggle:
+                choice("Thinking on", selected: selection == .on) { session.setReasoning(.on) }
+                choice("Thinking off", selected: selection == .off) { session.setReasoning(.off) }
+            case .levels(let levels):
+                ForEach(levels) { level in
+                    choice(level.title, selected: selection == .level(level.id)) { session.setReasoning(.level(level.id)) }
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "brain").font(.system(size: 10))
+                if let text = title(selection, control) { Text(text).font(SSTypography.caption()) }
+            }
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .disabled(!control.isAvailable)
+        .help(control.isAvailable ? "Reasoning: \(control.explanation)" : "Reasoning: \(control.explanation)")
+        .accessibilityLabel("Reasoning")
+        .accessibilityValue(title(selection, control) ?? "Not available for this model")
+    }
+
+    @ViewBuilder
+    private func choice(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) { if selected { Label(text, systemImage: "checkmark") } else { Text(text) } }
     }
 }

@@ -28,6 +28,8 @@ public final class ModelLabModule: @preconcurrency Module, ModuleDefinition, Mod
     public private(set) var hardware = HardwareProfile.current()
     public private(set) var capabilityReports: [CapabilityReport] = []
     public private(set) var seededDemo = false
+    public private(set) var checkingMLX = false
+    @ObservationIgnored private var capabilityTask: Task<Void, Never>?
 
     // Lazy: the coordinators are @MainActor types, so they cannot be default-
     // initialized inside the module's nonisolated `init()` (required by
@@ -115,8 +117,44 @@ public final class ModelLabModule: @preconcurrency Module, ModuleDefinition, Mod
     }
 
     public func refreshCapabilities() {
+        capabilityTask?.cancel()
         capabilityReports = CapabilityDetector.detectAll()
         hardware = HardwareProfile.current()
+        capabilityTask = Task { [weak self] in
+            let result = await CapabilityDetector.checkNetwork()
+            guard !Task.isCancelled, let self else { return }
+            self.replaceCapability(result)
+        }
+    }
+
+    private func replaceCapability(_ report: CapabilityReport) {
+        guard let index = capabilityReports.firstIndex(where: { $0.name == report.name }) else { return }
+        capabilityReports[index] = report
+    }
+
+    /// Runs only a model already in the selected store; no model download is initiated.
+    public func testMLX() async {
+        guard !checkingMLX else { return }
+        checkingMLX = true
+        defer { checkingMLX = false }
+        let name = "MLX (local LLM inference)"
+        let models = await UniversalModelStore().installedOffPool()
+            .filter { InstalledModelCatalog.fit($0, hardware: hardware) == .estimatedFit }
+            .sorted { $0.totalBytes < $1.totalBytes }
+        guard let model = models.first else {
+            replaceCapability(CapabilityReport(name: name, status: .unavailable(reason: "No installed language model has a known memory estimate that fits this Mac. Choose a model store in Settings and install a compatible model."), detail: ""))
+            return
+        }
+        let engine = MLXInferenceProvider(modelDirectory: URL(fileURLWithPath: model.path))
+        do {
+            for try await piece in engine.streamConversation([ChatTurn(role: "user", text: "Reply with one word: ready")]) where !piece.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                replaceCapability(CapabilityReport(name: name, status: .available, detail: "Generated text using \(model.repoID). This checks text inference, not vision or tool calling."))
+                return
+            }
+            replaceCapability(CapabilityReport(name: name, status: .unavailable(reason: "\(model.repoID) produced no text."), detail: ""))
+        } catch {
+            replaceCapability(CapabilityReport(name: name, status: .unavailable(reason: "\(model.repoID) failed: \(error.localizedDescription)"), detail: ""))
+        }
     }
 
     /// On first run, seed the built-in sentiment demo so a fresh install has

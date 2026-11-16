@@ -39,7 +39,7 @@
       <a class="btn btn-ghost" href="https://github.com/noktirnal42/Kiln">View the source</a>
     </div>
     <p class="badges"><span>Notarized by Apple</span><span>Source-available</span><span>Apple silicon recommended</span></p>
-    <p class="fine">Version 0.1.1 preview for macOS 15 or later. Early software: read <a href="#status">what works and what does not</a> before you rely on it.</p>
+    <p class="fine">Version 0.1.1 preview for macOS 15 or later; the source on GitHub is far ahead of it (builds from source call themselves 0.2.0, the next preview, which is not released yet). Early software: read <a href="#status">what works and what does not</a> before you rely on it.</p>
   </div>
   <div class="stage">
     <div class="window main">
@@ -54,7 +54,7 @@
 
 <div class="strip">
   <ul aria-label="Facts about Kiln">
-    <li><strong>592</strong><span>automated tests pass on the Mac</span></li>
+    <li><strong>1,063</strong><span>automated tests pass on the Mac</span></li>
     <li><strong>3</strong><span>approval modes: Ask, Auto, Bypass</span></li>
     <li><strong>5</strong><span>model providers verified in live chat</span></li>
     <li><strong>Source-available</strong><span>source, notarized builds, public issues</span></li>
@@ -200,6 +200,44 @@
     <article class="card"><span class="chip ok">Working</span><h3>Browse</h3><p>A tabbed WebKit browser the agent can read and drive. Sign-in, autofill and passkeys are not verified.</p></article>
     <article class="card"><span class="chip ok">Working</span><h3>Run devices</h3><p>Boot iOS simulators and Android emulators, watch the screen, install and launch apps, read logs.</p></article>
     <article class="card"><span class="chip ok">Working</span><h3>Handle media</h3><p>View video, images and audio, speak text to a file and transcribe recordings. <a href="activities.html">Explore the activities</a> and <a href="agent.html">the agent&rsquo;s tools</a>.</p></article>
+  </div>
+  <div class="grid-3" style="margin-top:20px">
+    <article class="card"><span class="chip early">Development build</span><h3>Mail, messages and calendar</h3><p>Read and write email, texts and reminders from one window, with every send approved by you. Seen on screen only as far as empty states and permission screens (Calendar has read real events); not yet tried with a real mailbox or conversation.</p></article>
+    <article class="card"><span class="chip early">Development build</span><h3>Notes, drives and research</h3><p>Apple Notes, the cloud-drive folders on your Mac, PDFs and a citation library, with the agent able to search them. Not yet tried with real notes, folders or PDFs.</p></article>
+    <article class="card"><span class="chip ok">Working</span><h3>Context that lasts</h3><p>More than 200 tools are loaded only when the agent asks for them, so small and large context windows both leave room for the conversation, and the browser identifies as Safari so streaming sites accept it. Seen working with one hosted model; no cloud-gaming service has been tried yet.</p></article>
+  </div>
+</section>
+
+<section id="new" aria-labelledby="new-title">
+  <div class="section-head">
+    <p class="eyebrow">New on main</p>
+    <h2 id="new-title">Fresh from the workshop. <em>Not in the preview yet.</em></h2>
+    <p>These are built in the source and have been seen on screen where noted. The download above is the older preview, so build from source to try them.</p>
+  </div>
+  <div class="grid-3">
+    <article class="card">
+      <img src="assets/shots/maps-radar.jpg" width="940" height="692" alt="Kiln's Maps activity over Syracuse, New York with NOAA radar on: light echoes over the map, a play button and time scrubber, an opacity slider, a colour legend and the source line" style="width:100%;height:auto;border-radius:10px;margin-bottom:14px">
+      <span class="chip ok">Seen on screen</span><span class="chip early">US only</span>
+      <h3>Weather and radar</h3>
+      <p>A Radar button on Maps shows NOAA's radar for the contiguous United States with a two-hour loop, opacity and a legend. A Weather sheet gives a US forecast and alerts. Radar shows rain already falling, not a forecast, and official warnings decide safety.</p>
+    </article>
+    <article class="card">
+      <img src="assets/shots/theme-violet.jpg" width="752" height="554" alt="Kiln's chat window in the Violet theme with a serif font: purple accents and tinted panels" style="width:100%;height:auto;border-radius:10px;margin-bottom:14px">
+      <span class="chip ok">Seen on screen</span><span class="chip early">Light mode unchecked</span>
+      <h3>Themes of your own</h3>
+      <p>Seven built-in themes, and your own: colours for dark and light, a font design and a text size, saved on your Mac. Duplicate any theme in Settings to start.</p>
+    </article>
+    <article class="card">
+      <span class="chip ok">Built</span><span class="chip early">Partly seen</span>
+      <h3>And more</h3>
+      <ul>
+        <li>Download, track and remove Ollama models from the model picker, with approval-gated agent tools</li>
+        <li>An optional menu-bar quick-ask, <code>kiln://</code> links, a Services entry and a Share extension that never send by themselves</li>
+        <li>Run-finished notifications that respect Focus</li>
+        <li>A Slack activity with a token you create yourself</li>
+        <li>A calmer chat bar and reasoning options that follow each model</li>
+      </ul>
+    </article>
   </div>
 </section>
 

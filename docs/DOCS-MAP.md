@@ -14,6 +14,7 @@ Kiln's public documentation lives in four places. This page says which one is au
 | Apple capabilities, Private Cloud Compute, entitlements | [20-APPLE-CAPABILITIES.md](20-APPLE-CAPABILITIES.md) | Enabled capability is not a feature |
 | Devices, Ghidra, remote control | [16-DEVICES.md](16-DEVICES.md), [GHIDRA.md](GHIDRA.md), [14-REMOTE-CONTROL.md](14-REMOTE-CONTROL.md) | |
 | Clean-clone build and first contribution | [GETTING-STARTED.md](GETTING-STARTED.md) | |
+| Where to pick up the work (state, todo, pitfalls, what is unverified) | [HANDOFF-CODEX-2026-11-12.md](HANDOFF-CODEX-2026-11-12.md), [LEFTOVERS-2026-11-12.md](LEFTOVERS-2026-11-12.md), [HANDOFF-MODEL-LIBRARY-2026-11-12.md](HANDOFF-MODEL-LIBRARY-2026-11-12.md) | Handoffs are dated; the newest wins |
 | Signing, notarization, releases, CI | [RELEASING.md](RELEASING.md) | |
 | Which activities exist and their order and shortcuts | `Core/Registry/ActivityCatalog.swift` | The code is the source; docs follow it |
 | Vision and design intent | [00-MASTER-SPEC.md](00-MASTER-SPEC.md) and the numbered specs | Not completion claims |

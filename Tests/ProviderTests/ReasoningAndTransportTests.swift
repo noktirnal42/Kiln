@@ -54,6 +54,27 @@ struct ReasoningConfigTests {
 }
 
 struct OpenAICompatibleTransportTests {
+    @Test func imageMessagesEncodeAsOrderedContentParts() throws {
+        let image = ChatImage(data: Data([0, 1, 2]), mimeType: "image/png")
+        let request = ChatRequest(messages: [ChatMessage(role: .user, content: "describe", images: [image]), ChatMessage(role: .user, content: "plain")], model: "test")
+        let body = try OpenAICompatibleTransport.body(for: request, reasoning: nil)
+        let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let messages = try #require(json["messages"] as? [[String: Any]])
+        let parts = try #require(messages[0]["content"] as? [[String: Any]])
+        #expect(parts[0]["type"] as? String == "text")
+        #expect(parts[0]["text"] as? String == "describe")
+        let url = try #require(parts[1]["image_url"] as? [String: String])
+        #expect(parts[1]["type"] as? String == "image_url")
+        #expect(url["url"] == "data:image/png;base64,AAEC")
+        #expect(messages[1]["content"] as? String == "plain")
+    }
+
+    @Test func oldChatMessagesDecodeWithoutImages() throws {
+        let message = try JSONDecoder().decode(ChatMessage.self, from: Data(#"{"role":"user","content":"old"}"#.utf8))
+        #expect(message.images.isEmpty)
+        let withImage = ChatMessage(role: .user, content: "new", images: [ChatImage(data: Data([42]), mimeType: "image/jpeg")])
+        #expect(try JSONDecoder().decode(ChatMessage.self, from: JSONEncoder().encode(withImage)) == withImage)
+    }
     @Test func wireTimeoutAllowsTheEntireConfiguredFirstReplyWait() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [TimeoutEchoProtocol.self]

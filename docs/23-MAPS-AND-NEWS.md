@@ -1,6 +1,6 @@
 # Maps and News — development status
 
-This describes the development branch, not a published release. Verification is scoped below.
+This describes the current source on `main`, not a published release; the published preview predates Maps and News. Verification is scoped below.
 
 ## Maps
 
@@ -9,6 +9,10 @@ The Maps activity uses MapKit for an interactive map, Apple place search, Map, S
 **My Location** requests a one-shot Core Location update. macOS controls the location permission; the app does not grant itself access. The agent/MCP `maps_location` tool requests approval and reads only the last explicitly requested location, including its timestamp and accuracy. It does not trigger the OS permission prompt. Map search and routing send queries or coordinates to Apple; USGS layer and historical search send the viewed area to USGS. Agent and MCP actions use the same registry: `maps_viewport` and `maps_pins` (read), `maps_navigate`, `maps_set_layer`, `maps_add_pin`, `maps_remove_pin` and `maps_clear_route` (write), and `maps_location`, `maps_search_places`, `maps_search_historical`, `maps_directions` (execute/network or sensitive location, approval gated).
 
 **Evidence:** initial MapKit view rendered on screen. A USGS tile request and a separate historical product API query returned data. Registry, tool-permission and decoding tests cover the initial integration. The combined build showed Maps, News, the source directory, and the My Location control. On this Mac, a location request in an earlier running build without the hardened-runtime location entitlement returned a denied error. The entitlement is present in the rebuilt, signed Debug app; the old running process does not acquire newly signed entitlements until it restarts. After enabling Kiln in macOS Location Services and relaunching, a one-shot location update succeeded. The Directions sheet opened and a right-click pin was added and removed. Actual routing and agent/MCP tool calls still need end-to-end checks. The News directory opened and a live Apple Newsroom feed displayed entries on screen. Registry and MCP tool-list tests pass for both activities. No offline, routing accuracy or historical-overlay claim is made.
+
+### Radar layer (2026-11-12)
+
+Source: the NOAA National Weather Service MRMS base-reflectivity composite, WMS layer `conus_bref_qcd` at `opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows`, requested as 256-pixel PNG tiles in web mercator with a `time` value. The capabilities document lists fees "none" and access constraints "none"; no rate limit or service promise is published, so tiles are requested only while the layer is on and with a descriptive User-Agent. Coverage is the contiguous US; the layer lists about 60 frames, roughly two minutes apart over the last two hours. Frame handling: the capabilities document is read for discrete timestamps (ranges are not expanded; if only ranges are offered the layer says there are no frames). Honest states: loading, unreachable, no frames, outside coverage, stale after 20 minutes. Radar shows precipitation already falling, not a forecast; official warnings decide safety. Not used: RainViewer (free API stated as personal and educational use only, no availability guarantee, unclear 2026 limits). Tool: `maps_radar`. Code: `Core/Weather/RadarService.swift`, `Modules/Maps/RadarBar.swift`.
 
 ## News
 
