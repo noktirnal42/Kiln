@@ -5,6 +5,10 @@
 Read this first. It says what exists, how it was checked, how to build and ship it, and what is still open.
 Older docs describe the plan; this describes the app. Sections dated before 2026-11-12 are kept as the record of when a thing was verified; where they disagree with the section below, the section below wins.
 
+## State on 2026-11-15 (branch `codex/kiln-qa-completion`)
+
+Per-round narrative in the thread, thread pin/archive/rename/search and Maps GPX/route alternatives were added on top of `main` with unit tests (full suite green before merging main); the narrative was seen on screen with a local model before the merge, the rest was not seen. See `docs/LEFTOVERS-2026-11-10.md` for the exact list.
+
 ## State on 2026-11-12
 
 - **Branches.** Everything described here is merged to `main` (pull requests through #38; GitHub still lists #38 as closed because its merge call returned a 502, but its merge commit `4b647e8` is on `main`). The published preview, `v0.1.1` (2026-11-03), is far behind `main`. Builds from `main` report version **0.2.0 (3)** (`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml`, set when the 0.2 preview was prepared); no 0.2 release exists yet, so the version in Settings → About and the version of the download differ on purpose.

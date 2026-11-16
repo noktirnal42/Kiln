@@ -66,7 +66,8 @@ Task-list card, live status line, Shift+Return in the running app, drop of a fil
 
 ## Update 2026-11-15 (Claude, continuing on the same branch)
 
-- Done and committed with tests (see the last section of `docs/LEFTOVERS-2026-11-10.md`): step-limit setting with Keep going, per-round narrative and the Codex-style "Worked for" option, Maps (real GPX, alternatives with ETA, honest offline/flyover), thread pin/archive/rename/search.
-- Seen on screen later in the session: Shift+Return, the narrative lines, the live status line, "Worked for", the Settings picker (details and what is still unseen in the leftovers file). Still to check: the step-limit menu and Keep going card, sidebar pin/archive/rename, Maps Directions sheet. Run `pgrep -fl "Contents/MacOS/Kiln"` and confirm a real model before checking.
+- **Check `origin/main` before starting any todo item:** it gained 109 commits from other sessions after this handoff and already has the round-limit setting with Keep going, the "Worked for" summary style, file-name chips, edit-and-resend and image pixels. This branch was merged with it and its duplicates dropped.
+- This branch adds, with tests: per-round narrative between tool lines (seen on screen before the merge), Maps GPX import/export, route alternatives with ETA and honest offline/flyover tools, and thread pin/archive/rename/search. Details and what was seen are in the last section of `docs/LEFTOVERS-2026-11-10.md`.
+- Still to check on screen after the merge: the narrative in both summary styles, sidebar pin/archive/rename, the Maps Directions sheet. Run `pgrep -fl "Contents/MacOS/Kiln"` and confirm a real model first.
 - If a build fails with a SwiftSyntax module error, look for an empty `SourcePackages/prebuilts/swift-syntax/*/*MacroSupport/Modules` in the derived data folder (see the leftovers note).
-- Not started: the layout rework (item 4), Look Around and the place card, image pixels for vision models, steering a running agent.
+- Not started: the layout rework (item 4: Canvas, Swarm in chat, native menu bar and Help), Look Around and the place card, steering a running agent.

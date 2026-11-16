@@ -110,6 +110,8 @@ collections and share, then thread cards. Anything the table calls "not availabl
 
 ## 6. Owner todo, added 2026-11-10 (do these once the current chat slices are done)
 
+**Status 2026-11-15:** `origin/main` has since gained the round-limit setting with Keep going, the "Worked for" summary style, file-name chips, edit-and-resend, image pixels, themes and a toolbar with a Work menu. This branch adds per-round narrative, thread pin/archive/rename/search and Maps GPX/alternatives (see `LEFTOVERS-2026-11-10.md`). Still open: tables and math, the banner, the Canvas and Swarm-in-chat layout, Maps place card and Look Around, `@symbol/@page/@device`, steering, background runs, PR/CI flow, push-to-talk.
+
 Everything in the chat needs to be checked and verified against Claude and Codex, and missing features and functions implemented. Specific items:
 
 1. **Chat display and tool calls (first pass done 2026-11-10, see below).** The owner does not like how the thread and especially tool calls look; the ChatGPT, Codex and Claude desktop apps are much better.
