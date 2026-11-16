@@ -187,7 +187,6 @@ public final class ChatSession {
     /// The profile as a run uses it: its own prompt plus the memory files.
     func effectiveProfile(_ profile: AgentProfile) -> AgentProfile {
         var profile = profile
-        if let stored = RoundLimit.stored(profileName: profile.name, defaults: compactionDefaults) { profile.roundLimit = stored }
         profile.systemPrompt += memory.promptSection
         return profile
     }
@@ -197,34 +196,6 @@ public final class ChatSession {
         guard let index = messages.firstIndex(where: { $0.id == messageID }), index > 0,
               let prompt = messages[..<index].last(where: { $0.role == .user }) else { return nil }
         return max(0, messages[index].createdAt.timeIntervalSince(prompt.createdAt))
-    }
-
-    // MARK: Round limit ("Paused after N steps")
-    /// Bumped when the setting changes so views re-read it.
-    public private(set) var roundLimitRevision = 0
-    /// Steps taken by the last run when it paused at its limit; cleared by the next message.
-    public private(set) var pausedAfterRounds: Int?
-
-    /// The open profile's stored step limit: nil = default, 0 = no pause.
-    public var roundLimitSetting: Int? {
-        _ = roundLimitRevision
-        guard let profile = agentProfile else { return nil }
-        return RoundLimit.stored(profileName: profile.name, defaults: compactionDefaults) ?? profile.roundLimit
-    }
-
-    public func setRoundLimit(_ value: Int?) async {
-        guard let profile = agentProfile else { return }
-        RoundLimit.store(value, profileName: profile.name, defaults: compactionDefaults)
-        roundLimitRevision += 1
-        await platformAudit.record("agent.round_limit.changed", [
-            "profile": .string(profile.name), "steps": .int(value.map { RoundLimit.resolve($0) } ?? AgentOrchestrator.defaultRoundLimit), "unlimited": .bool(value == RoundLimit.unlimited),
-        ])
-    }
-
-    /// Resumes a run that paused at its step limit without typing anything.
-    public func keepGoing() async {
-        guard pausedAfterRounds != nil, !isStreaming else { return }
-        await send("Continue.")
     }
 
     // MARK: Verifier
@@ -950,7 +921,6 @@ public final class ChatSession {
         agentRound = 0
         runStartedAt = Date()
         agentNotice = nil
-        pausedAfterRounds = nil
         let root = workspaceRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
         let registry = registry
         let reasoning = reasoning
@@ -991,7 +961,7 @@ public final class ChatSession {
                     case .contextMeasured(let used, let window): self.contextUsage = ContextUsage(used: used, window: window)
                     case .contextCompacted(let compaction):
                         self.recordCompaction(compaction, conversationID: conversationID, promptIndex: promptIndex)
-                    case .finished(let summary): finalText = summary.finalText; tokens = summary.totalTokens; self.pausedAfterRounds = summary.pausedAfterRounds
+                    case .finished(let summary): finalText = summary.finalText; tokens = summary.totalTokens
                     case .awaitingApproval(let request):
                         self.setSessionState(.waitingForApproval, for: conversationID)
                         self.pendingApprovals += 1

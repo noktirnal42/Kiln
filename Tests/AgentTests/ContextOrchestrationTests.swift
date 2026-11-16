@@ -53,7 +53,7 @@ struct ContextOrchestrationTests {
         return (orchestrator, profile, workspace, watcher)
     }
 
-    private func run(_ o: AgentOrchestrator, _ p: AgentProfile, _ ws: URL, window: Int?, limit: Int? = 200, chat: RoundScript) async -> (events: [AgentEvent], error: Error?) {
+    private func run(_ o: AgentOrchestrator, _ p: AgentProfile, _ ws: URL, window: Int?, limit: Int = 200, chat: RoundScript) async -> (events: [AgentEvent], error: Error?) {
         var events: [AgentEvent] = []
         var caught: Error?
         do {
@@ -112,26 +112,7 @@ struct ContextOrchestrationTests {
         let summary = events.compactMap { e -> AgentRunSummary? in if case .finished(let s) = e { return s }; return nil }.first
         #expect(summary?.pausedAfterRounds == 3)
         #expect(summary?.rounds == 3)
-        #expect(summary?.finalText == AgentOrchestrator.pauseMessage(rounds: 3))
-    }
-
-    @Test func theProfilesOwnLimitApplies() async throws {
-        var (orchestrator, profile, ws, watcher) = try await setup()
-        defer { watcher.cancel(); try? FileManager.default.removeItem(at: ws) }
-        profile.roundLimit = 7
-        let (events, _) = await run(orchestrator, profile, ws, window: nil, limit: nil, chat: RoundScript(toolRounds: 100))
-        let summary = events.compactMap { e -> AgentRunSummary? in if case .finished(let s) = e { return s }; return nil }.first
-        #expect(summary?.pausedAfterRounds == 7)
-    }
-
-    @Test func zeroMeansNoPauseUntilTheModelFinishes() async throws {
-        var (orchestrator, profile, ws, watcher) = try await setup()
-        defer { watcher.cancel(); try? FileManager.default.removeItem(at: ws) }
-        profile.roundLimit = RoundLimit.unlimited
-        let (events, _) = await run(orchestrator, profile, ws, window: nil, limit: nil, chat: RoundScript(toolRounds: 230))
-        let summary = events.compactMap { e -> AgentRunSummary? in if case .finished(let s) = e { return s }; return nil }.first
-        #expect(summary?.pausedAfterRounds == nil)
-        #expect(summary?.finalText == "All done.")
+        #expect(summary?.finalText == "Paused after 3 steps; say continue to pick up where it left off.")
     }
 
     @Test func theDefaultLimitIsFarAboveTheOldFortyAndAFinishedRunIsNotPaused() async throws {

@@ -31,7 +31,6 @@ struct ChatRootView: View {
                                 .font(SSTypography.caption()).foregroundStyle(report.findings.isEmpty ? Color.secondary : SSColor.warning)
                         }
                         if let plan = session.pendingPlan, !session.isStreaming { PlanCardView(session: session, plan: plan) }
-                        if let steps = session.pausedAfterRounds, !session.isStreaming { PausedCardView(session: session, steps: steps) }
                         if session.isStreaming {
                             MessageBubble(
                                 session: session,
